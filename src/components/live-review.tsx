@@ -37,7 +37,6 @@ export function LiveReview({arquivoId,nome,titularPadrao,books,cats}:{
   const [fields,setFields]=useState<LiveFields>({});
   const [stage,setStage]=useState("aguardando");
   const [error,setError]=useState("");
-  const [updated,setUpdated]=useState(0);
   useEffect(()=>{
     let alive=true;
     let inFlight=false;
@@ -53,8 +52,8 @@ export function LiveReview({arquivoId,nome,titularPadrao,books,cats}:{
         if(!alive)return;
         setStage(row.progresso_etapa||row.status);
         setFields(old=>({...old,...(row.progresso_dados||{})}));
-        setUpdated(n=>n+1);
         if(row.status==="erro")setError(row.erro||"Falha ao processar o arquivo.");
+        else setError("");
         if(row.status==="pronto"){
           if(row.propostas>0)router.refresh();
           else setError("A leitura terminou, mas não foi criada uma proposta para conferência.");
