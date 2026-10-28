@@ -33,11 +33,13 @@ function localPath(key: string): string {
 }
 
 async function directoryBytes(dir: string): Promise<number> {
-  let total = 0;
+  // Conta blocos reais alocados, inclusive metadados dos diretórios.
+  const directory = await stat(dir);
+  let total = directory.blocks * 512;
   for (const entry of await readdir(dir, { withFileTypes: true })) {
     const full = join(dir, entry.name);
     if (entry.isDirectory()) total += await directoryBytes(full);
-    else if (entry.isFile()) total += (await stat(full)).size;
+    else if (entry.isFile()) total += (await stat(full)).blocks * 512;
     else throw new Error("Entrada inesperada no armazenamento: " + entry.name);
   }
   return total;
@@ -74,12 +76,13 @@ export async function writeCompressedOriginal(key: string, compressed: Buffer): 
     return;
   }
   const used = await physicalStorageBytes();
-  if (used + compressed.length > STORAGE_LIMIT_BYTES) {
+  const disk = await statfs(ROOT);
+  const allocated = Math.ceil(compressed.length / disk.bsize) * disk.bsize;
+  if (used + allocated > STORAGE_LIMIT_BYTES) {
     throw new StorageFullError("Limite de 20 GB dos documentos atingido. Solicite ao administrador a liberação de espaço antes de importar mais.");
   }
-  const disk = await statfs(ROOT);
   const free = disk.bavail * disk.bsize;
-  if (free < compressed.length + FREE_DISK_RESERVE_BYTES) {
+  if (free < allocated + FREE_DISK_RESERVE_BYTES) {
     throw new StorageFullError("Espaço livre insuficiente na VPS. O sistema preserva 2 GB livres para os demais aplicativos.");
   }
   await writeFile(full, compressed, { flag: "wx", mode: 0o600 });
