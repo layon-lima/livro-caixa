@@ -7,7 +7,8 @@ import { LoaderCircle, ExternalLink } from "lucide-react";
 type LiveFields={
   titulo?:string;documento_tipo?:string;titular_id?:string;categoria?:string;
   competencia?:string;tipo?:string;valor?:string;contraparte?:string;
-  referencia?:string;descricao?:string;
+  referencia?:string;descricao?:string;titular_sugerido?:string;
+  consulta_empresa?:{cnpj?:string;razao_social?:string;nome_fantasia?:string;atividade?:string;fonte?:string};
 };
 type FileState={
   id:string;nome_original:string;status:string;erro:string|null;
@@ -21,7 +22,8 @@ const stages:Record<string,string>={
   ia:"Interpretando com a IA Central…",
   xml:"Interpretando o XML…",
   pronto:"Leitura concluída. Abrindo conferência…",
-  erro:"Não foi possível concluir a leitura"
+  erro:"Não foi possível concluir a leitura",
+  pesquisando:"Consultando dados públicos do recebedor…"
 };
 function currency(raw:string|undefined){
   if(!raw)return "Identificando…";
@@ -30,8 +32,8 @@ function currency(raw:string|undefined){
   return Number.isFinite(parsed)?parsed.toLocaleString("pt-BR",{style:"currency",currency:"BRL"}):raw;
 }
 
-export function LiveReview({arquivoId,nome,titularPadrao,books,cats}:{
-  arquivoId:string;nome:string;titularPadrao:string;books:Book[];cats:Category[];
+export function LiveReview({arquivoId,nome,titularPadrao,books,cats,isAdmin}:{
+  arquivoId:string;nome:string;titularPadrao:string;books:Book[];cats:Category[];isAdmin:boolean;
 }){
   const router=useRouter();
   const [fields,setFields]=useState<LiveFields>({});
@@ -94,6 +96,24 @@ export function LiveReview({arquivoId,nome,titularPadrao,books,cats}:{
       <div><span>Valor</span><strong>{currency(fields.valor)}</strong></div>
       <div><span>Contraparte</span><strong>{fields.contraparte||"Identificando…"}</strong></div>
     </section>
+    {(fields.titular_sugerido||fields.consulta_empresa||fields.contraparte)&&<section className="review-enrichment">
+      {fields.titular_sugerido&&<div className="enrichment-line">
+        <strong>Possível titular novo</strong><span>{fields.titular_sugerido}</span>
+        <small>Cadastro sujeito à conferência. Nenhum livro será criado automaticamente.</small>
+        {isAdmin&&<a href={"/admin?sugerir_titular="+encodeURIComponent(fields.titular_sugerido)} className="flat-button">Conferir e cadastrar</a>}
+      </div>}
+      {fields.consulta_empresa&&<div className="enrichment-line">
+        <strong>Dados públicos do recebedor</strong>
+        <span>{fields.consulta_empresa.razao_social||fields.contraparte}</span>
+        <small>CNPJ: {fields.consulta_empresa.cnpj}</small>
+        {fields.consulta_empresa.atividade&&<small>CNAE: {fields.consulta_empresa.atividade}</small>}
+        <small>Fonte: BrasilAPI. Atividade não é comprovação do tipo de despesa.</small>
+      </div>}
+      {fields.contraparte&&<div className="enrichment-line">
+        <a href={"https://www.google.com/search?q="+encodeURIComponent(fields.contraparte)}
+          target="_blank" rel="noopener noreferrer" className="flat-button">Pesquisar recebedor na internet <ExternalLink size={13}/></a>
+      </div>}
+    </section>}
     <div className="review-form review-live-fields">
       <div className="review-fields-grid">
         <label className="review-span-all">Título da operação
