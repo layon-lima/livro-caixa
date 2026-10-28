@@ -88,7 +88,18 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
           </div>}
           {!selected.duplicada_de && <form action={"/api/propostas/"+selected.id+"/revisar"} method="post" className="review-form">
             {batch&&<input type="hidden" name="arquivos" value={batch.join(",")}/>}
-            <div className="form-inline-two">
+            <section className="review-auto-summary">
+              <div><span>Documento</span><strong>{selected.documento_tipo}</strong></div>
+              <div><span>Titular</span><strong>{selected.nome_titular}</strong></div>
+              <div><span>Categoria</span><strong>{cats.find(c=>c.id===selected.categoria_id)?.nome||"Não identificada"}</strong></div>
+              <div><span>Competência</span><strong>{selected.competencia.slice(0,7)}</strong></div>
+              <div><span>Valor</span><strong>{selected.valor?Number(selected.valor).toLocaleString("pt-BR",{style:"currency",currency:"BRL"}):"Não identificado"}</strong></div>
+              <div><span>Contraparte</span><strong>{selected.contraparte||"Não identificada"}</strong></div>
+              {selected.operacao_sugerida_id&&<div><span>Vinculação</span><strong>Operação relacionada #{selected.operacao_sugerida_id}</strong></div>}
+            </section>
+            <details className="review-edit-data" open={selected.metodo_leitura==="local" || (selected.avisos?.length??0)>1}>
+              <summary>Corrigir informações sugeridas</summary>
+              <div className="form-inline-two">
               <label>Titular
                 <select name="titularId" defaultValue={selected.titular_id} required>
                   {books.map(b=><option key={b.id} value={b.id}>{b.nome}</option>)}
@@ -134,6 +145,7 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
               </select>
             </label>
             {selected.operacao_sugerida_id&&<p className="muted">Foi encontrada uma possível operação relacionada. Confirme a escolha acima antes de salvar.</p>}
+            </details>
             <div className="review-approval-actions">
               <button type="submit" name="acao" value="aprovar" className="primary-btn">Aprovar e organizar documento</button>
               <button type="submit" name="acao" value="salvar" className="flat-button">Salvar para depois</button>
