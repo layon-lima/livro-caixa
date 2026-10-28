@@ -46,15 +46,16 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
         {query.aprovados&&<p className="form-success">{query.aprovados} proposta(s) aprovada(s).</p>}
         <form method="post" action="/api/propostas/aprovar">
           {batch&&<input type="hidden" name="arquivos" value={batch.join(",")}/>}
-          <div className="file-columns review-columns"><div>Documento</div><div>Titular</div><div>Revisão</div></div>
           {all.map(p=><div key={p.id} className={"review-row"+(selected?.id===p.id?" selected":"")}>
             <label className="review-check" title={p.revisada_em?"Selecionar para aprovação":"Confira antes de aprovar"}>
               <input type="checkbox" name="ids" value={p.id} disabled={!p.revisada_em || !!p.duplicada_de}/>
             </label>
             <Link href={"/conferencia?"+batchQuery+"id="+p.id} className="review-row-link">
-              <span className="ellipsis"><FileText size={14}/>{p.titulo}</span>
-              <small>{p.nome_titular}</small>
-              <small>{p.duplicada_de?"Duplicado":p.revisada_em?"Conferido":"Pendente"}</small>
+              <span className="review-row-title"><FileText size={14}/><span title={p.titulo}>{p.titulo}</span></span>
+              <span className="review-row-meta">
+                <span title={p.nome_titular}>{p.nome_titular}</span>
+                <span>{p.duplicada_de?"Duplicado":p.revisada_em?"Conferido":"Pendente"}</span>
+              </span>
             </Link>
           </div>)}
           {all.length===0&&<p className="empty-info">Nenhuma proposta aguardando aprovação.</p>}
@@ -73,13 +74,6 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
             {selected.confianca&&<span>Indicador aproximado de extração: {Math.round(Number(selected.confianca)*100)}%</span>}
             {selected.pagina_inicial&&<span>Páginas: {selected.pagina_inicial}{selected.pagina_final&&selected.pagina_final!==selected.pagina_inicial?"–"+selected.pagina_final:""}</span>}
           </div>
-          {selected.avisos?.length>0&&<div className="review-notices">
-            <strong>Verificar antes de aprovar</strong>
-            <ul>{selected.avisos.map((notice,i)=><li key={i}>{notice}</li>)}</ul>
-          </div>}
-          <div className="review-preview">
-            <iframe title="Arquivo original" src={"/api/documentos/"+selected.arquivo_id}/>
-          </div>
           {selected.duplicada_de && <div className="duplicate-alert">
             <strong>Duplicidade confirmada — proposta #{selected.duplicada_de}</strong>
             <span>Este documento não poderá ser aprovado novamente.</span>
@@ -97,53 +91,63 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
               <div><span>Contraparte</span><strong>{selected.contraparte||"Não identificada"}</strong></div>
               {selected.operacao_sugerida_id&&<div><span>Vinculação</span><strong>Operação relacionada #{selected.operacao_sugerida_id}</strong></div>}
             </section>
+            {selected.avisos?.length>0&&<details className="review-notices">
+              <summary>{selected.avisos.length} ponto(s) para conferir <span>Ver detalhes</span></summary>
+              <ul>{selected.avisos.map((notice,i)=><li key={i}>{notice}</li>)}</ul>
+            </details>}
             <details className="review-edit-data" open={(selected.avisos?.length??0)>1}>
               <summary>Corrigir informações sugeridas</summary>
-              <div className="form-inline-two">
-              <label>Titular
-                <select name="titularId" defaultValue={selected.titular_id} required>
-                  {books.map(b=><option key={b.id} value={b.id}>{b.nome}</option>)}
-                </select>
-              </label>
-              <label>Competência {selected.competencia_estimada&&<em>(estimada)</em>}
-                <input name="competencia" type="month" defaultValue={selected.competencia.slice(0,7)} required/>
-              </label>
-            </div>
-            <label>Título da operação <input name="titulo" defaultValue={selected.titulo} required maxLength={170}/></label>
-            <div className="form-inline-two">
-              <label>Categoria
-                <select name="categoriaId" defaultValue={selected.categoria_id||""}>
-                  <option value="">Sem categoria</option>
-                  {cats.map(c=><option value={c.id} key={c.id}>{c.nome}{c.subcategoria?" → "+c.subcategoria:""}</option>)}
-                </select>
-              </label>
-              <label>Documento
-                <select name="documentoTipo" defaultValue={selected.documento_tipo}>
-                  {Array.from(new Set(["nota fiscal","boleto","comprovante","recibo","outro",selected.documento_tipo])).map(c=><option key={c}>{c}</option>)}
-                </select>
-              </label>
-            </div>
-            <div className="form-inline-two">
-              <label>Tipo
-                <select name="tipo" defaultValue={selected.tipo}>
-                  <option value="despesa">Despesa</option><option value="receita">Receita</option><option value="outro">Outro</option>
-                </select>
-              </label>
-              <label>Valor (informativo)<input name="valor" inputMode="decimal" defaultValue={selected.valor||""}/></label>
-            </div>
-            <div className="form-inline-two">
-              <label>Fornecedor / contraparte<input name="contraparte" defaultValue={selected.contraparte}/></label>
-              <label>Nº ou referência<input name="referencia" defaultValue={selected.referencia}/></label>
-            </div>
-            <label>Descrição<textarea name="descricao" defaultValue={selected.descricao} rows={2}/></label>
-            <label>Vinculação com operação existente
-              <select name="operacaoId" defaultValue={selected.operacao_sugerida_id||""}>
-                <option value="">Criar nova operação</option>
-                {available?.rows.map(o=><option key={o.id} value={o.id}>
-                  {o.id===selected.operacao_sugerida_id?"Sugestão: ":""}#{o.id} — {o.titulo}
-                </option>)}
-              </select>
-            </label>
+              <div className="review-fields-grid">
+                <label className="review-span-all">Título da operação
+                  <input name="titulo" defaultValue={selected.titulo} required maxLength={170}/>
+                </label>
+                <label>Titular
+                  <select name="titularId" defaultValue={selected.titular_id} required>
+                    {books.map(b=><option key={b.id} value={b.id}>{b.nome}</option>)}
+                  </select>
+                </label>
+                <label>Categoria
+                  <select name="categoriaId" defaultValue={selected.categoria_id||""}>
+                    <option value="">Sem categoria</option>
+                    {cats.map(c=><option value={c.id} key={c.id}>{c.nome}{c.subcategoria?" → "+c.subcategoria:""}</option>)}
+                  </select>
+                </label>
+                <label>Competência {selected.competencia_estimada&&<em>(estimada)</em>}
+                  <input name="competencia" type="month" defaultValue={selected.competencia.slice(0,7)} required/>
+                </label>
+                <label>Documento
+                  <select name="documentoTipo" defaultValue={selected.documento_tipo}>
+                    {Array.from(new Set(["nota fiscal","boleto","comprovante","recibo","tributo","contrato","outro",selected.documento_tipo])).map(c=><option key={c}>{c}</option>)}
+                  </select>
+                </label>
+                <label>Tipo
+                  <select name="tipo" defaultValue={selected.tipo}>
+                    <option value="despesa">Despesa</option>
+                    <option value="receita">Receita</option>
+                    <option value="outro">Outro</option>
+                  </select>
+                </label>
+                <label>Valor (informativo)
+                  <input name="valor" inputMode="decimal" defaultValue={selected.valor||""}/>
+                </label>
+                <label>Fornecedor / contraparte
+                  <input name="contraparte" defaultValue={selected.contraparte}/>
+                </label>
+                <label>Nº ou referência
+                  <input name="referencia" defaultValue={selected.referencia}/>
+                </label>
+                <label className="review-span-half">Descrição
+                  <textarea name="descricao" defaultValue={selected.descricao} rows={2}/>
+                </label>
+                <label className="review-span-half">Vinculação com operação existente
+                  <select name="operacaoId" defaultValue={selected.operacao_sugerida_id||""}>
+                    <option value="">Criar nova operação</option>
+                    {available?.rows.map(o=><option key={o.id} value={o.id}>
+                      {o.id===selected.operacao_sugerida_id?"Sugestão: ":""}#{o.id} — {o.titulo}
+                    </option>)}
+                  </select>
+                </label>
+              </div>
             {selected.operacao_sugerida_id&&<p className="muted">Foi encontrada uma possível operação relacionada. Confirme a escolha acima antes de salvar.</p>}
             </details>
             <div className="review-approval-actions">
