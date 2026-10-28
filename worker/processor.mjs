@@ -140,13 +140,35 @@ async function processFile(file){
     let aiNotice="";
     let items=output.xml||parseLocalDocument(output.text,file.nome_original,file.mime);
     if(!items.length)throw Error("Não foi possível identificar documentos no arquivo.");
+    // Primeira etapa: já mostrar no formulário os dados descobertos pelo OCR.
+    const first=items[0];
+    const dateInitial=competence(first.competencia);
+    const matchingOwner=recognizedOwner(output.text,allowedBooks);
+    const initialFields={
+      titulo:short(first.titulo,170),documento_tipo:short(first.documento_tipo,50),
+      contraparte:short(first.contraparte,150),competencia:dateInitial.estimated?"":dateInitial.date.slice(0,7),
+      categoria:short(first.categoria,120),tipo:short(first.tipo,15),
+      descricao:short(first.descricao,600),valor:short(first.valor,40),
+      referencia:short(first.referencia,100),
+      ...(matchingOwner?{titular_id:String(matchingOwner.id)}:{})
+    };
+    await db.query(
+      "UPDATE arquivos SET progresso_etapa=$2,progresso_dados=$3::jsonb,atualizado_em=now() WHERE id=$1",
+      [file.id,output.xml?"xml":"ocr",JSON.stringify(initialFields)]
+    );
     if(method==="local" && process.env.OLLAMA_URL){
       try{
         const labels=cats.map(x=>x.nome+(x.subcategoria?" > "+x.subcategoria:""));
         const maxPages=Number(output.text.match(/^PÁGINA \d+ DE (\d+)/m)?.[1]||1);
+        await db.query("UPDATE arquivos SET progresso_etapa='ia',atualizado_em=now() WHERE id=$1",[file.id]);
         const fromOllama=await analyzeWithOllama({
           text:output.text,filename:file.nome_original,categories:labels,
-          owners:allowedBooks,maxPages
+          owners:allowedBooks,maxPages,
+          onPartial:async fields=>{
+            if(!Object.keys(fields).length)return;
+            await db.query("UPDATE arquivos SET progresso_dados=progresso_dados || $2::jsonb,atualizado_em=now() WHERE id=$1",
+              [file.id,JSON.stringify(fields)]);
+          }
         });
         if(fromOllama?.length){items=fromOllama;method="ia";}
         else {
@@ -252,7 +274,7 @@ async function processFile(file){
         );
       }
       await connection.query(
-        "UPDATE arquivos SET status='pronto',texto_extraido=$2,erro=NULL,atualizado_em=now() WHERE id=$1",
+        "UPDATE arquivos SET status='pronto',progresso_etapa='pronto',texto_extraido=$2,erro=NULL,atualizado_em=now() WHERE id=$1",
         [file.id,output.text.slice(0,1500000)]
       );
       await connection.query("COMMIT");
@@ -271,7 +293,7 @@ async function claim(){
       "(status='processando' AND atualizado_em < now() - interval '30 minutes') "+
       "ORDER BY id FOR UPDATE SKIP LOCKED LIMIT 1");
     if(!r.rows[0]){await c.query("COMMIT");return null;}
-    await c.query("UPDATE arquivos SET status='processando',atualizado_em=now() WHERE id=$1",[r.rows[0].id]);
+    await c.query("UPDATE arquivos SET status='processando',progresso_etapa='ocr',progresso_dados='{}'::jsonb,atualizado_em=now() WHERE id=$1",[r.rows[0].id]);
     await c.query("COMMIT");return r.rows[0];
   }catch(e){await c.query("ROLLBACK");throw e;}finally{c.release();}
 }
@@ -283,7 +305,7 @@ for(;;) {
     try{await processFile(file);}
     catch(e){
       console.error("Falha OCR",file.id,e);
-      await db.query("UPDATE arquivos SET status='erro',erro=$2,atualizado_em=now() WHERE id=$1",[file.id,String(e).slice(0,600)]);
+      await db.query("UPDATE arquivos SET status='erro',progresso_etapa='erro',erro=$2,atualizado_em=now() WHERE id=$1",[file.id,String(e).slice(0,600)]);
     }
   }catch(e){console.error("Worker indisponível",e);await sleep(8000);}
 }
