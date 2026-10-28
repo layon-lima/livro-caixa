@@ -58,7 +58,39 @@ export function parseOllamaOutput(raw, {text,categories,owners,maxPages=1}) {
   return entries.length?entries:null;
 }
 
-export async function analyzeWithOllama({text,filename,categories,owners,maxPages}){
+// A resposta JSON chega em fragmentos. Publicar somente strings já fechadas,
+// apenas do primeiro item (PDFs com vários documentos usam a conferência final).
+export function partialOllamaFields(buffer,{categories,owners,text}){
+  const index=buffer.search(/"itens"\s*:\s*\[\s*\{/);
+  if(index<0)return {};
+  const block=buffer.slice(index).split(/\}\s*,\s*\{/)[0].slice(0,16000);
+  const allowed=new Set(["titulo","documento_tipo","contraparte","competencia","categoria",
+    "tipo","descricao","valor","referencia","titular_id"]);
+  const result={};
+  const regex=/"([a-z_]+)"\s*:\s*("(?:\\.|[^"\\])*")/g;
+  let match;
+  while((match=regex.exec(block))){
+    const key=match[1];
+    if(!allowed.has(key))continue;
+    let value;
+    try { value=JSON.parse(match[2]); }catch{continue;}
+    if(typeof value!=="string")continue;
+    value=value.trim().slice(0,key==="descricao"?600:170);
+    if(!value)continue;
+    if(key==="categoria"&&!categories.includes(value))continue;
+    if(key==="titular_id"){
+      const owner=owners.find(x=>String(x.id)===value);
+      if(!owner||!norm(text).includes(norm(owner.nome)))continue;
+    }
+    if(key==="competencia"&&!/^20\d{2}-(0[1-9]|1[0-2])$/.test(value))continue;
+    if(key==="tipo"&&!["despesa","receita","outro"].includes(value))continue;
+    if(key==="valor"&&!/^\d{1,3}(?:\.\d{3})*,\d{2}$|^\d{1,12}(?:[.,]\d{1,2})?$/.test(value))continue;
+    result[key]=value;
+  }
+  return result;
+}
+
+export async function analyzeWithOllama({text,filename,categories,owners,maxPages,onPartial}){
   const base=process.env.OLLAMA_URL;
   if(!base)return null;
   const model=process.env.OLLAMA_MODEL||"qwen3-vl:2b-instruct";
@@ -78,7 +110,8 @@ export async function analyzeWithOllama({text,filename,categories,owners,maxPage
     "Avisos é lista de dúvidas objetivas (máximo 5); confianca entre 0 e 1, sem exagerar.",
     "Se houver vários documentos distintos num mesmo PDF, retorne um item por documento com intervalo real de páginas.",
     "Não separe uma nota por produtos nem separe páginas de um mesmo documento.",
-    "Nunca invente dados. Título e descrição objetivos, sem reproduzir o OCR inteiro."
+    "Nunca invente dados. Título e descrição objetivos, sem reproduzir o OCR inteiro.",
+    "Dentro de cada item escreva PRIMEIRO: titulo, documento_tipo, contraparte, competencia, valor, categoria, tipo, referencia, titular_id, descricao."
   ].join("\n");
   const prompt=[
     "Categorias permitidas:\n"+categories.slice(0,100).join(" | "),
@@ -93,11 +126,48 @@ export async function analyzeWithOllama({text,filename,categories,owners,maxPage
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({model,messages:[{role:"system",content:system},{role:"user",content:prompt}],
-      format:"json",stream:false,keep_alive:0,
+      format:"json",stream:true,keep_alive:0,
       options:{temperature:0,num_ctx:4096,num_predict:1100}}),
     signal:AbortSignal.timeout(210000)
   });
   if(!response.ok)throw Error("IA Central indisponível: HTTP "+response.status);
-  const payload=await response.json();
-  return parseOllamaOutput(payload?.message?.content,{text,categories,owners,maxPages});
+  if(!response.body)throw Error("IA Central não retornou transmissão.");
+  const decoder=new TextDecoder();
+  const reader=response.body.getReader();
+  let pending="",full="",lastPublished="",lastTime=0;
+  try{
+    for(;;){
+      const {done,value}=await reader.read();
+      if(done)break;
+      pending+=decoder.decode(value,{stream:true});
+      const lines=pending.split("\n");
+      pending=lines.pop()||"";
+      for(const line of lines){
+        if(!line.trim())continue;
+        let event;
+        try{event=JSON.parse(line);}catch{continue;}
+        if(event.error)throw Error("Ollama: "+String(event.error).slice(0,140));
+        full+=event.message?.content||"";
+      }
+      if(onPartial&&Date.now()-lastTime>700){
+        const fields=partialOllamaFields(full,{text:shortText,categories,owners});
+        const serialized=JSON.stringify(fields);
+        if(serialized!=="{}"&&serialized!==lastPublished){
+          await onPartial(fields);
+          lastPublished=serialized;
+          lastTime=Date.now();
+        }
+      }
+    }
+    if(pending.trim()){
+      let event;try{event=JSON.parse(pending);}catch{}
+      if(event?.error)throw Error("Ollama: "+String(event.error).slice(0,140));
+      full+=event?.message?.content||"";
+    }
+    if(onPartial){
+      const fields=partialOllamaFields(full,{text:shortText,categories,owners});
+      if(Object.keys(fields).length&&JSON.stringify(fields)!==lastPublished)await onPartial(fields);
+    }
+  }finally{reader.releaseLock();}
+  return parseOllamaOutput(full,{text,categories,owners,maxPages});
 }
