@@ -30,6 +30,9 @@ export default async function Admin({ searchParams }: {
     searchParams,
   ]);
 
+  const catRows = await db.query<{id:string;nome:string;subcategoria:string}>(
+    "SELECT id::text,nome,subcategoria FROM categorias ORDER BY nome,subcategoria"
+  );
   const matrix = new Map(permissoes.rows.map(p => [p.user_id + ":" + p.titular_id, p]));
   return (
     <div className="admin-shell">
@@ -56,6 +59,30 @@ export default async function Admin({ searchParams }: {
             <label htmlFor="novo-titular" className="sr-only">Nome do titular</label>
             <input id="novo-titular" type="text" name="nome" placeholder="Nome do novo titular" maxLength={120} required />
             <button type="submit">Adicionar titular</button>
+          </form>
+        </section>
+
+        <section className="admin-panel">
+          <h2>Categorias compartilhadas</h2>
+          <div className="table-scroll">
+            <table className="admin-table dense-table">
+              <thead><tr><th>Categoria</th><th>Subcategoria</th><th></th></tr></thead>
+              <tbody>{catRows.rows.map(c=><tr key={c.id}>
+                <td colSpan={3}>
+                  <form action="/api/admin/categorias" method="post" className="inline-form">
+                    <input type="hidden" name="id" value={c.id}/>
+                    <input name="nome" aria-label="Categoria" defaultValue={c.nome} required maxLength={90}/>
+                    <input name="subcategoria" aria-label="Subcategoria" defaultValue={c.subcategoria} maxLength={90}/>
+                    <button type="submit">Salvar</button>
+                  </form>
+                </td>
+              </tr>)}</tbody>
+            </table>
+          </div>
+          <form action="/api/admin/categorias" method="post" className="inline-form">
+            <input name="nome" placeholder="Nova categoria" required maxLength={90}/>
+            <input name="subcategoria" placeholder="Subcategoria (opcional)" maxLength={90}/>
+            <button type="submit">Adicionar categoria</button>
           </form>
         </section>
 
