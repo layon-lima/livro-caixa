@@ -21,7 +21,7 @@ function competence(value) {
   const s=String(value||"");
   let m=s.match(/(20\d\d)[-/](0[1-9]|1[0-2])/);
   if(m)return {date:m[1]+"-"+m[2]+"-01",estimated:false};
-  m=s.match(/(?:^|\\D)(?:0[1-9]|[12]\\d|3[01])\\/(0[1-9]|1[0-2])\\/(20\\d\\d)(?:\\D|$)/);
+  m=s.match(/(?:^|\D)(?:0[1-9]|[12]\d|3[01])\/(0[1-9]|1[0-2])\/(20\d\d)(?:\D|$)/);
   if(m)return {date:m[2]+"-"+m[1]+"-01",estimated:false};
   m=s.match(/(?:^|\D)(0[1-9]|1[0-2])\/(20\d\d)(?:\D|$)/);
   if(m)return {date:m[2]+"-"+m[1]+"-01",estimated:false};
