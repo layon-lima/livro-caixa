@@ -113,3 +113,31 @@ Instalação do código do Livro Caixa:
     docker compose up -d --build
 
 O compose requer a rede `ia_central_net` pré-existente, mas não cria ou atualiza o container Ollama. Modelos e dados da IA Central permanecem em seu volume separado.
+
+
+## Sugestão de titular e consulta pública de recebedores
+
+Migração adicional:
+
+    cd /opt/apps/livro-caixa
+    git pull --ff-only
+    docker compose exec -T database sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1' < db/migrations/007_enrichment.sql
+    docker compose up -d --build
+
+Ao identificar pagador/comprador com nome completo ainda inexistente, o OCR ou o Ollama
+pode sugerir novo titular; **não cria** o registro nem altera a titularidade do
+documento. A criação depende da confirmação de um administrador em /admin, e a
+atribuição ao documento continua sendo uma ação separada na conferência.
+
+Quando há CNPJ válido no bloco do recebedor/contraparte, o worker faz consulta
+pontual à BrasilAPI (https://brasilapi.com.br/api/cnpj/v1/{cnpj}); a consulta
+envia somente o CNPJ identificado, nunca o PDF ou o texto do OCR. Retorna razão
+social, nome fantasia e descrição CNAE, mostrados com fonte na conferência,
+e oferece esse contexto à IA local. O CNAE **não** comprova o produto adquirido,
+então categorias continuam sugestões para aprovação humana.
+
+Sem CNPJ confiável, o sistema não inventa pesquisa externa. A conferência
+oferece link "Pesquisar recebedor na internet" para busca manual pelo nome.
+A consulta automática é opcional ao funcionamento: se indisponível, o OCR e a
+IA local continuam operando. A IA permanece um serviço compartilhado na VPS,
+carregado apenas durante uma solicitação.
