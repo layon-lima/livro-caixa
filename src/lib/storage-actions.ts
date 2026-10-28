@@ -26,7 +26,7 @@ function localPath(key: string): string {
   if (!/^originais\/[a-f0-9]{2}\/[a-f0-9]{64}\.gz$/.test(key)) {
     throw new Error("Chave de armazenamento inválida");
   }
-  const root = resolve(ROOT);
+  const root = resolve(/* turbopackIgnore: true */ ROOT);
   const full = resolve(root, key);
   if (!full.startsWith(root + sep)) throw new Error("Caminho inválido");
   return full;
@@ -67,7 +67,7 @@ export async function writeCompressedOriginal(key: string, compressed: Buffer): 
   // pode deixar um original órfão. Reaproveitá-lo é mais seguro do que
   // apagar o arquivo ou ignorá-lo na contagem da cota.
   let existing: Buffer | null = null;
-  try { existing = await readFile(full); }
+  try { existing = await readFile(/* turbopackIgnore: true */ full); }
   catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
   }
@@ -92,6 +92,6 @@ export async function readOriginal(key: string, armazenamento = "local"): Promis
   if (armazenamento !== "local") {
     throw new Error("Este arquivo antigo ainda usa o armazenamento anterior; é necessária migração.");
   }
-  const data = await readFile(localPath(key));
+  const data = await readFile(/* turbopackIgnore: true */ localPath(key));
   return gunzipAsync(data);
 }
