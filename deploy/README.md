@@ -63,3 +63,30 @@ Se o resultado for maior que zero, **não apague arquivos do R2** nem suas crede
 - Senhas permanecem em hash. Repositório deve ser privado.
 - Mantenha backup externo: volume persistente não é backup; falhas da VPS ainda podem causar perda.
 - Caddy deve continuar apontando "livrocaixa-web:3000". Não publicar porta da aplicação ou do PostgreSQL no host.
+
+## Leitura inteligente e conferência automática (camada 06)
+
+A importação envia e guarda o arquivo compactado localmente. O worker faz OCR por página e prepara sugestões. A interface acompanha o status e leva o usuário autorizado automaticamente à conferência; o cadastro definitivo requer aprovação humana.
+
+**Atualização após instalar as migrações anteriores:**
+
+    cd /opt/apps/livro-caixa
+    git pull --ff-only
+    docker compose exec -T database sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1' < db/migrations/005_intelligent_review.sql
+    docker compose up -d --build
+    docker compose ps
+
+A migração 005 adiciona apenas informações de origem da leitura, confiança e alertas nas propostas existentes. Não apaga originais, categorias, nem operações aprovadas.
+
+**OCR não equivale a análise inteligente.** Para interpretação de documentos complexos e separação de vários documentos em um PDF, configure um modelo externo. O worker oferece integração com OpenAI Responses API; usa OPENAI_API_KEY e, opcionalmente, OPENAI_MODEL (por padrão gpt-4.1-mini).
+
+Antes de ativar, informe os usuários responsáveis: o TEXTO EXTRAÍDO dos documentos será enviado ao provedor de IA, e a cobrança da API é separada do ChatGPT. Não registre a chave no código nem no chat. Configure diretamente na VPS (script interativo, pergunta confirmação e oculta a digitação):
+
+    cd /opt/apps/livro-caixa
+    bash scripts/configurar-ia.sh
+
+Após configuração, arquivos novos usam IA; originais já importados podem ser reprocessados pela interface enquanto as propostas ainda não foram revisadas/aprovadas. Propostas já aprovadas nunca devem ser reprocessadas automaticamente, para preservar o histórico.
+
+Em caso de indisponibilidade da IA, o worker recorre ao OCR local e marca explicitamente essa origem na conferência. Usuário deve verificar avisos e dados de baixa confiança.
+
+Proteção de acesso: o trabalhador só sugere titulares que o usuário importador está autorizado a acessar; nenhum documento é publicado automaticamente. O endpoint que acompanha a fila também valida a permissão.
