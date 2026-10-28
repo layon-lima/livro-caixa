@@ -134,6 +134,9 @@ async function processFile(file){
     ]);
     const cats=categories.rows;
     const allowedBooks=books.rows;
+    // Comparar com todos os titulares existentes (inclusive os não autorizados),
+    // para nunca sugerir criar um cadastro duplicado.
+    const allNames=(await db.query("SELECT nome FROM titulares")).rows.map(x=>x.nome);
     const defaultBook=allowedBooks.find(x=>String(x.id)===String(file.titular_envio_id));
     if(!defaultBook)throw Error("Titular do envio não está autorizado para o usuário.");
     // O modelo só carrega durante a análise e descarrega ao terminar (keep_alive: 0).
@@ -143,7 +146,7 @@ async function processFile(file){
     if(!items.length)throw Error("Não foi possível identificar documentos no arquivo.");
     // Primeira etapa: OCR detecta campos e possíveis titulares ainda não cadastrados.
     const first=items[0];
-    const knownNames=allowedBooks.map(x=>x.nome);
+    const knownNames=allNames;
     const localSuggestedOwner=candidateNewOwner(output.text,first.documento_tipo,knownNames);
     let companyInfo=null;
     // Busca pública só por CNPJ válido e ancorado ao recebedor/contraparte.
@@ -184,6 +187,9 @@ async function processFile(file){
           owners:allowedBooks,maxPages,publicCompany:companyInfo,
           onPartial:async fields=>{
             if(!Object.keys(fields).length)return;
+            if(fields.titular_sugerido&&allNames.some(x=>normalizeName(x)===normalizeName(fields.titular_sugerido)))
+              delete fields.titular_sugerido;
+            if(!Object.keys(fields).length)return;
             await db.query("UPDATE arquivos SET progresso_dados=progresso_dados || $2::jsonb,atualizado_em=now() WHERE id=$1",
               [file.id,JSON.stringify(fields)]);
           }
@@ -208,7 +214,7 @@ async function processFile(file){
         if(aiNotice)notice.push(aiNotice);
         const suggested=short(item.titular_sugerido||localSuggestedOwner,120);
         const cleanSuggested=suggested&&
-          !allowedBooks.some(x=>normalizeName(x.nome)===normalizeName(suggested))?
+          !allNames.some(x=>normalizeName(x)===normalizeName(suggested))?
           suggested.toLocaleUpperCase("pt-BR"):"";
         if(cleanSuggested)notice.push("Possível titular não cadastrado: "+cleanSuggested+". Confirme antes de criar.");
         const fullText=item.trecho||output.text;
