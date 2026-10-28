@@ -296,3 +296,5 @@ button { cursor: pointer; }
 .storage-meter-track {height:5px;border-radius:4px;background:#e5eaf0;overflow:hidden;margin-bottom:4px;}
 .storage-meter-track div {height:100%;background:#497db5;min-width:0;transition:width .2s;}
 .storage-meter small {font-size:10px;color:#8a98a5;}
+
+.review-approval-actions {display:flex;align-items:center;gap:8px;flex-wrap:wrap;}

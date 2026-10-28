@@ -8,7 +8,7 @@ type WorkerStatus = {id:string;status:"aguardando"|"processando"|"pronto"|"erro"
 
 const delay = (ms:number)=>new Promise<void>(resolve=>setTimeout(resolve,ms));
 
-export function ImportDrop({titularId}:{titularId:string}) {
+export function ImportDrop({titularId,canApprove}:{titularId:string;canApprove:boolean}) {
   const router=useRouter();
   const input=useRef<HTMLInputElement>(null);
   const alive=useRef(true);
@@ -84,7 +84,11 @@ export function ImportDrop({titularId}:{titularId:string}) {
           const ready=statuses.filter(st=>st.status==="pronto"&&st.propostas>0).map(st=>st.id);
           if(ready.length) {
             setPhase("concluido");
-            router.push("/conferencia?arquivos="+encodeURIComponent(ready.join(",")));
+            if(canApprove) {
+              router.push("/conferencia?arquivos="+encodeURIComponent(ready.join(",")));
+            } else {
+              setError("A leitura foi concluída. Os documentos estão aguardando conferência de um usuário autorizado.");
+            }
             return;
           }
           setPhase("concluido");

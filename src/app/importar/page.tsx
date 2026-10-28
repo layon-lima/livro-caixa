@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireUser } from "@/lib/auth";
+import { requireUser, canAccessTitular } from "@/lib/auth";
 import { titularesPermitidos } from "@/lib/document-data";
 import { getDatabase } from "@/lib/database";
 import { physicalStorageBytes, STORAGE_LIMIT_BYTES } from "@/lib/storage-actions";
@@ -13,6 +13,7 @@ export default async function Importar({searchParams}:{searchParams:Promise<{tit
   const books=await titularesPermitidos(user,"import");
   const query=await searchParams;
   const selected=books.find(x=>x.id===query.titular)||books[0];
+  const canApprove=selected?await canAccessTitular(user,Number(selected.id),"approve"):false;
   const [list, usedBytes]=await Promise.all([
     getDatabase().query<{
     id:string;nome_original:string;status:string;erro:string|null;criado_em:string;nome:string;revisado:boolean;
@@ -50,7 +51,7 @@ export default async function Importar({searchParams}:{searchParams:Promise<{tit
         </select>
         <button type="submit" className="flat-button">Selecionar</button>
       </form>
-      {selected?<ImportDrop key={selected.id} titularId={selected.id}/>
+      {selected?<ImportDrop key={selected.id} titularId={selected.id} canApprove={canApprove}/>
         :<p className="form-error">Este usuário não possui permissão de importação.</p>}
       <div className="page-title-compact"><h2>Arquivos recebidos</h2><span>Processamento automático na VPS</span></div>
       <ImportStatusRefresh active={list.rows.some(a=>a.status==="aguardando"||a.status==="processando")}/>
@@ -69,7 +70,7 @@ export default async function Importar({searchParams}:{searchParams:Promise<{tit
           </tr>)}</tbody>
         </table>
       </div>
-      <p className="muted">Quando o status for Pronto, abra Conferência para revisar os dados extraídos. Você pode reprocessar arquivos ainda não conferidos sem reenviá-los.</p>
+      <p className="muted">Depois que o OCR terminar, a conferência do lote abre automaticamente para quem tem permissão de aprovar. Arquivos não conferidos podem ser reprocessados sem novo envio.</p>
     </main>
   </div>;
 }
