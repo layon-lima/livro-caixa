@@ -31,6 +31,7 @@ services:
       PGDATABASE: ${POSTGRES_DB:?Informe POSTGRES_DB no .env}
       PGUSER: ${POSTGRES_USER:?Informe POSTGRES_USER no .env}
       PGPASSWORD: ${POSTGRES_PASSWORD:?Informe POSTGRES_PASSWORD no .env}
+      AI_CONFIGURED: ${OPENAI_API_KEY:+yes}
     volumes:
       - documents_data:/data/livro-caixa-arquivos
     expose:

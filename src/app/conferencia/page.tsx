@@ -19,7 +19,7 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
   const rows=await db.query<Queued>(
     "SELECT p.id::text,p.arquivo_id::text,p.titular_id::text,p.titulo,p.documento_tipo,p.contraparte,"+
     "p.competencia::text,p.competencia_estimada,p.categoria_id::text,p.tipo,p.descricao,p.valor::text,p.referencia,"+
-    "p.pagina_inicial,p.pagina_final,p.revisada_em::text,p.operacao_sugerida_id::text,p.aprovado_em::text,p.duplicada_de::text,"+
+    "p.pagina_inicial,p.pagina_final,p.metodo_leitura,p.confianca::text,p.avisos,p.revisada_em::text,p.operacao_sugerida_id::text,p.aprovado_em::text,p.duplicada_de::text,"+
     "orig.arquivo_id::text AS arquivo_original_id,orig.titular_id::text AS titular_original_id,"+
     "a.nome_original,a.status,a.erro,a.texto_extraido,t.nome AS nome_titular "+
     "FROM propostas p JOIN arquivos a ON a.id=p.arquivo_id JOIN titulares t ON t.id=p.titular_id "+
@@ -67,6 +67,16 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
         {!selected?<p className="empty-info">{batch?"Nenhuma proposta pendente neste envio.":"Importe um arquivo para começar."}</p>:<>
           <div className="page-title-compact"><h2>{selected.nome_original}</h2>
             <a href={"/api/documentos/"+selected.arquivo_id} target="_blank" rel="noreferrer">Abrir original <ExternalLink size={13}/></a></div>
+          <div className="review-analysis-status">
+            <strong>{selected.metodo_leitura==="ia"?"Analisado por inteligência artificial":
+              selected.metodo_leitura==="xml"?"Dados estruturados do XML":"Extração básica por OCR"}</strong>
+            {selected.confianca&&<span>Confiança estimada: {Math.round(Number(selected.confianca)*100)}%</span>}
+            {selected.pagina_inicial&&<span>Páginas: {selected.pagina_inicial}{selected.pagina_final&&selected.pagina_final!==selected.pagina_inicial?"–"+selected.pagina_final:""}</span>}
+          </div>
+          {selected.avisos?.length>0&&<div className="review-notices">
+            <strong>Verificar antes de aprovar</strong>
+            <ul>{selected.avisos.map((notice,i)=><li key={i}>{notice}</li>)}</ul>
+          </div>}
           <div className="review-preview">
             <iframe title="Arquivo original" src={"/api/documentos/"+selected.arquivo_id}/>
           </div>
@@ -116,7 +126,7 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
             </div>
             <label>Descrição<textarea name="descricao" defaultValue={selected.descricao} rows={2}/></label>
             <label>Vinculação com operação existente
-              <select name="operacaoId" defaultValue="">
+              <select name="operacaoId" defaultValue={selected.operacao_sugerida_id||""}>
                 <option value="">Criar nova operação</option>
                 {available?.rows.map(o=><option key={o.id} value={o.id}>
                   {o.id===selected.operacao_sugerida_id?"Sugestão: ":""}#{o.id} — {o.titulo}
