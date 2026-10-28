@@ -81,3 +81,49 @@ Esse comando não cria uma senha fixa no código ou repositório. O usuário ini
 - O PostgreSQL continua isolado e o contêiner web ainda não publica portas próprias.
 - Nenhuma credencial real foi incluída neste commit.
 - Não interprete o endpoint /api/health como verificação de login ou do banco.
+
+
+## Camada 03–05 — Fluxo documental operacional
+
+A implantação dessas camadas requer primeiro o bucket privado no Cloudflare R2. Nunca versionar ou compartilhar credenciais no GitHub.
+
+### Configuração do bucket e da interpretação
+
+1. No Cloudflare R2 crie um bucket privado exclusivo para o Livro Caixa, por exemplo "livro-caixa-documentos".
+2. Crie credenciais R2 S3 limitadas ao bucket (leitura e escrita de objetos).
+3. Edite o arquivo privado /opt/apps/livro-caixa/.env e preencha as variáveis já definidas:
+   R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY e R2_BUCKET.
+4. A variável OPENAI_API_KEY é opcional. Sem ela, o OCR local funciona e prepara uma única proposta simples por arquivo; a identificação sofisticada e a separação de documentos distintos num mesmo PDF exigem a IA externa. Use a variável OPENAI_MODEL quando desejar selecionar um modelo compatível.
+
+### Atualização no servidor
+
+Executar em /opt/apps/livro-caixa:
+
+    git pull --ff-only
+    docker compose exec -T database sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1' < db/migrations/002_documents.sql
+    docker compose exec -T database sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1' < db/migrations/003_duplicates.sql
+    docker compose up -d --build
+    docker compose ps
+
+As migrações criam as tabelas sem apagar as credenciais ou os titulares existentes.
+Não remover volumes Docker nem executar docker compose down -v.
+
+### Uso
+
+- Importação: arrastar arquivos PDF/XML/JPG/PNG (até 25MB cada); o navegador divide grandes seleções em lotes de 20 arquivos.
+- Worker: extração direta do texto PDF/XML, Tesseract para digitalizações e análise opcional por IA externa.
+- Conferência: editar e marcar explicitamente cada proposta como conferida; aprovação individual ou múltipla apenas depois.
+- Livro: navegar por titular, competência e categoria; buscar nos dados e textos OCR; documentos relacionados sob a mesma operação.
+- Manual: usuários autorizados registram operações sem anexos; documentos posteriores podem ser vinculados na conferência.
+- Lixeira: exclusão lógica e restauração de operações.
+
+### Limites operacionais e proteção
+
+- O repositório deve ser privado.
+- Não inserir documentos reais enquanto as credenciais temporárias do administrador que foram expostas na conversa não forem substituídas.
+- O conteúdo enviado à IA externa, quando habilitada, sai da VPS. Utilize apenas provedores compatíveis com sua política de privacidade.
+- O OCR é sujeito a erros: nenhuma proposta é aprovada automaticamente.
+- Os PDFs originais ficam intactos no bucket privado. A plataforma não cria controles de saldos bancários.
+- O endpoint /api/health não verifica R2 ou processamento OCR.
+- Se um arquivo falhar na extração, a importação informa o erro e permite solicitar reprocessamento.
+- Duplicação comprovada pelo mesmo hash ou identificador robusto de documento é bloqueada; valores iguais isoladamente não são critérios de bloqueio.
