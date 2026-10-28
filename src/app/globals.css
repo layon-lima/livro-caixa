@@ -68,3 +68,60 @@ svg { flex-shrink: 0; }
   .content-header { padding: 0 12px; }
   .file-columns > div { padding: 0 10px; }
 }
+
+
+/* Camada 02: formulários de acesso e administração sem cards grandes. */
+a { color: inherit; text-decoration: none; }
+button, input { font: inherit; }
+button { cursor: pointer; }
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.muted { color: var(--muted); font-size: 12px; }
+.tree-link { display: flex; align-items: center; gap: 9px; padding: 6px 10px 6px 31px; font-size: 11px; }
+.tree-link:hover, .titular-row:hover { background: #e9f0fa; }
+.tree-link-selected { color: #15549b; background: #e3efff; font-weight: 600; }
+.rail-item { text-decoration: none; }
+.rail-item:hover { background: #2b476b; }
+.top-actions { display: flex; align-items: center; gap: 13px; }
+.logout-button { display: inline-flex; align-items: center; gap: 6px; padding: 5px 7px; background: transparent; color: #627184; border: 1px solid var(--line); border-radius: 5px; font-size: 11px; }
+.logout-button:hover { background: #f1f5fa; }
+.titular-list { flex: 1; overflow: auto; padding: 6px 0; }
+.titular-list > p { padding: 12px 19px; }
+.titular-row { display: flex; align-items: center; gap: 11px; height: 39px; padding: 0 20px; border-bottom: 1px solid var(--line-soft); font-size: 12px; }
+.titular-row span { flex: 1; }
+.titular-row > svg:last-child { color: #9aabba; }
+.login-screen { min-height: 100dvh; display: flex; justify-content: center; align-items: center; padding: 24px; }
+.login-form { width: 100%; max-width: 340px; display: flex; flex-direction: column; padding: 26px; background: white; border: 1px solid var(--line); border-radius: 8px; }
+.login-brand { display: flex; gap: 9px; align-items: center; color: #285c9c; font-size: 16px; }
+.login-subtitle { margin: 4px 0 24px 32px; }
+.login-form h1 { font-size: 17px; margin: 0 0 20px; }
+.login-form label { font-weight: 600; font-size: 12px; margin: 0 0 5px; }
+.login-form input { margin-bottom: 15px; }
+.login-form input, .inline-form input { border: 1px solid #cfd8e2; background: #fff; border-radius: 5px; padding: 9px 10px; outline-offset: 2px; min-width: 0; }
+.login-form input:focus, .inline-form input:focus { outline: 1px solid #468bd3; }
+.primary-btn, .inline-form button, .form-actions button { border: 1px solid #2761a7; background: #347ac5; color: #fff; border-radius: 5px; padding: 8px 13px; font-weight: 600; }
+.primary-btn:hover, .inline-form button:hover, .form-actions button:hover { background: #2768b0; }
+.form-error { color: #a82e2e; font-size: 12px; margin: 2px 0 13px; }
+.form-success { color: #16704a; font-size: 12px; }
+.admin-shell { min-height: 100dvh; background: #f6f7f9; }
+.admin-header { height: 50px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); background: #fff; padding: 0 22px; gap: 12px; }
+.admin-brand, .small-link, .admin-page-title { display: flex; align-items: center; gap: 8px; }
+.admin-brand span, .small-link { color: #728193; font-size: 12px; }
+.admin-main { max-width: 1150px; margin: 0 auto; padding: 20px; }
+.admin-page-title { margin-bottom: 18px; color: #30465e; }
+.admin-page-title h1 { margin: 0; font-size: 18px; }
+.admin-panel { background: white; border: 1px solid var(--line); border-radius: 6px; padding: 14px; margin-bottom: 13px; }
+.admin-panel h2 { margin: 0 0 12px; font-size: 14px; }
+.admin-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.admin-table th { background: #f5f7fa; text-align: left; color: #6c7a8a; padding: 8px 10px; border: 1px solid var(--line); }
+.admin-table td { padding: 8px 10px; border: 1px solid var(--line); }
+.inline-form { display: flex; align-items: center; gap: 8px; margin-top: 11px; flex-wrap: wrap; }
+.inline-form input { flex: 1; min-width: 190px; max-width: 330px; }
+.user-permissions { border: 1px solid var(--line); margin-top: 9px; border-radius: 5px; padding: 11px; }
+.user-permissions-title { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; }
+.mini-tag { color: #51708d; border: 1px solid var(--line); border-radius: 4px; padding: 2px 6px; display: inline-flex; align-items: center; gap: 4px; font-size: 10px; }
+.table-scroll { overflow: auto; }
+.permission-table th:not(:first-child), .permission-table .check-cell { text-align: center; width: 95px; }
+.check-cell input { width: 15px; height: 15px; accent-color: #347ac5; }
+.form-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
+.reset-form { border-top: 1px solid var(--line-soft); padding-top: 10px; }
+@media (max-width: 650px) { .admin-main { padding: 10px; } .admin-header { padding: 0 10px; } .admin-panel { padding: 10px; } .top-actions { gap: 6px; } .login-form { padding: 20px; } }

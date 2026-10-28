@@ -40,3 +40,12 @@ Leia [deploy/README.md](deploy/README.md). **Não aplique modificações no Cadd
 ## Segurança
 
 O repositório deve ser **privado** antes de receber detalhes operacionais. Autenticação e controle de permissões por titular serão implementados na Camada 02. Não introduza documentos reais antes de autenticação e autorização estarem ativas.
+
+
+## Camada 02 — autenticação e permissões
+
+Implementa login por usuário e senha, sessão em cookie HttpOnly, área administrativa, livros por titular e permissões por ação. Os três titulares iniciais são carregados pela migração SQL. O acesso ao site exige autenticação antes de apresentar dados.
+
+As permissões são checadas no servidor. A tela compacta continua sem operações e documentos nesta etapa. Instruções de implantação em [deploy/README.md](deploy/README.md).
+
+Não use senhas padrão, não publique chaves no Git e não exponha o serviço via HTTP sem TLS.
