@@ -1,20 +1,33 @@
 import Link from "next/link";
 import {
   BookOpen, ChevronDown, ChevronRight, FileSearch, Folder, FolderOpen,
-  LayoutList, LogOut, PanelRight, Settings2,
+  LayoutList, LogOut, PanelRight, Settings2, FileUp, ClipboardCheck, PenLine,
 } from "lucide-react";
 import type { AuthUser } from "@/lib/auth";
 
 export type Titular = { id: string; nome: string };
-type Props = { user: AuthUser; titulares: Titular[]; selected?: Titular };
+type Props = {
+  user: AuthUser; titulares: Titular[]; selected?: Titular;
+  children?: React.ReactNode; folderContent?: React.ReactNode;
+  preview?: React.ReactNode; operationCount?: number;
+};
 
-export function ExplorerShell({ user, titulares, selected }: Props) {
+export function ExplorerShell({ user, titulares, selected, children, folderContent, preview, operationCount }: Props) {
   return (
     <div className="workspace">
       <aside className="rail" aria-label="Navegação">
         <div className="rail-mark" aria-label="Livro Caixa Inteligente">LC</div>
         <Link className="rail-item rail-item-active" href="/" aria-label="Livros Caixa">
           <BookOpen size={19} strokeWidth={1.8} aria-hidden="true" /><span>Livros</span>
+        </Link>
+        <Link className="rail-item" href="/importar" aria-label="Importar documentos">
+          <FileUp size={19} strokeWidth={1.8}/><span>Importar</span>
+        </Link>
+        <Link className="rail-item" href="/conferencia" aria-label="Conferência">
+          <ClipboardCheck size={19} strokeWidth={1.8}/><span>Conferir</span>
+        </Link>
+        <Link className="rail-item" href="/manual" aria-label="Novo lançamento manual">
+          <PenLine size={19} strokeWidth={1.8}/><span>Manual</span>
         </Link>
         {user.isAdmin && (
           <Link className="rail-item" href="/admin" aria-label="Administração">
@@ -36,6 +49,7 @@ export function ExplorerShell({ user, titulares, selected }: Props) {
             <Folder size={15} className="folder-icon" /><span>{t.nome}</span>
           </Link>
         ))}
+        {folderContent}
         {titulares.length === 0 && <p className="tree-empty">Nenhum livro autorizado</p>}
       </aside>
 
@@ -63,7 +77,7 @@ export function ExplorerShell({ user, titulares, selected }: Props) {
               <p>{selected ? "Operações e documentos" : "Selecione o titular para abrir seu livro"}</p></div>
           </div>
 
-          {selected ? <>
+          {selected && children ? children : selected ? <>
             <div className="file-columns" aria-hidden="true">
               <div className="col-main">Nome da operação</div><div className="col-category">Categoria</div>
               <div className="col-period">Competência</div><div className="col-docs">Documentos</div>
@@ -80,18 +94,18 @@ export function ExplorerShell({ user, titulares, selected }: Props) {
           </div>}
         </section>
         <footer className="statusbar">
-          <span><LayoutList size={13} /> {selected ? "0 operações" : titulares.length + " livros"}</span>
+          <span><LayoutList size={13} /> {selected ? (operationCount ?? 0) + " operações" : titulares.length + " livros"}</span>
           <span>Livro Caixa Inteligente</span>
         </footer>
       </main>
 
       <aside className="preview-pane" aria-label="Visualização de documentos">
         <div className="preview-title"><span><PanelRight size={15} /> Visualização</span></div>
-        <div className="preview-empty">
+        {preview || <div className="preview-empty">
           <FileSearch size={33} strokeWidth={1.3} />
           <strong>Nenhum documento selecionado</strong>
-          <p>Os documentos vinculados à operação serão exibidos neste painel.</p>
-        </div>
+          <p>Selecione uma operação para visualizar seus documentos.</p>
+        </div>}
       </aside>
     </div>
   );
