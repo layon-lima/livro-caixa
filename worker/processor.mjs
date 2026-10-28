@@ -157,7 +157,9 @@ async function claim(){
   const c=await db.connect();
   try{
     await c.query("BEGIN");
-    const r=await c.query("SELECT * FROM arquivos WHERE status='aguardando' ORDER BY id FOR UPDATE SKIP LOCKED LIMIT 1");
+    const r=await c.query("SELECT * FROM arquivos WHERE status='aguardando' OR "+
+      "(status='processando' AND atualizado_em < now() - interval '30 minutes') "+
+      "ORDER BY id FOR UPDATE SKIP LOCKED LIMIT 1");
     if(!r.rows[0]){await c.query("COMMIT");return null;}
     await c.query("UPDATE arquivos SET status='processando',atualizado_em=now() WHERE id=$1",[r.rows[0].id]);
     await c.query("COMMIT");return r.rows[0];
