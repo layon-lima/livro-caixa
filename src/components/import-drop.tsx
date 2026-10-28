@@ -12,6 +12,7 @@ export function ImportDrop({titularId,canApprove}:{titularId:string;canApprove:b
   const router=useRouter();
   const input=useRef<HTMLInputElement>(null);
   const alive=useRef(true);
+  const sending=useRef(false);
   const [files,setFiles]=useState<File[]>([]);
   const [busy,setBusy]=useState(false);
   const [hover,setHover]=useState(false);
@@ -37,7 +38,8 @@ export function ImportDrop({titularId,canApprove}:{titularId:string;canApprove:b
   }
 
   async function upload(pending:File[]) {
-    if(!pending.length || !titularId || busy)return;
+    if(!pending.length || !titularId || sending.current)return;
+    sending.current=true;
     setBusy(true);setPhase("enviando");setError("");setResults([]);
     const all:UploadResult[]=[];
     try {
@@ -105,8 +107,11 @@ export function ImportDrop({titularId,canApprove}:{titularId:string;canApprove:b
         await delay(3000);
       }
     }catch(e) {
-      if(alive.current){setPhase("concluido");setError(e instanceof Error?e.message:"Erro na importação");}
-    }finally {if(alive.current)setBusy(false);}
+      if(alive.current){setFiles([]);setPhase("concluido");setError(e instanceof Error?e.message:"Erro na importação");}
+    }finally {
+      sending.current=false;
+      if(alive.current)setBusy(false);
+    }
   }
 
   useEffect(()=>{
