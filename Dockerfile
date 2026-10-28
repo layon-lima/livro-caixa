@@ -8,6 +8,7 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
+RUN node --test worker/local-parser.test.mjs
 RUN npm run build
 
 FROM node:24-alpine AS runner
