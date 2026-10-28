@@ -31,7 +31,6 @@ services:
       PGDATABASE: ${POSTGRES_DB:?Informe POSTGRES_DB no .env}
       PGUSER: ${POSTGRES_USER:?Informe POSTGRES_USER no .env}
       PGPASSWORD: ${POSTGRES_PASSWORD:?Informe POSTGRES_PASSWORD no .env}
-      AI_CONFIGURED: ${OPENAI_API_KEY:+yes}
     volumes:
       - documents_data:/data/livro-caixa-arquivos
     expose:
@@ -57,16 +56,12 @@ services:
       PGDATABASE: ${POSTGRES_DB:?Informe POSTGRES_DB no .env}
       PGUSER: ${POSTGRES_USER:?Informe POSTGRES_USER no .env}
       PGPASSWORD: ${POSTGRES_PASSWORD:?Informe POSTGRES_PASSWORD no .env}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
     volumes:
       - documents_data:/data/livro-caixa-arquivos:ro
     networks:
       - private
-      - egress
 
 networks:
-  egress:
   private:
     internal: true
   proxy:

@@ -69,8 +69,8 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
             <a href={"/api/documentos/"+selected.arquivo_id} target="_blank" rel="noreferrer">Abrir original <ExternalLink size={13}/></a></div>
           <div className="review-analysis-status">
             <strong>{selected.metodo_leitura==="ia"?"Analisado por inteligência artificial":
-              selected.metodo_leitura==="xml"?"Dados estruturados do XML":"Extração básica por OCR"}</strong>
-            {selected.confianca&&<span>Confiança estimada: {Math.round(Number(selected.confianca)*100)}%</span>}
+              selected.metodo_leitura==="xml"?"Dados estruturados do XML":"Leitura automática local (OCR + regras)"}</strong>
+            {selected.confianca&&<span>Indicador aproximado de extração: {Math.round(Number(selected.confianca)*100)}%</span>}
             {selected.pagina_inicial&&<span>Páginas: {selected.pagina_inicial}{selected.pagina_final&&selected.pagina_final!==selected.pagina_inicial?"–"+selected.pagina_final:""}</span>}
           </div>
           {selected.avisos?.length>0&&<div className="review-notices">
@@ -97,7 +97,7 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
               <div><span>Contraparte</span><strong>{selected.contraparte||"Não identificada"}</strong></div>
               {selected.operacao_sugerida_id&&<div><span>Vinculação</span><strong>Operação relacionada #{selected.operacao_sugerida_id}</strong></div>}
             </section>
-            <details className="review-edit-data" open={selected.metodo_leitura==="local" || (selected.avisos?.length??0)>1}>
+            <details className="review-edit-data" open={(selected.avisos?.length??0)>1}>
               <summary>Corrigir informações sugeridas</summary>
               <div className="form-inline-two">
               <label>Titular
