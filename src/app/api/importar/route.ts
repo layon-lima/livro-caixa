@@ -5,7 +5,7 @@ import { getDatabase } from "@/lib/database";
 import { safeId } from "@/lib/document-data";
 import {
   StorageFullError, compressedOriginal, writeCompressedOriginal,
-  cleanupFailedWrite, localKey,
+  localKey,
 } from "@/lib/storage-actions";
 import { sameOriginPost } from "@/lib/request-security";
 
@@ -56,7 +56,6 @@ export async function POST(request: Request) {
       const compressed = await compressedOriginal(buffer);
       const key = localKey(digest);
       const connection = await db.connect();
-      let created = false;
       try {
         await connection.query("BEGIN");
         // Impede que dois envios simultâneos ultrapassem a cota ou gravem duplicados.
@@ -70,7 +69,6 @@ export async function POST(request: Request) {
           continue;
         }
         await writeCompressedOriginal(key, compressed);
-        created = true;
         const inserted = await connection.query<{id:string}>(
           "INSERT INTO arquivos (sha256,chave_armazenamento,nome_original,mime,bytes,"+
           "bytes_armazenados,armazenamento,compressao,titular_envio_id,enviado_por) "+
@@ -79,10 +77,8 @@ export async function POST(request: Request) {
         );
         await connection.query("COMMIT");
         results.push({name,status:"importado",id:inserted.rows[0].id});
-        created = false;
       } catch (error) {
         await connection.query("ROLLBACK").catch(()=>{});
-        if (created) await cleanupFailedWrite(key).catch(e => console.error("Falha de limpeza",e));
         throw error;
       } finally { connection.release(); }
     } catch (error) {
