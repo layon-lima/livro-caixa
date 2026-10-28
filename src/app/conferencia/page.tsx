@@ -6,10 +6,16 @@ import { ArrowLeft, ClipboardCheck, FileText, ExternalLink } from "lucide-react"
 export const dynamic="force-dynamic";
 type Queued=Proposta&{nome_titular:string;duplicada_de:string|null;arquivo_original_id:string|null;titular_original_id:string|null};
 
-export default async function Conferencia({searchParams}:{searchParams:Promise<{id?:string;revisada?:string;aprovados?:string;erro?:string}>}){
+export default async function Conferencia({searchParams}:{searchParams:Promise<{id?:string;arquivos?:string;revisada?:string;aprovados?:string;erro?:string}>}){
   const user=await requireUser();
   const db=getDatabase();
   const [query,books,cats]=await Promise.all([searchParams,titularesPermitidos(user,"approve"),categorias()]);
+  const ids=query.arquivos && /^\d+(?:,\d+){0,99}$/.test(query.arquivos)
+    ? [...new Set(query.arquivos.split(",").map(Number))].filter(x=>Number.isSafeInteger(x)&&x>0)
+    : null;
+  const batch=ids?.length?ids:null;
+  const queryArgs:(number|number[])[] = user.isAdmin?[]:[user.id];
+  if(batch) queryArgs.push(batch);
   const rows=await db.query<Queued>(
     "SELECT p.id::text,p.arquivo_id::text,p.titular_id::text,p.titulo,p.documento_tipo,p.contraparte,"+
     "p.competencia::text,p.competencia_estimada,p.categoria_id::text,p.tipo,p.descricao,p.valor::text,p.referencia,"+
@@ -19,10 +25,14 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
     "FROM propostas p JOIN arquivos a ON a.id=p.arquivo_id JOIN titulares t ON t.id=p.titular_id "+
     "LEFT JOIN propostas orig ON orig.id=p.duplicada_de "+
     (user.isAdmin?"":"JOIN user_titular_permissions up ON up.titular_id=p.titular_id AND up.user_id=$1 AND up.can_approve=true ")+
-    "WHERE p.aprovado_em IS NULL ORDER BY p.id DESC LIMIT 200",
-    user.isAdmin?[]:[user.id]);
+    "WHERE p.aprovado_em IS NULL "+
+    (batch?"AND p.arquivo_id = ANY($"+queryArgs.length+"::bigint[]) ":"")+
+    "ORDER BY p.id DESC LIMIT 500",
+    queryArgs);
   const all=rows.rows;
   const selected=all.find(p=>p.id===query.id)||all[0];
+  const batchQuery=batch?"arquivos="+batch.join(",")+"&":"";
+  const actionBatch=batch?"&arquivos="+batch.join(","):"";
   const available=selected?await db.query<{id:string;titulo:string}>(
     "SELECT id::text,titulo FROM operacoes WHERE titular_id=$1 AND excluido_em IS NULL ORDER BY id DESC LIMIT 200",
     [selected.titular_id]):null;
@@ -31,17 +41,18 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
       <strong><ClipboardCheck size={16}/> Conferência</strong><Link href="/importar">Importar documentos</Link></header>
     <div className="review-grid">
       <section className="review-list">
-        <div className="page-title-compact"><h1>Documentos aguardando aprovação</h1><span>{all.length} propostas</span></div>
+        <div className="page-title-compact"><h1>{batch?"Conferência desta importação":"Documentos aguardando aprovação"}</h1><span>{all.length} propostas</span></div>
         {query.erro&&<p className="form-error">Não foi possível concluir: {query.erro}.</p>}
         {query.revisada&&<p className="form-success">Proposta conferida e salva.</p>}
         {query.aprovados&&<p className="form-success">{query.aprovados} proposta(s) aprovada(s).</p>}
         <form method="post" action="/api/propostas/aprovar">
+          {batch&&<input type="hidden" name="arquivos" value={batch.join(",")}/>}
           <div className="file-columns review-columns"><div>Documento</div><div>Titular</div><div>Revisão</div></div>
           {all.map(p=><div key={p.id} className={"review-row"+(selected?.id===p.id?" selected":"")}>
             <label className="review-check" title={p.revisada_em?"Selecionar para aprovação":"Confira antes de aprovar"}>
               <input type="checkbox" name="ids" value={p.id} disabled={!p.revisada_em || !!p.duplicada_de}/>
             </label>
-            <Link href={"/conferencia?id="+p.id} className="review-row-link">
+            <Link href={"/conferencia?"+batchQuery+"id="+p.id} className="review-row-link">
               <span className="ellipsis"><FileText size={14}/>{p.titulo}</span>
               <small>{p.nome_titular}</small>
               <small>{p.duplicada_de?"Duplicado":p.revisada_em?"Conferido":"Pendente"}</small>
@@ -54,7 +65,7 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
         </form>
       </section>
       <section className="review-detail">
-        {!selected?<p className="empty-info">Importe um arquivo para começar.</p>:<>
+        {!selected?<p className="empty-info">{batch?"Nenhuma proposta pendente neste envio.":"Importe um arquivo para começar."}</p>:<>
           <div className="page-title-compact"><h2>{selected.nome_original}</h2>
             <a href={"/api/documentos/"+selected.arquivo_id} target="_blank" rel="noreferrer">Abrir original <ExternalLink size={13}/></a></div>
           <div className="review-preview">
@@ -67,6 +78,7 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
               <a href={"/api/documentos/"+selected.arquivo_original_id} target="_blank" rel="noreferrer">Abrir documento original</a>}
           </div>}
           {!selected.duplicada_de && <form action={"/api/propostas/"+selected.id+"/revisar"} method="post" className="review-form">
+            {batch&&<input type="hidden" name="arquivos" value={batch.join(",")}/>}
             <div className="form-inline-two">
               <label>Titular
                 <select name="titularId" defaultValue={selected.titular_id} required>
@@ -113,8 +125,11 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
               </select>
             </label>
             {selected.operacao_sugerida_id&&<p className="muted">Foi encontrada uma possível operação relacionada. Confirme a escolha acima antes de salvar.</p>}
-            <button type="submit" className="primary-btn">Salvar conferência</button>
-            <span className="muted">Depois selecione a proposta na lista e aprove. Nada é lançado antes da aprovação.</span>
+            <div className="review-approval-actions">
+              <button type="submit" name="acao" value="aprovar" className="primary-btn">Aprovar e organizar documento</button>
+              <button type="submit" name="acao" value="salvar" className="flat-button">Salvar para depois</button>
+            </div>
+            <span className="muted">Confira os dados acima antes de aprovar. Nada será organizado definitivamente sem sua confirmação.</span>
           </form>}
           <details className="text-extracted"><summary>Texto extraído do documento</summary><pre>{selected.texto_extraido.slice(0,30000)}</pre></details>
         </>}
