@@ -19,7 +19,7 @@ const actions: Action[] = [
 ];
 
 export default async function Admin({ searchParams }: {
-  searchParams: Promise<{ error?: string; created?: string; saved?: string }>;
+  searchParams: Promise<{ error?: string; created?: string; saved?: string; sugerir_titular?: string }>;
 }) {
   await requireAdmin();
   const db = getDatabase();
@@ -55,9 +55,10 @@ export default async function Admin({ searchParams }: {
             <thead><tr><th>Livro Caixa</th></tr></thead>
             <tbody>{titulares.rows.map(t => <tr key={t.id}><td>{t.nome}</td></tr>)}</tbody>
           </table>
+          {status.sugerir_titular&&<p className="muted">Nome sugerido pela leitura do documento. Confira antes de cadastrar; o cadastro não altera automaticamente documentos já importados.</p>}
           <form action="/api/admin/titulares" method="post" className="inline-form">
             <label htmlFor="novo-titular" className="sr-only">Nome do titular</label>
-            <input id="novo-titular" type="text" name="nome" placeholder="Nome do novo titular" maxLength={120} required />
+            <input id="novo-titular" type="text" name="nome" placeholder="Nome do novo titular" defaultValue={status.sugerir_titular?.slice(0,120)||""} maxLength={120} required />
             <button type="submit">Adicionar titular</button>
           </form>
         </section>
