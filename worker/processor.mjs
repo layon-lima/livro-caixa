@@ -44,8 +44,9 @@ function invoiceXml(xml) {
       titulo:short("NF "+(n.ide?.nNF||"")+" — "+(n.emit?.xNome||""),170),
       documento_tipo:"nota fiscal",contraparte:short(n.emit?.xNome,150),
       competencia:n.ide?.dhEmi?.slice(0,7)||n.ide?.dEmi?.slice(0,7)||"",
-      categoria:"",tipo:"despesa",descricao:short(prods.map(x=>x?.prod?.xProd).join("; "),1000),
+      categoria:"",tipo:"outro",descricao:short(prods.map(x=>x?.prod?.xProd).join("; "),1000),
       valor:n.total?.ICMSTot?.vNF||"",referencia:short(n["@Id"]||n.ide?.nNF,100).replace(/^NFe/,""),
+      emitente_nome:short(n.emit?.xNome,150),destinatario_nome:short(n.dest?.xNome,150),
       pagina_inicial:1,pagina_final:1
     }];
   }catch{return null;}
@@ -238,9 +239,12 @@ async function processFile(file){
         }
         const fullText=output.text;
         const hinted=fromAiOwner(item.titular_id||item.titular_nome,allowedBooks);
+        const seller=fromAiOwner(item.emitente_nome,allowedBooks);
+        const buyer=fromAiOwner(item.destinatario_nome,allowedBooks);
+        const structuredOwner=seller&&!buyer?seller:buyer&&!seller?buyer:null;
         const byText=recognizedOwner(fullText,allowedBooks);
-        const owner=hinted||byText||defaultBook;
-        if(!hinted&&!byText)notice.push("Titular não confirmado pelo documento; mantido o titular escolhido no envio.");
+        const owner=structuredOwner||hinted||byText||defaultBook;
+        if(!structuredOwner&&!hinted&&!byText)notice.push("Titular não confirmado pelo documento; mantido o titular escolhido no envio.");
         if(hinted&&byText&&String(hinted.id)!==String(byText.id)){
           notice.push("Há divergência na identificação do titular; confira antes de aprovar.");
         }
@@ -250,13 +254,33 @@ async function processFile(file){
         const categoryName=normalizeName(item.categoria);
         const cat=cats.find(c=>normalizeName(c.nome+(c.subcategoria?" > "+c.subcategoria:""))===categoryName);
         if(!cat)notice.push("Categoria não determinada; selecione uma na conferência.");
+        const xmlIncoming=method==="xml"&&buyer&&String(buyer.id)===String(owner.id)&&!seller;
+        const xmlOutgoing=method==="xml"&&seller&&String(seller.id)===String(owner.id)&&!buyer;
+        if(method==="xml"&&!xmlIncoming&&!xmlOutgoing)notice.push("Confira se a nota representa compra ou venda.");
         const title=short(item.titulo,170)||file.nome_original;
-        const party=short(item.contraparte,150);
+        const party=method==="xml"&&xmlOutgoing?
+          short(item.destinatario_nome,150):short(item.contraparte,150);
         const value=amount(item.valor);
         if(!party)notice.push("Fornecedor ou contraparte não identificado.");
         if(value===null)notice.push("Valor principal não identificado.");
         const reference=short(item.referencia,100);
         const docType=short(item.documento_tipo,50).toLowerCase()||"outro";
+        const type=xmlIncoming?"despesa":xmlOutgoing?"receita":item.tipo;
+        if(method==="xml"&&xmlOutgoing)notice.push("Nota de saída identificada: confirme se deve entrar como receita.");
+        let category=cat;
+        if(!category&&method==="xml"){
+          const products=normalizeName(item.descricao);
+          const guess=/DIESEL|GASOLINA|COMBUSTIVEL/.test(products)?"Combustíveis > Diesel":
+            /SEMENTE|SOJA SEMENTE|MILHO SEMENTE/.test(products)?"Insumos Agrícolas > Sementes":
+            /FERTILIZANTE|ADUBO|UREIA|NPK/.test(products)?"Insumos Agrícolas > Fertilizantes":
+            /HERBICIDA|FUNGICIDA|INSETICIDA|DEFENSIVO/.test(products)?"Insumos Agrícolas > Defensivos":
+            xmlOutgoing?"Receitas":"";
+          category=cats.find(c=>normalizeName(c.nome+(c.subcategoria?" > "+c.subcategoria:""))===normalizeName(guess));
+          if(category) {
+            const i=notice.indexOf("Categoria não determinada; selecione uma na conferência.");
+            if(i>=0)notice.splice(i,1);
+          }
+        }
         const start=Number(item.pagina_inicial),end=Number(item.pagina_final);
         const strongerReference=(
           (docType==="nota fiscal"&&/^\d{44}$/.test(reference))||
@@ -289,8 +313,8 @@ async function processFile(file){
           "competencia_estimada,categoria_id,tipo,descricao,valor,referencia,pagina_inicial,pagina_final,"+
           "operacao_sugerida_id,duplicada_de,metodo_leitura,confianca,avisos) "+
           "VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)",
-          [file.id,ownerId,title,docType,party,date.date,date.estimated,cat?.id||null,
-            ["receita","despesa","outro"].includes(item.tipo)?item.tipo:"outro",
+          [file.id,ownerId,title,docType,party,date.date,date.estimated,category?.id||null,
+            ["receita","despesa","outro"].includes(type)?type:"outro",
             desc,value,reference,
             Number.isInteger(start)&&start>=1?start:null,
             Number.isInteger(end)&&end>=start?end:null,
