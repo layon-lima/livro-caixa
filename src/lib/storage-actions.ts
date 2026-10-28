@@ -1,7 +1,7 @@
 import "server-only";
 import { gunzip, gzip } from "node:zlib";
 import { promisify } from "node:util";
-import { mkdir, readdir, readFile, stat, statfs, writeFile, unlink } from "node:fs/promises";
+import { mkdir, readdir, readFile, stat, statfs, writeFile } from "node:fs/promises";
 import { dirname, join, resolve, sep } from "node:path";
 
 const gzipAsync = promisify(gzip);
@@ -61,9 +61,21 @@ export async function compressedOriginal(content: Buffer): Promise<Buffer> {
 export async function writeCompressedOriginal(key: string, compressed: Buffer): Promise<void> {
   const full = localPath(key);
   await mkdir(dirname(full), { recursive: true });
+  // Uma falha após gravar o arquivo, mas antes de confirmar o banco,
+  // pode deixar um original órfão. Reaproveitá-lo é mais seguro do que
+  // apagar o arquivo ou ignorá-lo na contagem da cota.
+  let existing: Buffer | null = null;
+  try { existing = await readFile(full); }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
+  if (existing) {
+    if (!existing.equals(compressed)) throw new Error("Arquivo local existente não confere com o conteúdo enviado.");
+    return;
+  }
   const used = await physicalStorageBytes();
   if (used + compressed.length > STORAGE_LIMIT_BYTES) {
-    throw new StorageFullError("Limite de 20 GB dos documentos atingido. Exclua ou arquive documentos antes de importar mais.");
+    throw new StorageFullError("Limite de 20 GB dos documentos atingido. Solicite ao administrador a liberação de espaço antes de importar mais.");
   }
   const disk = await statfs(ROOT);
   const free = disk.bavail * disk.bsize;
@@ -71,11 +83,6 @@ export async function writeCompressedOriginal(key: string, compressed: Buffer): 
     throw new StorageFullError("Espaço livre insuficiente na VPS. O sistema preserva 2 GB livres para os demais aplicativos.");
   }
   await writeFile(full, compressed, { flag: "wx", mode: 0o600 });
-}
-
-export async function cleanupFailedWrite(key: string): Promise<void> {
-  try { await unlink(localPath(key)); }
-  catch (e) { if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e; }
 }
 
 export async function readOriginal(key: string, armazenamento = "local"): Promise<Uint8Array> {
