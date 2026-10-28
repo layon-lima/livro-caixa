@@ -1,9 +1,11 @@
 "use client";
 import { useRef, useState, type DragEvent, type ChangeEvent } from "react";
 import { FileUp, FolderUp, LoaderCircle } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 type ImportResult = { name:string;status:string;id?:string;error?:string };
 export function ImportDrop({titularId}:{titularId:string}) {
+  const router=useRouter();
   const input=useRef<HTMLInputElement>(null);
   const [files,setFiles]=useState<File[]>([]);
   const [busy,setBusy]=useState(false);
@@ -34,6 +36,7 @@ export function ImportDrop({titularId}:{titularId:string}) {
         setResults([...all]);
       }
       setFiles([]);
+      router.refresh();
     }catch(e){setError(e instanceof Error?e.message:"Erro no envio");}
     finally{setBusy(false);}
   }
