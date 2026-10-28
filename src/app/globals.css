@@ -125,3 +125,37 @@ button { cursor: pointer; }
 .form-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
 .reset-form { border-top: 1px solid var(--line-soft); padding-top: 10px; }
 @media (max-width: 650px) { .admin-main { padding: 10px; } .admin-header { padding: 0 10px; } .admin-panel { padding: 10px; } .top-actions { gap: 6px; } .login-form { padding: 20px; } }
+
+
+/* Visualização local da senha digitada na administração. */
+.admin-password-field {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-width: 190px;
+  max-width: 330px;
+  position: relative;
+}
+.inline-form .admin-password-field input {
+  flex: 1;
+  min-width: 0;
+  max-width: none;
+  width: 100%;
+  padding-right: 38px;
+}
+.inline-form .admin-password-field .admin-password-toggle {
+  position: absolute;
+  right: 4px;
+  padding: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: #66788c;
+  border: 0;
+  border-radius: 4px;
+}
+.inline-form .admin-password-field .admin-password-toggle:hover {
+  background: #edf2f7;
+  color: #2b5c92;
+}
