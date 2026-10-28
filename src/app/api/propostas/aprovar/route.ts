@@ -8,6 +8,8 @@ export async function POST(request:Request){
   if(!sameOriginPost(request))return forbidden();
   const user=await currentUser();if(!user)return forbidden();
   const form=await request.formData();
+  const batchRaw=String(form.get("arquivos")||"");
+  const batch=/^\d+(?:,\d+){0,99}$/.test(batchRaw)?"&arquivos="+batchRaw:"";
   const ids=[...new Set(form.getAll("ids").map(safeId).filter((n):n is number=>n!==null))];
   if(!ids.length||ids.length>100)return backTo("/conferencia?erro=selecione");
   const db=getDatabase();
@@ -56,9 +58,9 @@ export async function POST(request:Request){
       );
     }
     await cx.query("COMMIT");
-    return backTo("/conferencia?aprovados="+ids.length);
+    return backTo("/conferencia?aprovados="+ids.length+batch);
   }catch(e){
     await cx.query("ROLLBACK");console.error("Erro ao aprovar",e);
-    return backTo("/conferencia?erro=processamento");
+    return backTo("/conferencia?erro=processamento"+batch);
   }finally{cx.release();}
 }
