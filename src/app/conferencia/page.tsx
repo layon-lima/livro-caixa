@@ -32,7 +32,6 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
   const all=rows.rows;
   const selected=all.find(p=>p.id===query.id)||all[0];
   const batchQuery=batch?"arquivos="+batch.join(",")+"&":"";
-  const actionBatch=batch?"&arquivos="+batch.join(","):"";
   const available=selected?await db.query<{id:string;titulo:string}>(
     "SELECT id::text,titulo FROM operacoes WHERE titular_id=$1 AND excluido_em IS NULL ORDER BY id DESC LIMIT 200",
     [selected.titular_id]):null;
