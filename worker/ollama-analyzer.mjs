@@ -62,7 +62,7 @@ export async function analyzeWithOllama({text,filename,categories,owners,maxPage
   const base=process.env.OLLAMA_URL;
   if(!base)return null;
   const model=process.env.OLLAMA_MODEL||"qwen3-vl:2b-instruct";
-  const shortText=String(text||"").slice(0,10000);
+  const shortText=String(text||"").slice(0,6500);
   if(shortText.trim().length<25)return null;
   const system=[
     "Você é extrator de dados para organização documental rural brasileira.",
