@@ -286,3 +286,13 @@ button { cursor: pointer; }
   .work-bar {padding:0 9px;gap:6px;}
   .work-bar a,.work-bar strong {font-size:10px;}
 }
+
+
+/* Uso de armazenamento no topo da importação, mantendo a interface compacta. */
+.storage-meter {padding:7px 10px 8px;border:1px solid var(--line);border-radius:5px;background:#fbfcfe;margin:0 0 10px;}
+.storage-meter-caption {display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:11px;margin-bottom:6px;}
+.storage-meter-caption strong {color:#45576b;}
+.storage-meter-caption span {font-variant-numeric:tabular-nums;color:#6a7e92;}
+.storage-meter-track {height:5px;border-radius:4px;background:#e5eaf0;overflow:hidden;margin-bottom:4px;}
+.storage-meter-track div {height:100%;background:#497db5;min-width:0;transition:width .2s;}
+.storage-meter small {font-size:10px;color:#8a98a5;}
