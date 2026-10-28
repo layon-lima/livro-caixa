@@ -1,0 +1,4 @@
+BEGIN;
+ALTER TABLE propostas ADD COLUMN IF NOT EXISTS titular_sugerido TEXT NOT NULL DEFAULT '';
+ALTER TABLE propostas ADD COLUMN IF NOT EXISTS consulta_empresa JSONB NOT NULL DEFAULT '{}'::jsonb;
+COMMIT;
