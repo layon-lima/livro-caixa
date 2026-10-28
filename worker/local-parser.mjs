@@ -162,7 +162,7 @@ function parseOne(t,name,defaultKind,first,last) {
   const evidence=[party,competence,value,category,reference].filter(Boolean).length;
   const confidence=Math.min(0.85,Math.max(0.3,0.30+evidence*0.11));
   return {titulo:title||name.replace(/\.[^.]+$/,""),documento_tipo:kind,contraparte:party,
-    competencia:competence,categoria,tipo:transactionKind(t,kind),
+    competencia:competence,categoria:category,tipo:transactionKind(t,kind),
     descricao:summary(t,kind,name,party),valor:value,referencia:reference,
     pagina_inicial:first,pagina_final:last,confianca:confidence,avisos,
     trecho:t.slice(0,120000)};
