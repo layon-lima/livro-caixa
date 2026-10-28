@@ -89,3 +89,27 @@ A imagem Docker executa os testes básicos de extração local antes de construi
 A rede `egress` e as variáveis OPENAI foram removidas do serviço worker. A integração externa não faz parte do fluxo ativo. Para uso futuro, somente mediante escolha explícita do responsável e revisão de privacidade e custos.
 
 Arquivos já importados e não revisados podem ser reprocessados na página de importação sem novo upload.
+
+
+## IA Central por demanda (Ollama independente)
+
+O Ollama pertence à VPS (projeto /opt/apps/ia-central), não ao Livro Caixa. O serviço central deve estar na rede Docker externa `ia_central_net`, com hostname `ollama`, modelo `qwen3-vl:2b-instruct` já baixado.
+
+O Livro Caixa conecta APENAS o seu worker à rede externa e usa:
+- OLLAMA_URL=http://ollama:11434
+- OLLAMA_MODEL=qwen3-vl:2b-instruct
+- `keep_alive: 0` em CADA solicitação, descarregando o modelo da RAM ao terminar.
+
+Sem Ollama ou em caso de erro/timeout, o OCR e as regras locais seguem funcionando. Arquivos XML de NF-e utilizam extração estruturada direta, sem chamar o modelo. PDFs e imagens primeiro passam por extração/OCR e depois pelo modelo local.
+
+A IA Central conserva o container do servidor em standby, mas não mantém o modelo carregado. Para usar o mesmo comportamento em todos os aplicativos, altere o `OLLAMA_KEEP_ALIVE` do compose da IA Central para `"0"`. Requisições individuais ainda podem sobrescrever essa configuração.
+
+O envio começa automaticamente ao soltar arquivos na área de importação ou selecioná-los no navegador; o processamento continua assíncrono e os dados só são registrados definitivamente após aprovação.
+
+Instalação do código do Livro Caixa:
+
+    cd /opt/apps/livro-caixa
+    git pull --ff-only
+    docker compose up -d --build
+
+O compose requer a rede `ia_central_net` pré-existente, mas não cria ou atualiza o container Ollama. Modelos e dados da IA Central permanecem em seu volume separado.
