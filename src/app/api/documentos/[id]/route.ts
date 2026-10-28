@@ -27,7 +27,9 @@ export async function GET(_request:Request,{params}:{params:Promise<{id:string}>
   try {
     const data=await readOriginal(file.chave_r2);
     const safeName=file.nome_original.replace(/[\r\n"]/g,"_");
-    return new NextResponse(Buffer.from(data),{
+    const body = new Uint8Array(data.length);
+    body.set(data);
+    return new NextResponse(body.buffer,{
       headers:{
         "Content-Type":file.mime,
         "Content-Disposition":'inline; filename="'+safeName+'"',
