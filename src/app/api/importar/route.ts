@@ -60,13 +60,37 @@ export async function POST(request: Request) {
         await connection.query("BEGIN");
         // Impede que dois envios simultâneos ultrapassem a cota ou gravem duplicados.
         await connection.query("SELECT pg_advisory_xact_lock(731266201)");
-        const existing = await connection.query<{id:string;titular_envio_id:string}>(
-          "SELECT id::text,titular_envio_id::text FROM arquivos WHERE sha256=$1",[digest]
+        const existing = await connection.query<{
+          id:string;titular_envio_id:string;status:string;armazenamento:string;
+        }>(
+          "SELECT id::text,titular_envio_id::text,status,armazenamento FROM arquivos WHERE sha256=$1 FOR UPDATE",[digest]
         );
         if (existing.rows[0]) {
+          const original=existing.rows[0];
+          // O usuário reenviou um documento ainda não conferido.
+          // Reprocessar a mesma entrada sem duplicar armazenamento, preservando
+          // documentos já revisados/aprovados e sem cruzar titulares distintos.
+          if (original.titular_envio_id===String(titularId) &&
+              original.armazenamento==="local" &&
+              ["pronto","erro"].includes(original.status)) {
+            const checked=await connection.query(
+              "SELECT 1 FROM propostas WHERE arquivo_id=$1 AND "+
+              "(revisada_em IS NOT NULL OR aprovado_em IS NOT NULL) LIMIT 1",[original.id]
+            );
+            if (!checked.rowCount) {
+              await connection.query("DELETE FROM propostas WHERE arquivo_id=$1",[original.id]);
+              await connection.query(
+                "UPDATE arquivos SET status='aguardando',erro=NULL,texto_extraido='',atualizado_em=now() "+
+                "WHERE id=$1",[original.id]
+              );
+              await connection.query("COMMIT");
+              results.push({name,status:"reprocessado",id:original.id});
+              continue;
+            }
+          }
           await connection.query("COMMIT");
-          results.push(existing.rows[0].titular_envio_id===String(titularId)
-            ? {name,status:"duplicado",id:existing.rows[0].id}
+          results.push(original.titular_envio_id===String(titularId)
+            ? {name,status:"duplicado",id:original.id}
             : {name,status:"duplicado"});
           continue;
         }

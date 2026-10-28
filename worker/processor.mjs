@@ -137,6 +137,7 @@ async function processFile(file){
     if(!defaultBook)throw Error("Titular do envio não está autorizado para o usuário.");
     // O modelo só carrega durante a análise e descarrega ao terminar (keep_alive: 0).
     let method=output.xml?"xml":"local";
+    let aiNotice="";
     let items=output.xml||parseLocalDocument(output.text,file.nome_original,file.mime);
     if(!items.length)throw Error("Não foi possível identificar documentos no arquivo.");
     if(method==="local" && process.env.OLLAMA_URL){
@@ -148,9 +149,14 @@ async function processFile(file){
           owners:allowedBooks,maxPages
         });
         if(fromOllama?.length){items=fromOllama;method="ia";}
-        else console.warn("IA Central sem dados válidos; mantido extrator local",file.id);
+        else {
+          aiNotice="IA Central retornou dados incompletos ou inválidos; mantida leitura OCR local.";
+          console.warn("IA Central sem dados válidos; mantido extrator local",file.id);
+        }
       }catch(e){
-        console.warn("IA Central indisponível, mantido OCR local",file.id,String(e).slice(0,300));
+        const detail=String(e instanceof Error?e.message:e).slice(0,125);
+        aiNotice="IA Central não concluiu a leitura ("+detail+"); mantido OCR local.";
+        console.warn("IA Central indisponível, mantido OCR local",file.id,detail);
       }
     }
 
@@ -159,6 +165,7 @@ async function processFile(file){
       await connection.query("BEGIN");
       for(const item of items){
         const notice=[];
+        if(aiNotice)notice.push(aiNotice);
         const fullText=item.trecho||output.text;
         const hinted=fromAiOwner(item.titular_id||item.titular_nome,allowedBooks);
         const seller=fromAiOwner(item.emitente_nome,allowedBooks);

@@ -56,7 +56,7 @@ export function ImportDrop({titularId,canApprove}:{titularId:string;canApprove:b
       if(!alive.current)return;
       setFiles([]);
       router.refresh();
-      const ids=[...new Set(all.filter(x=>(x.status==="importado"||x.status==="duplicado") && x.id).map(x=>x.id!))];
+      const ids=[...new Set(all.filter(x=>(x.status==="importado"||x.status==="reprocessado"||x.status==="duplicado") && x.id).map(x=>x.id!))];
       const failed=all.filter(x=>x.status==="erro");
       if(!ids.length) {
         setPhase("concluido");
@@ -121,7 +121,7 @@ export function ImportDrop({titularId,canApprove}:{titularId:string;canApprove:b
   const displayedFiles:UploadResult[]=results.length?results:files.map(f=>({name:f.name,status:"selecionado"}));
   const statusText:Record<string,string>={
     selecionado:"Preparando envio",importado:"Na fila de leitura",
-    duplicado:"Já cadastrado",aguardando:"Aguardando OCR",processando:"Lendo e identificando dados…",
+    duplicado:"Já cadastrado",reprocessado:"Nova leitura solicitada",aguardando:"Aguardando OCR",processando:"Lendo e identificando dados…",
     pronto:"Leitura concluída",erro:"Erro",
   };
   return <div className="uploader">
