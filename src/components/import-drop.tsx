@@ -65,8 +65,13 @@ export function ImportDrop({titularId,canApprove}:{titularId:string;canApprove:b
         return;
       }
       setPhase("lendo");
-      // A gravação não é o resultado final: o usuário só vai à conferência
-      // depois que o worker publicar os dados extraídos no PostgreSQL.
+      // Abrir a conferência imediatamente após o upload (antes do OCR e da IA).
+      // O formulário se atualiza ao vivo enquanto o worker processa.
+      if(canApprove){
+        router.push("/conferencia?arquivos="+encodeURIComponent(ids.join(",")));
+        return;
+      }
+      // Usuários sem permissão de aprovação acompanham o estado nesta página.
       for(let attempt=0;alive.current;attempt++){
         const res=await fetch("/api/importar/status?ids="+encodeURIComponent(ids.join(",")),
           {cache:"no-store",credentials:"same-origin"});
