@@ -49,13 +49,16 @@ export default async function Importar({searchParams}:{searchParams:Promise<{tit
         </div>
         <small>Limite de 20 GB para arquivos compactados. O banco de dados e os temporários do OCR são separados.</small>
       </section>
-      <form action="/importar" className="form-row-compact">
-        <label htmlFor="titular">Livro de destino:</label>
-        <select name="titular" id="titular" defaultValue={selected?.id||""}>
-          {books.map(t=><option key={t.id} value={t.id}>{t.nome}</option>)}
-        </select>
-        <button type="submit" className="flat-button">Selecionar</button>
-      </form>
+      <details className="import-options">
+        <summary>Opções de importação (opcional)</summary>
+        <form action="/importar" className="form-row-compact">
+          <label htmlFor="titular">Titular provisório, caso não seja identificado no documento:</label>
+          <select name="titular" id="titular" defaultValue={selected?.id||""}>
+            {books.map(t=><option key={t.id} value={t.id}>{t.nome}</option>)}
+          </select>
+          <button type="submit" className="flat-button">Aplicar</button>
+        </form>
+      </details>
       {selected?<ImportDrop key={selected.id} titularId={selected.id} canApprove={canApprove}/>
         :<p className="form-error">Este usuário não possui permissão de importação.</p>}
       <div className="page-title-compact"><h2>Arquivos recebidos</h2><span>Processamento automático na VPS</span></div>
