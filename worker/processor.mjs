@@ -1,6 +1,7 @@
 import { Pool } from "pg";
 import { parseLocalDocument } from "./local-parser.mjs";
 import { analyzeWithOllama } from "./ollama-analyzer.mjs";
+import { candidateNewOwner, receiverCnpj, lookupPublicCnpj } from "./company-lookup.mjs";
 import { XMLParser } from "fast-xml-parser";
 import { mkdtemp, writeFile, rm, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -140,8 +141,23 @@ async function processFile(file){
     let aiNotice="";
     let items=output.xml||parseLocalDocument(output.text,file.nome_original,file.mime);
     if(!items.length)throw Error("Não foi possível identificar documentos no arquivo.");
-    // Primeira etapa: já mostrar no formulário os dados descobertos pelo OCR.
+    // Primeira etapa: OCR detecta campos e possíveis titulares ainda não cadastrados.
     const first=items[0];
+    const knownNames=allowedBooks.map(x=>x.nome);
+    const localSuggestedOwner=candidateNewOwner(output.text,first.documento_tipo,knownNames);
+    let companyInfo=null;
+    // Busca pública só por CNPJ válido e ancorado ao recebedor/contraparte.
+    // Não enviar PDF, CPF nem conteúdo OCR para serviços externos.
+    const possibleCnpj=items.length===1?
+      receiverCnpj(output.text,first.contraparte,first.documento_tipo):"";
+    if(possibleCnpj){
+      await db.query("UPDATE arquivos SET progresso_etapa='pesquisando',atualizado_em=now() WHERE id=$1",[file.id]);
+      try{
+        companyInfo=await lookupPublicCnpj(possibleCnpj);
+      }catch(e){
+        console.warn("Consulta pública de CNPJ não disponível",possibleCnpj,String(e).slice(0,160));
+      }
+    }
     const dateInitial=competence(first.competencia);
     const matchingOwner=recognizedOwner(output.text,allowedBooks);
     const initialFields={
@@ -150,7 +166,9 @@ async function processFile(file){
       categoria:short(first.categoria,120),tipo:short(first.tipo,15),
       descricao:short(first.descricao,600),valor:short(first.valor,40),
       referencia:short(first.referencia,100),
-      ...(matchingOwner?{titular_id:String(matchingOwner.id)}:{})
+      ...(matchingOwner?{titular_id:String(matchingOwner.id)}:{}),
+      ...(localSuggestedOwner?{titular_sugerido:localSuggestedOwner}:{}),
+      ...(companyInfo?{consulta_empresa:companyInfo}:{})
     };
     await db.query(
       "UPDATE arquivos SET progresso_etapa=$2,progresso_dados=$3::jsonb,atualizado_em=now() WHERE id=$1",
@@ -163,7 +181,7 @@ async function processFile(file){
         await db.query("UPDATE arquivos SET progresso_etapa='ia',atualizado_em=now() WHERE id=$1",[file.id]);
         const fromOllama=await analyzeWithOllama({
           text:output.text,filename:file.nome_original,categories:labels,
-          owners:allowedBooks,maxPages,
+          owners:allowedBooks,maxPages,publicCompany:companyInfo,
           onPartial:async fields=>{
             if(!Object.keys(fields).length)return;
             await db.query("UPDATE arquivos SET progresso_dados=progresso_dados || $2::jsonb,atualizado_em=now() WHERE id=$1",
@@ -188,6 +206,11 @@ async function processFile(file){
       for(const item of items){
         const notice=[];
         if(aiNotice)notice.push(aiNotice);
+        const suggested=short(item.titular_sugerido||localSuggestedOwner,120);
+        const cleanSuggested=suggested&&
+          !allowedBooks.some(x=>normalizeName(x.nome)===normalizeName(suggested))?
+          suggested.toLocaleUpperCase("pt-BR"):"";
+        if(cleanSuggested)notice.push("Possível titular não cadastrado: "+cleanSuggested+". Confirme antes de criar.");
         const fullText=item.trecho||output.text;
         const hinted=fromAiOwner(item.titular_id||item.titular_nome,allowedBooks);
         const seller=fromAiOwner(item.emitente_nome,allowedBooks);
@@ -262,15 +285,16 @@ async function processFile(file){
         await connection.query(
           "INSERT INTO propostas (arquivo_id,titular_id,titulo,documento_tipo,contraparte,competencia,"+
           "competencia_estimada,categoria_id,tipo,descricao,valor,referencia,pagina_inicial,pagina_final,"+
-          "operacao_sugerida_id,duplicada_de,metodo_leitura,confianca,avisos) "+
-          "VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)",
+          "operacao_sugerida_id,duplicada_de,metodo_leitura,confianca,avisos,titular_sugerido,consulta_empresa) "+
+          "VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)",
           [file.id,ownerId,title,docType,party,date.date,date.estimated,category?.id||null,
             ["receita","despesa","outro"].includes(type)?type:"outro",
             desc,value,reference,
             Number.isInteger(start)&&start>=1?start:null,
             Number.isInteger(end)&&end>=start?end:null,
             chosen,duplicates?.rows[0]?.id||null,method,confidence,
-            [...new Set([...notice,...extraWarnings])].slice(0,12)]
+            [...new Set([...notice,...extraWarnings])].slice(0,12),
+            cleanSuggested,JSON.stringify(companyInfo||{})]
         );
       }
       await connection.query(
