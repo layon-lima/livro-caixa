@@ -20,7 +20,7 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
   const rows=await db.query<Queued>(
     "SELECT p.id::text,p.arquivo_id::text,p.titular_id::text,p.titulo,p.documento_tipo,p.contraparte,"+
     "p.competencia::text,p.competencia_estimada,p.categoria_id::text,p.tipo,p.descricao,p.valor::text,p.referencia,"+
-    "p.pagina_inicial,p.pagina_final,p.metodo_leitura,p.confianca::text,p.avisos,p.revisada_em::text,p.operacao_sugerida_id::text,p.aprovado_em::text,p.duplicada_de::text,"+
+    "p.pagina_inicial,p.pagina_final,p.metodo_leitura,p.confianca::text,p.avisos,p.titular_sugerido,p.consulta_empresa,p.revisada_em::text,p.operacao_sugerida_id::text,p.aprovado_em::text,p.duplicada_de::text,"+
     "orig.arquivo_id::text AS arquivo_original_id,orig.titular_id::text AS titular_original_id,"+
     "a.nome_original,a.status,a.erro,a.texto_extraido,t.nome AS nome_titular "+
     "FROM propostas p JOIN arquivos a ON a.id=p.arquivo_id JOIN titulares t ON t.id=p.titular_id "+
@@ -121,6 +121,31 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
               <div><span>Contraparte</span><strong>{selected.contraparte||"Não identificada"}</strong></div>
               {selected.operacao_sugerida_id&&<div><span>Vinculação</span><strong>Operação relacionada #{selected.operacao_sugerida_id}</strong></div>}
             </section>
+            {(selected.titular_sugerido||selected.contraparte)&&<section className="review-enrichment">
+              {selected.titular_sugerido&&<div className="enrichment-line">
+                <strong>Possível novo titular</strong>
+                <span>{selected.titular_sugerido}</span>
+                <small>O documento cita essa pessoa como possível responsável. O sistema não cria titulares automaticamente.</small>
+                {user.isAdmin?
+                  <Link href={"/admin?sugerir_titular="+encodeURIComponent(selected.titular_sugerido)}
+                    className="flat-button">Conferir e cadastrar titular</Link>:
+                  <small>O cadastro de titulares depende de um administrador.</small>}
+              </div>}
+              {selected.contraparte&&<div className="enrichment-line">
+                <strong>Pesquisa do recebedor / fornecedor</strong>
+                {selected.consulta_empresa?.cnpj?<>
+                  <span>{selected.consulta_empresa.razao_social||selected.contraparte}
+                    {selected.consulta_empresa.nome_fantasia?" ("+selected.consulta_empresa.nome_fantasia+")":""}</span>
+                  <small>CNPJ: {selected.consulta_empresa.cnpj}</small>
+                  {selected.consulta_empresa.atividade&&<small>Atividade pública (CNAE): {selected.consulta_empresa.atividade}</small>}
+                  <small>Fonte: BrasilAPI. A atividade não comprova o tipo do gasto.</small>
+                </>:<small>Não foi possível confirmar o recebedor por CNPJ; nenhuma informação externa foi utilizada na classificação.</small>}
+                <a href={"https://www.google.com/search?q="+encodeURIComponent(selected.contraparte)}
+                  target="_blank" rel="noopener noreferrer" className="flat-button">
+                  Pesquisar recebedor na internet <ExternalLink size={13}/>
+                </a>
+              </div>}
+            </section>}
             {selected.avisos?.length>0&&<details className="review-notices">
               <summary>{selected.avisos.length} ponto(s) para conferir <span>Ver detalhes</span></summary>
               <ul>{selected.avisos.map((notice,i)=><li key={i}>{notice}</li>)}</ul>
