@@ -1,0 +1,4 @@
+BEGIN;
+ALTER TABLE arquivos ADD COLUMN IF NOT EXISTS progresso_etapa TEXT NOT NULL DEFAULT 'aguardando';
+ALTER TABLE arquivos ADD COLUMN IF NOT EXISTS progresso_dados JSONB NOT NULL DEFAULT '{}'::jsonb;
+COMMIT;
