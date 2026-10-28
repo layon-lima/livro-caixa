@@ -64,7 +64,7 @@ export default async function Admin({ searchParams }: {
             <label htmlFor="new-username" className="sr-only">Nome de usuário</label>
             <input id="new-username" name="username" placeholder="Usuário (a-z, 0-9, ponto, _ ou -)" minLength={3} maxLength={32} pattern="[a-z0-9._-]{3,32}" autoComplete="off" required />
             <label htmlFor="new-password" className="sr-only">Senha do usuário</label>
-            <input id="new-password" name="password" type="password" placeholder="Senha (mínimo 12 caracteres)" minLength={12} maxLength={128} autoComplete="new-password" required />
+            <input id="new-password" name="password" type="password" placeholder="Senha (mínimo 6 caracteres)" minLength={6} maxLength={128} autoComplete="new-password" required />
             <button type="submit">Criar usuário</button>
           </form>
           <p className="muted">Contas criadas sem acesso aos livros até que suas permissões sejam definidas abaixo.</p>
@@ -103,7 +103,7 @@ export default async function Admin({ searchParams }: {
               <form className="inline-form reset-form" action="/api/admin/reset-password" method="post">
                 <input type="hidden" name="userId" value={u.id} />
                 <label className="sr-only" htmlFor={"reset-" + u.id}>Nova senha de {u.username}</label>
-                <input id={"reset-" + u.id} type="password" name="password" placeholder="Nova senha (mínimo 12 caracteres)" minLength={12} maxLength={128} autoComplete="new-password" required />
+                <input id={"reset-" + u.id} type="password" name="password" placeholder="Nova senha (mínimo 6 caracteres)" minLength={6} maxLength={128} autoComplete="new-password" required />
                 <button type="submit">Alterar senha</button>
               </form>
             </div>
