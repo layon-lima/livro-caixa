@@ -317,3 +317,7 @@ button { cursor: pointer; }
 .review-edit-data > summary {cursor:pointer;font-size:12px;font-weight:600;padding:7px 0;user-select:none;}
 .review-edit-data[open] > summary {margin-bottom:7px;}
 @media(max-width:650px){.review-auto-summary{grid-template-columns:repeat(2,minmax(0,1fr));}}
+
+.import-options {margin:0 0 8px;font-size:11px;}
+.import-options>summary {cursor:pointer;color:var(--muted,#64748b);padding:3px 0;}
+.import-options[open] .form-row-compact {margin:6px 0;}
