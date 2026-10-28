@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseOllamaOutput } from "./ollama-analyzer.mjs";
+import { parseOllamaOutput, partialOllamaFields } from "./ollama-analyzer.mjs";
 
 const options={
   text:"PÁGINA 1 DE 1\nComprovante de transferência Pix\n28/10/2026\n"+
@@ -42,4 +42,24 @@ test("recusar separação com páginas sobrepostas",()=>{
 
 test("recusar resposta que não é JSON",()=>{
   assert.equal(parseOllamaOutput("Texto livre",options),null);
+});
+
+test("Campos completos chegam antes do JSON inteiro: nao usa campo parcial",()=>{
+  const partial='{"itens":[{"titulo":"Comprovante Pix","documento_tipo":"comprovante","contraparte":"EMPRESA EXEMPLO","valor":"36027.03","descricao":"Aguardan';
+  const found=partialOllamaFields(partial,{
+    categories:options.categories,owners:options.owners,text:options.text
+  });
+  assert.equal(found.titulo,"Comprovante Pix");
+  assert.equal(found.contraparte,"EMPRESA EXEMPLO");
+  assert.equal(found.valor,"36027.03");
+  assert.equal(found.descricao,undefined);
+});
+test("Nao publica titular sem nome completo no OCR",()=>{
+  const raw='{"itens":[{"titular_id":"2","categoria":"Outra categoria","competencia":"2026-10"}]}';
+  const found=partialOllamaFields(raw,{
+    categories:options.categories,owners:options.owners,text:options.text
+  });
+  assert.equal(found.titular_id,undefined);
+  assert.equal(found.categoria,undefined);
+  assert.equal(found.competencia,"2026-10");
 });
