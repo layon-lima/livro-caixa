@@ -127,15 +127,26 @@ async function processFile(file){
           "ORDER BY (referencia=$2 AND $2<>'') DESC,id DESC LIMIT 1",
           [file.titular_envio_id,ref,short(item.contraparte,150),date.date]);
         const start=Number(item.pagina_inicial),end=Number(item.pagina_final);
+        // Só bloqueia por referência quando ela é forte o bastante para identificar
+        // inequivocamente uma transação/nota, nunca só por valor ou nome.
+        const docType=short(item.documento_tipo,50).toLowerCase();
+        const referenceIsStrong =
+          (docType==="nota fiscal" && /^\\d{44}$/.test(ref)) ||
+          (docType==="boleto" && /^\\d{44,48}$/.test(ref)) ||
+          (docType==="comprovante" && ref.length>=24);
+        const duplicate=referenceIsStrong?await connection.query(
+          "SELECT id FROM propostas WHERE documento_tipo=$1 AND referencia=$2 AND arquivo_id<>$3 ORDER BY id LIMIT 1",
+          [docType,ref,file.id]
+        ):null;
         await connection.query(
-          "INSERT INTO propostas (arquivo_id,titular_id,titulo,documento_tipo,contraparte,competencia,competencia_estimada,categoria_id,tipo,descricao,valor,referencia,pagina_inicial,pagina_final,operacao_sugerida_id) "+
-          "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)",
+          "INSERT INTO propostas (arquivo_id,titular_id,titulo,documento_tipo,contraparte,competencia,competencia_estimada,categoria_id,tipo,descricao,valor,referencia,pagina_inicial,pagina_final,operacao_sugerida_id,duplicada_de) "+
+          "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)",
           [file.id,file.titular_envio_id,title,short(item.documento_tipo,50)||"outro",
             short(item.contraparte,150),date.date,date.estimated,cat?.id||null,
             ["receita","despesa","outro"].includes(item.tipo)?item.tipo:"despesa",
             short(item.descricao,2000),amount(item.valor),ref,
             Number.isInteger(start)&&start>=1?start:null,
-            Number.isInteger(end)&&end>=start?end:null,related.rows[0]?.id||null]);
+            Number.isInteger(end)&&end>=start?end:null,related.rows[0]?.id||null,duplicate?.rows[0]?.id||null]);
       }
       await connection.query("UPDATE arquivos SET status='pronto',texto_extraido=$2,erro=NULL,atualizado_em=now() WHERE id=$1",[file.id,output.text.slice(0,1500000)]);
       await connection.query("COMMIT");
