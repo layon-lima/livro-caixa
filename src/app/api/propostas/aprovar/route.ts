@@ -18,17 +18,17 @@ export async function POST(request:Request){
       id:string;arquivo_id:string;titular_id:string;titulo:string;documento_tipo:string;
       competencia:string;categoria_id:string|null;tipo:string;descricao:string;contraparte:string;
       valor:string|null;referencia:string;operacao_sugerida_id:string|null;revisada_em:string|null;
-      aprovado_em:string|null;status:string;
+      aprovado_em:string|null;status:string;duplicada_de:string|null;
     }>(
       "SELECT p.id::text,p.arquivo_id::text,p.titular_id::text,p.titulo,p.documento_tipo,p.competencia::text,"+
       "p.categoria_id::text,p.tipo,p.descricao,p.contraparte,p.valor::text,p.referencia,p.operacao_sugerida_id::text,"+
-      "p.revisada_em::text,p.aprovado_em::text,a.status "+
+      "p.revisada_em::text,p.aprovado_em::text,p.duplicada_de::text,a.status "+
       "FROM propostas p JOIN arquivos a ON a.id=p.arquivo_id WHERE p.id=ANY($1::bigint[]) FOR UPDATE OF p",
       [ids],
     );
     if(found.rows.length!==ids.length){await cx.query("ROLLBACK");return backTo("/conferencia?erro=invalido");}
     for(const p of found.rows){
-      if(p.aprovado_em || !p.revisada_em || p.status!=="pronto" ||
+      if(p.aprovado_em || p.duplicada_de || !p.revisada_em || p.status!=="pronto" ||
          !await canAccessTitular(user,Number(p.titular_id),"approve")){
         await cx.query("ROLLBACK");return backTo("/conferencia?erro=nao-conferido");
       }
