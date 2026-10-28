@@ -38,7 +38,13 @@ export default async function Importar({searchParams}:{searchParams:Promise<{tit
         <table className="admin-table dense-table">
           <thead><tr><th>Arquivo</th><th>Titular</th><th>Situação</th><th>Recebido em</th></tr></thead>
           <tbody>{list.rows.map(a=><tr key={a.id}>
-            <td>{a.nome_original}</td><td>{a.nome}</td><td>{a.status==="erro"?<span title={a.erro||""}>Erro — {a.erro?.slice(0,100)}</span>:a.status}</td>
+            <td>{a.nome_original}</td><td>{a.nome}</td><td>
+              {a.status==="erro"?<span title={a.erro||""}>Erro — {a.erro?.slice(0,100)}</span>:a.status}
+              {a.status==="erro" && <form className="inline-retry" action="/api/importar/reprocessar" method="post">
+                <input type="hidden" name="arquivoId" value={a.id}/>
+                <button type="submit" className="flat-button">Reprocessar</button>
+              </form>}
+            </td>
             <td>{new Date(a.criado_em).toLocaleString("pt-BR")}</td>
           </tr>)}</tbody>
         </table>
