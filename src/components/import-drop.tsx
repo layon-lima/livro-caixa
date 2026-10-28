@@ -54,12 +54,12 @@ export function ImportDrop({titularId,canApprove}:{titularId:string;canApprove:b
       if(!alive.current)return;
       setFiles([]);
       router.refresh();
-      const ids=[...new Set(all.filter(x=>x.status==="importado" && x.id).map(x=>x.id!))];
+      const ids=[...new Set(all.filter(x=>(x.status==="importado"||x.status==="duplicado") && x.id).map(x=>x.id!))];
       const failed=all.filter(x=>x.status==="erro");
       if(!ids.length) {
         setPhase("concluido");
         setError(failed.length?failed.map(x=>x.name+": "+(x.error||"Falha no envio")).join("; "):
-          "Esses arquivos já estão cadastrados. Nenhum novo documento foi enviado.");
+          "Os arquivos já estão cadastrados e não há uma conferência pendente para abrir.");
         return;
       }
       setPhase("lendo");
@@ -92,7 +92,9 @@ export function ImportDrop({titularId,canApprove}:{titularId:string;canApprove:b
             return;
           }
           setPhase("concluido");
-          setError("A leitura terminou, mas nenhuma proposta foi criada. Confira o erro exibido e use Reprocessar.");
+          setError(statuses.some(st=>st.status==="erro")
+            ?"Houve falha na leitura. Confira o erro e use Reprocessar na lista de arquivos."
+            :"Não há propostas pendentes destes documentos. Se já foram aprovados, estão organizados no Livro Caixa.");
           return;
         }
         if(attempt>=180){
