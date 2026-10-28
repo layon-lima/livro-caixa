@@ -1,14 +1,20 @@
 import { Pool } from "pg";
-import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { XMLParser } from "fast-xml-parser";
-import { mkdtemp, writeFile, readdir, rm } from "node:fs/promises";
+import { mkdtemp, writeFile, readdir, rm, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve, sep } from "node:path";
+import { gunzipSync } from "node:zlib";
 import { execFile as nodeExec } from "node:child_process";
 import { promisify } from "node:util";
 const exec = promisify(nodeExec);
 const db = new Pool({host:process.env.PGHOST,user:process.env.PGUSER,password:process.env.PGPASSWORD,database:process.env.PGDATABASE});
-const r2 = new S3Client({region:"auto",endpoint:"https://"+process.env.R2_ACCOUNT_ID+".r2.cloudflarestorage.com",credentials:{accessKeyId:process.env.R2_ACCESS_KEY_ID||"",secretAccessKey:process.env.R2_SECRET_ACCESS_KEY||""}});
+const ROOT = process.env.LC_STORAGE_DIR || "/data/livro-caixa-arquivos";
+function compressedPath(key) {
+  if(!/^originais\/[a-f0-9]{2}\/[a-f0-9]{64}\.gz$/.test(key))throw Error("Chave local inválida");
+  const root=resolve(ROOT), full=resolve(root,key);
+  if(!full.startsWith(root+sep))throw Error("Caminho local inválido");
+  return full;
+}
 const sleep = ms => new Promise(resolve=>setTimeout(resolve,ms));
 const short=(s,n=300)=>String(s||"").trim().slice(0,n);
 function competence(value) {
@@ -102,8 +108,8 @@ async function ai(text,name,labels) {
 async function processFile(file){
   const folder=await mkdtemp(join(tmpdir(),"lc-"));
   try{
-    const result=await r2.send(new GetObjectCommand({Bucket:process.env.R2_BUCKET,Key:file.chave_r2}));
-    const bytes=Buffer.from(await result.Body.transformToByteArray());
+    if(file.armazenamento!=="local")throw Error("Arquivo anterior requer migração para a VPS");
+    const bytes=gunzipSync(await readFile(compressedPath(file.chave_armazenamento)));
     const output=await extract(bytes,file.mime,folder);
     const cats=(await db.query("SELECT id::text,nome,subcategoria FROM categorias")).rows;
     const labels=cats.map(x=>x.nome+(x.subcategoria?" > "+x.subcategoria:""));

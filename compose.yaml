@@ -31,10 +31,8 @@ services:
       PGDATABASE: ${POSTGRES_DB:?Informe POSTGRES_DB no .env}
       PGUSER: ${POSTGRES_USER:?Informe POSTGRES_USER no .env}
       PGPASSWORD: ${POSTGRES_PASSWORD:?Informe POSTGRES_PASSWORD no .env}
-      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:-}
-      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
-      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
-      R2_BUCKET: ${R2_BUCKET:-}
+    volumes:
+      - documents_data:/data/livro-caixa-arquivos
     expose:
       - "3000"
     networks:
@@ -58,12 +56,10 @@ services:
       PGDATABASE: ${POSTGRES_DB:?Informe POSTGRES_DB no .env}
       PGUSER: ${POSTGRES_USER:?Informe POSTGRES_USER no .env}
       PGPASSWORD: ${POSTGRES_PASSWORD:?Informe POSTGRES_PASSWORD no .env}
-      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:-}
-      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
-      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
-      R2_BUCKET: ${R2_BUCKET:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
+    volumes:
+      - documents_data:/data/livro-caixa-arquivos:ro
     networks:
       - private
       - egress
@@ -78,3 +74,4 @@ networks:
 
 volumes:
   postgres_data:
+  documents_data:
