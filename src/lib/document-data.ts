@@ -16,7 +16,7 @@ export type Proposta = {
   categoria_id: string | null; tipo: string; descricao: string; valor: string | null; referencia: string;
   nome_original: string; status: string; erro: string | null; texto_extraido: string;
   pagina_inicial: number | null; pagina_final: number | null;
-  revisada_em: string | null; operacao_sugerida_id: string | null; aprovado_em: string | null;
+  revisada_em: string | null; operacao_sugerida_id: string | null; aprovado_em: string | null; duplicada_de: string | null;
 };
 export function safeId(input: unknown): number | null {
   const n = Number(input);
