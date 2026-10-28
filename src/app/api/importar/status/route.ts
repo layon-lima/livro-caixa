@@ -11,6 +11,9 @@ type Item = {
   status: "aguardando"|"processando"|"pronto"|"erro";
   erro: string|null;
   propostas: number;
+  nome_original: string;
+  progresso_etapa: string;
+  progresso_dados: Record<string,string>;
 };
 
 export async function GET(request: Request) {
@@ -25,7 +28,8 @@ export async function GET(request: Request) {
     return NextResponse.json({error:"Identificadores inválidos."},{status:400});
   }
   const rows=await getDatabase().query<Item>(
-    "SELECT a.id::text,a.titular_envio_id::text AS titular_id,a.status,a.erro,"+
+    "SELECT a.id::text,a.titular_envio_id::text AS titular_id,a.nome_original,a.status,a.erro,"+
+    "a.progresso_etapa,a.progresso_dados,"+
     "(SELECT count(*)::integer FROM propostas p WHERE p.arquivo_id=a.id AND p.aprovado_em IS NULL) AS propostas "+
     "FROM arquivos a WHERE a.id=ANY($1::bigint[])",
     [ids],
