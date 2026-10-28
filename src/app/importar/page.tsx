@@ -4,6 +4,7 @@ import { titularesPermitidos } from "@/lib/document-data";
 import { getDatabase } from "@/lib/database";
 import { physicalStorageBytes, STORAGE_LIMIT_BYTES } from "@/lib/storage-actions";
 import { ImportDrop } from "@/components/import-drop";
+import { ImportStatusRefresh } from "@/components/import-status-refresh";
 import { FileUp, ArrowLeft, ClipboardCheck } from "lucide-react";
 export const dynamic="force-dynamic";
 
@@ -14,9 +15,11 @@ export default async function Importar({searchParams}:{searchParams:Promise<{tit
   const selected=books.find(x=>x.id===query.titular)||books[0];
   const [list, usedBytes]=await Promise.all([
     getDatabase().query<{
-    id:string;nome_original:string;status:string;erro:string|null;criado_em:string;nome:string;
+    id:string;nome_original:string;status:string;erro:string|null;criado_em:string;nome:string;revisado:boolean;
   }>(
-    "SELECT a.id::text,a.nome_original,a.status,a.erro,a.criado_em::text,t.nome FROM arquivos a JOIN titulares t ON t.id=a.titular_envio_id "+
+    "SELECT a.id::text,a.nome_original,a.status,a.erro,a.criado_em::text,t.nome,"+
+    "EXISTS(SELECT 1 FROM propostas p WHERE p.arquivo_id=a.id AND (p.revisada_em IS NOT NULL OR p.aprovado_em IS NOT NULL)) AS revisado "+
+    "FROM arquivos a JOIN titulares t ON t.id=a.titular_envio_id "+
     (user.isAdmin?"":"JOIN user_titular_permissions p ON p.titular_id=a.titular_envio_id AND p.user_id=$1 AND p.can_import=true ")+
     "ORDER BY a.id DESC LIMIT 100",
     user.isAdmin?[]:[user.id],
@@ -49,14 +52,15 @@ export default async function Importar({searchParams}:{searchParams:Promise<{tit
       </form>
       {selected?<ImportDrop key={selected.id} titularId={selected.id}/>
         :<p className="form-error">Este usuário não possui permissão de importação.</p>}
-      <div className="page-title-compact"><h2>Arquivos recebidos</h2><span>O processamento ocorre na VPS</span></div>
+      <div className="page-title-compact"><h2>Arquivos recebidos</h2><span>Processamento automático na VPS</span></div>
+      <ImportStatusRefresh active={list.rows.some(a=>a.status==="aguardando"||a.status==="processando")}/>
       <div className="table-scroll">
         <table className="admin-table dense-table">
           <thead><tr><th>Arquivo</th><th>Titular</th><th>Situação</th><th>Recebido em</th></tr></thead>
           <tbody>{list.rows.map(a=><tr key={a.id}>
             <td>{a.nome_original}</td><td>{a.nome}</td><td>
               {a.status==="erro"?<span title={a.erro||""}>Erro — {a.erro?.slice(0,100)}</span>:a.status}
-              {a.status==="erro" && <form className="inline-retry" action="/api/importar/reprocessar" method="post">
+              {(a.status==="erro" || (a.status==="pronto" && !a.revisado)) && <form className="inline-retry" action="/api/importar/reprocessar" method="post">
                 <input type="hidden" name="arquivoId" value={a.id}/>
                 <button type="submit" className="flat-button">Reprocessar</button>
               </form>}
@@ -65,7 +69,7 @@ export default async function Importar({searchParams}:{searchParams:Promise<{tit
           </tr>)}</tbody>
         </table>
       </div>
-      <p className="muted">Documentos enviados não entram automaticamente no Livro Caixa. Revise e aprove em Conferência.</p>
+      <p className="muted">Quando o status for Pronto, abra Conferência para revisar os dados extraídos. Você pode reprocessar arquivos ainda não conferidos sem reenviá-los.</p>
     </main>
   </div>;
 }
