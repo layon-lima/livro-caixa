@@ -35,6 +35,12 @@ function extractLabel(t,labels,max=130) {
 }
 
 function findParty(t,kind) {
+  // Comprovantes Pix podem trazer "Nome:" separado por seção, em vez de "Recebedor:".
+  if(kind==="comprovante"){
+    const receiving=t.match(/Dados de quem recebeu([^]*?)(?=Dados da transa[cç][aã]o|Dados de quem fez|Dados de quem enviou|Autentica[cç][aã]o|$)/i);
+    const named=receiving?.[1]?.match(/(?:^|\n)\s*Nome\s*:\s*([^\r\n]+)/i);
+    if(named?.[1])return clean(named[1]).slice(0,145);
+  }
   const lines=t.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
   const preferred=kind==="comprovante"||kind==="boleto"?
     ["(?:FAVORECIDO|RECEBEDOR|BENEFICI[AÁ]RIO|DESTINAT[AÁ]RIO)","(?:NOME DO FAVORECIDO|NOME DO BENEFICI[AÁ]RIO)"]:
@@ -66,7 +72,7 @@ function extractReference(t,kind) {
     const digits=allDigits(line);
     if([44,47,48].includes(digits.length))return digits;
   }
-  const id=extractLabel(t,["(?:ID DA TRANSACAO|IDENTIFICADOR DA TRANSACAO|NUMERO DO DOCUMENTO|AUTENTICACAO BANCARIA|CODIGO DE AUTENTICACAO)"],90);
+  const id=extractLabel(t,["(?:ID DA TRANSACAO|IDENTIFICADOR DA TRANSACAO|NUMERO DO DOCUMENTO|N[ÚU]MERO DE CONTROLE|AUTENTICACAO BANCARIA|CODIGO DE AUTENTICACAO)"],90);
   return id;
 }
 
@@ -127,7 +133,7 @@ function transactionKind(t,kind) {
   const s=normalizeLocal(t.slice(0,10000));
   if(kind==="comprovante"){
     if(/COMPROVANTE DE RECEBIMENTO|CREDITO RECEBIDO|RECEBIMENTO DE PIX/.test(s))return "receita";
-    if(/COMPROVANTE DE PAGAMENTO|PAGAMENTO REALIZADO|PAGAMENTO EFETUADO|TRANSFERENCIA ENVIADA|PIX ENVIADO/.test(s))
+    if(/COMPROVANTE DE PAGAMENTO|PAGAMENTO REALIZADO|PAGAMENTO EFETUADO|TRANSFERENCIA ENVIADA|PIX ENVIADO|DATA DO DEBITO/.test(s))
       return "despesa";
   }
   if(kind==="boleto"||kind==="tributo")return "despesa";
