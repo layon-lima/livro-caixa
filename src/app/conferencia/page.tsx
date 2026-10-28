@@ -94,7 +94,7 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
       <section className="review-detail">
         {activePending?<LiveReview key={activePending.id}
           arquivoId={activePending.id} nome={activePending.nome_original}
-          titularPadrao={activePending.titular_envio_id} books={books} cats={cats}
+          titularPadrao={activePending.titular_envio_id} books={books} cats={cats} isAdmin={user.isAdmin}
         />:!selected?<p className="empty-info">{batch?"Nenhuma proposta pendente neste envio.":"Importe um arquivo para começar."}</p>:<>
           <div className="page-title-compact"><h2>{selected.nome_original}</h2>
             <a href={"/api/documentos/"+selected.arquivo_id} target="_blank" rel="noreferrer">Abrir original <ExternalLink size={13}/></a></div>
