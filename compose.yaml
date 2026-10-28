@@ -1,0 +1,54 @@
+name: livro-caixa
+
+services:
+  database:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Informe POSTGRES_DB no .env}
+      POSTGRES_USER: ${POSTGRES_USER:?Informe POSTGRES_USER no .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Informe POSTGRES_PASSWORD no .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - private
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PGHOST: database
+      PGPORT: "5432"
+      PGDATABASE: ${POSTGRES_DB:?Informe POSTGRES_DB no .env}
+      PGUSER: ${POSTGRES_USER:?Informe POSTGRES_USER no .env}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Informe POSTGRES_PASSWORD no .env}
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:-}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
+      R2_BUCKET: ${R2_BUCKET:-}
+    expose:
+      - "3000"
+    networks:
+      private: {}
+      proxy:
+        aliases:
+          - livrocaixa-web
+
+networks:
+  private:
+    internal: true
+  proxy:
+    external: true
+    name: ${CADDY_NETWORK:-gfarm_proxy}
+
+volumes:
+  postgres_data:

@@ -1,0 +1,7 @@
+# Acrescente ESTE bloco ao Caddyfile compartilhado existente somente
+# depois de verificar que Caddy participa da rede Docker gfarm_proxy.
+# Não substitua os blocos atuais de GFARM, PLUV ou Contas.
+
+livrocaixa.fazendanovohorizonte.com {
+    reverse_proxy livrocaixa-web:3000
+}
