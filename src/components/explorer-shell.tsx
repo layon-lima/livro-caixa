@@ -1,7 +1,7 @@
 import Link from "next/link";
 import {
   BookOpen, ChevronDown, ChevronRight, FileSearch, Folder, FolderOpen,
-  LayoutList, LogOut, PanelRight, Settings2, FileUp, ClipboardCheck, PenLine,
+  LayoutList, LogOut, PanelRight, Settings2, FileUp, ClipboardCheck, PenLine, Trash2,
 } from "lucide-react";
 import type { AuthUser } from "@/lib/auth";
 
@@ -28,6 +28,9 @@ export function ExplorerShell({ user, titulares, selected, children, folderConte
         </Link>
         <Link className="rail-item" href="/manual" aria-label="Novo lançamento manual">
           <PenLine size={19} strokeWidth={1.8}/><span>Manual</span>
+        </Link>
+        <Link className="rail-item" href="/lixeira" aria-label="Lixeira">
+          <Trash2 size={19} strokeWidth={1.8}/><span>Lixeira</span>
         </Link>
         {user.isAdmin && (
           <Link className="rail-item" href="/admin" aria-label="Administração">
