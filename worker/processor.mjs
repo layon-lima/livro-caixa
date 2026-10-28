@@ -153,14 +153,6 @@ async function processFile(file){
     // Não enviar PDF, CPF nem conteúdo OCR para serviços externos.
     const possibleCnpj=items.length===1?
       receiverCnpj(output.text,first.contraparte,first.documento_tipo):"";
-    if(possibleCnpj){
-      await db.query("UPDATE arquivos SET progresso_etapa='pesquisando',atualizado_em=now() WHERE id=$1",[file.id]);
-      try{
-        companyInfo=await lookupPublicCnpj(possibleCnpj);
-      }catch(e){
-        console.warn("Consulta pública de CNPJ não disponível",possibleCnpj,String(e).slice(0,160));
-      }
-    }
     const dateInitial=competence(first.competencia);
     const matchingOwner=recognizedOwner(output.text,allowedBooks);
     const initialFields={
@@ -170,13 +162,25 @@ async function processFile(file){
       descricao:short(first.descricao,600),valor:short(first.valor,40),
       referencia:short(first.referencia,100),
       ...(matchingOwner?{titular_id:String(matchingOwner.id)}:{}),
-      ...(localSuggestedOwner?{titular_sugerido:localSuggestedOwner}:{}),
-      ...(companyInfo?{consulta_empresa:companyInfo}:{})
+      ...(localSuggestedOwner?{titular_sugerido:localSuggestedOwner}:{})
     };
     await db.query(
       "UPDATE arquivos SET progresso_etapa=$2,progresso_dados=$3::jsonb,atualizado_em=now() WHERE id=$1",
       [file.id,output.xml?"xml":"ocr",JSON.stringify(initialFields)]
     );
+    // A consulta externa nunca segura os primeiros campos do OCR na tela.
+    if(possibleCnpj){
+      await db.query("UPDATE arquivos SET progresso_etapa='pesquisando',atualizado_em=now() WHERE id=$1",[file.id]);
+      try{
+        companyInfo=await lookupPublicCnpj(possibleCnpj);
+        if(companyInfo){
+          await db.query("UPDATE arquivos SET progresso_dados=progresso_dados || $2::jsonb,atualizado_em=now() WHERE id=$1",
+            [file.id,JSON.stringify({consulta_empresa:companyInfo})]);
+        }
+      }catch(e){
+        console.warn("Consulta pública de CNPJ não disponível",possibleCnpj,String(e).slice(0,160));
+      }
+    }
     if(method==="local" && process.env.OLLAMA_URL){
       try{
         const labels=cats.map(x=>x.nome+(x.subcategoria?" > "+x.subcategoria:""));
