@@ -4,7 +4,7 @@ import { promisify } from "node:util";
 const scrypt = promisify(scryptCallback);
 
 export function validPassword(password: string): boolean {
-  return password.length >= 12 && password.length <= 128;
+  return password.length >= 6 && password.length <= 128;
 }
 export async function hashPassword(password: string): Promise<string> {
   if (!validPassword(password)) throw new Error("Senha inválida");
