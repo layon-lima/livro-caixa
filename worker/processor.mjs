@@ -131,8 +131,8 @@ async function processFile(file){
         // inequivocamente uma transação/nota, nunca só por valor ou nome.
         const docType=short(item.documento_tipo,50).toLowerCase();
         const referenceIsStrong =
-          (docType==="nota fiscal" && /^\\d{44}$/.test(ref)) ||
-          (docType==="boleto" && /^\\d{44,48}$/.test(ref)) ||
+          (docType==="nota fiscal" && /^\d{44}$/.test(ref)) ||
+          (docType==="boleto" && /^\d{44,48}$/.test(ref)) ||
           (docType==="comprovante" && ref.length>=24);
         const duplicate=referenceIsStrong?await connection.query(
           "SELECT id FROM propostas WHERE documento_tipo=$1 AND referencia=$2 AND arquivo_id<>$3 ORDER BY id LIMIT 1",
