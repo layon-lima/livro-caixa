@@ -56,7 +56,7 @@ Na VPS, com os contêineres da Camada 01 já ativos:
 
 4. Crie o primeiro administrador com a senha digitada sem eco na tela:
 
-   read -rsp 'Senha do admin (12+ caracteres): ' LC_ADMIN_PASSWORD; echo
+   read -rsp 'Senha do admin (6+ caracteres): ' LC_ADMIN_PASSWORD; echo
    HASH=$(printf '%s' "$LC_ADMIN_PASSWORD" | docker compose exec -T app node scripts/hash-stdin.mjs)
    unset LC_ADMIN_PASSWORD
    if [ -n "$HASH" ]; then
