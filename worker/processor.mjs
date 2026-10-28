@@ -1,6 +1,6 @@
 import { Pool } from "pg";
 import { XMLParser } from "fast-xml-parser";
-import { mkdtemp, writeFile, readdir, rm, readFile } from "node:fs/promises";
+import { mkdtemp, writeFile, rm, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { gunzipSync } from "node:zlib";
@@ -56,30 +56,74 @@ async function extract(buf,mime,dir){
     return {text:raw.replace(/<[^>]*>/g," "),xml:invoiceXml(raw)};
   }
   if(mime==="application/pdf"){
-    const first=await exec("pdftotext",["-layout",original,"-"],{maxBuffer:15*1024*1024,timeout:60000});
-    if(first.stdout.trim().length>100)return {text:first.stdout,xml:null};
-    const prefix=join(dir,"page");
-    await exec("pdftoppm",["-f","1","-l","20","-r","120","-png",original,prefix],{timeout:120000});
-    const names=(await readdir(dir)).filter(x=>x.startsWith("page-")&&x.endsWith(".png")).sort();
+    // Extrai e analisa CADA página. PDFs mistos costumam ter páginas com texto
+    // nativo e páginas escaneadas: a detecção global perde essas digitalizações.
+    const info=await exec("pdfinfo",[original],{timeout:20000,maxBuffer:1024*1024});
+    const pageCount=Number(info.stdout.match(/^Pages:\s*(\d+)/m)?.[1]||0);
+    if(!Number.isInteger(pageCount)||pageCount<1)throw Error("Não foi possível identificar as páginas do PDF.");
+    // Limite explícito de segurança, sem truncamento silencioso.
+    if(pageCount>300)throw Error("PDF com mais de 300 páginas: divida em arquivos menores para OCR seguro.");
     const texts=[];
-    for(let i=0;i<names.length;i++){
-      const o=await exec("tesseract",[join(dir,names[i]),"stdout","-l","por+eng"],{maxBuffer:5*1024*1024,timeout:60000});
-      texts.push("PÁGINA "+(i+1)+"\n"+o.stdout);
+    for(let page=1;page<=pageCount;page++){
+      let nativeText="";
+      try {
+        const native=await exec("pdftotext",["-f",String(page),"-l",String(page),"-layout",original,"-"],
+          {timeout:60000,maxBuffer:5*1024*1024});
+        nativeText=native.stdout.trim();
+      }catch(e){
+        console.warn("Extração nativa falhou, tentando OCR na página",page,String(e));
+      }
+      let pageText=nativeText;
+      if(nativeText.replace(/\s/g,"").length<80){
+        const imagePrefix=join(dir,"scan-"+page);
+        await exec("pdftoppm",["-f",String(page),"-l",String(page),"-singlefile","-r","180",
+          "-gray","-png",original,imagePrefix],{timeout:120000,maxBuffer:1024*1024});
+        const recognized=await exec("tesseract",[imagePrefix+".png","stdout","-l","por+eng"],
+          {timeout:90000,maxBuffer:5*1024*1024});
+        pageText=recognized.stdout.trim()||nativeText;
+        await rm(imagePrefix+".png",{force:true});
+      }
+      texts.push("PÁGINA "+page+" DE "+pageCount+"\n"+pageText);
     }
-    return {text:texts.join("\n\n"),xml:null};
+    const text=texts.join("\n\n");
+    if(text.replace(/PÁGINA \d+ DE \d+/g,"").trim().length<12)
+      throw Error("OCR não encontrou texto legível no PDF. Verifique a qualidade do documento.");
+    return {text,xml:null};
   }
-  const o=await exec("tesseract",[original,"stdout","-l","por+eng"],{maxBuffer:5*1024*1024,timeout:60000});
+  const o=await exec("tesseract",[original,"stdout","-l","por+eng"],
+    {maxBuffer:5*1024*1024,timeout:90000});
+  if(o.stdout.trim().length<12)throw Error("OCR não encontrou texto legível na imagem.");
   return {text:o.stdout,xml:null};
 }
+
 function basic(text,name,kind) {
-  const normalized=text.replace(/\s+/g," ").slice(0,25000);
-  const company=normalized.match(/(?:favorecido|recebedor|beneficiário|fornecedor|emitente)\s*[:\-]\s*([^;,.]{4,100})/i)?.[1]||"";
-  const date=normalized.match(/(?:compet[êe]ncia|refer[êe]ncia|per[ií]odo)\s*[:\-]\s*([^\s;,]{4,22})/i)?.[1]||"";
-  const value=normalized.match(/(?:valor(?:\s+total)?|total)\s*[:\-]?\s*(?:R\$\s*)?([\d.,]{2,20})/i)?.[1]||"";
-  const ref=normalized.match(/(?:chave\s+de\s+acesso|NFe)\s*[:\-]?\s*(\d[\d\s]{42,60})/i)?.[1]?.replace(/\D/g,"").slice(0,44)||"";
-  return [{titulo:short(name.replace(/\.[^.]+$/,""),170),documento_tipo:kind,contraparte:short(company,150),
-    competencia:date,categoria:"",tipo:"despesa",descricao:short(normalized,1000),valor:value,
-    referencia:ref,pagina_inicial:1,pagina_final:null}];
+  // Plano de contingência sem IA: extrai apenas informações plausíveis,
+  // jamais substitui a revisão humana ou simula compreensão semântica.
+  const normalized=text.replace(/PÁGINA \d+ DE \d+/g," ").replace(/\s+/g," ").slice(0,50000);
+  const sample=normalized.slice(0,10000);
+  const find=(re)=>short(sample.match(re)?.[1]||"",150);
+  const type=/\bDANFE\b|NOTA FISCAL ELETR[ÔO]NICA|\bNF-E\b/i.test(sample)?"nota fiscal":
+    /BOLETO|FICHA DE COMPENSA[ÇC][ÃA]O|LINHA DIGIT[ÁA]VEL/i.test(sample)?"boleto":
+    /COMPROVANTE DE (PAGAMENTO|TRANSFER[ÊE]NCIA)|TRANSA[ÇC][ÃA]O REALIZADA/i.test(sample)?"comprovante":
+    /\bDARF\b|DOCUMENTO DE ARRECADA[ÇC][ÃA]O/i.test(sample)?"tributo":
+    /\bRECIBO\b/i.test(sample)?"recibo":kind;
+  const company=find(/(?:favorecido|recebedor|benefici[áa]rio|fornecedor|raz[ãa]o social|emitente)\s*[:\-]\s*([^\n;,.]{4,100})/i);
+  const date=find(/(?:compet[êe]ncia|refer[êe]ncia|per[íi]odo|data de emiss[ãa]o|emiss[ãa]o|vencimento)\s*[:\-]?\s*(\d{2}\/\d{2}\/20\d{2}|20\d{2}[-/]\d{2}[-/]\d{2}|\d{2}\/20\d{2})/i);
+  const value=find(/(?:valor(?:\s+total)?(?:\s+(?:da nota|documento))?|total a pagar|valor da opera[çc][ãa]o)\s*[:\-]?\s*(?:R\$\s*)?([\d.,]{2,20})/i);
+  const rawKey=sample.match(/(?:chave\s+de\s+acesso|chave nfe)\s*[:\-]?\s*((?:\d[\d\s.\-]*){44,65})/i)?.[1]||"";
+  const reference=rawKey.replace(/\D/g,"").slice(0,44);
+  const typeLabel=type==="nota fiscal"?"Nota fiscal":type==="boleto"?"Boleto":
+    type==="comprovante"?"Comprovante":type==="tributo"?"Tributo":type==="recibo"?"Recibo":"Documento";
+  const title=company?typeLabel+" — "+company:name.replace(/\.[^.]+$/,"");
+  let categoria="";
+  if(/\b(diesel|gasolina|etanol|combust[íi]vel)\b/i.test(sample))categoria="Combustíveis > Diesel";
+  else if(/\b(sementes|semente)\b/i.test(sample))categoria="Insumos Agrícolas > Sementes";
+  else if(/\b(adubo|fertilizante|ureia|npk)\b/i.test(sample))categoria="Insumos Agrícolas > Fertilizantes";
+  else if(/\b(defensivo|herbicida|fungicida|inseticida)\b/i.test(sample))categoria="Insumos Agrícolas > Defensivos";
+  else if(/\b(pe[çc]as de reposi[çc][ãa]o)\b/i.test(sample))categoria="Manutenção > Peças";
+  return [{titulo:short(title,170),documento_tipo:type,contraparte:company,
+    competencia:date,categoria,tipo:"despesa",descricao:short(normalized,1000),valor:value,
+    referencia:reference,pagina_inicial:1,pagina_final:null}];
 }
 async function ai(text,name,labels) {
   if(!process.env.OPENAI_API_KEY || text.trim().length<30)return null;
