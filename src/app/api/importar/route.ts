@@ -60,12 +60,14 @@ export async function POST(request: Request) {
         await connection.query("BEGIN");
         // Impede que dois envios simultâneos ultrapassem a cota ou gravem duplicados.
         await connection.query("SELECT pg_advisory_xact_lock(731266201)");
-        const existing = await connection.query<{id:string}>(
-          "SELECT id::text FROM arquivos WHERE sha256=$1",[digest]
+        const existing = await connection.query<{id:string;titular_envio_id:string}>(
+          "SELECT id::text,titular_envio_id::text FROM arquivos WHERE sha256=$1",[digest]
         );
         if (existing.rows[0]) {
           await connection.query("COMMIT");
-          results.push({name,status:"duplicado",id:existing.rows[0].id});
+          results.push(existing.rows[0].titular_envio_id===String(titularId)
+            ? {name,status:"duplicado",id:existing.rows[0].id}
+            : {name,status:"duplicado"});
           continue;
         }
         await writeCompressedOriginal(key, compressed);
