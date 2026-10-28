@@ -56,12 +56,18 @@ services:
       PGDATABASE: ${POSTGRES_DB:?Informe POSTGRES_DB no .env}
       PGUSER: ${POSTGRES_USER:?Informe POSTGRES_USER no .env}
       PGPASSWORD: ${POSTGRES_PASSWORD:?Informe POSTGRES_PASSWORD no .env}
+      OLLAMA_URL: http://ollama:11434
+      OLLAMA_MODEL: qwen3-vl:2b-instruct
     volumes:
       - documents_data:/data/livro-caixa-arquivos:ro
     networks:
       - private
+      - ia_central
 
 networks:
+  ia_central:
+    external: true
+    name: ia_central_net
   private:
     internal: true
   proxy:

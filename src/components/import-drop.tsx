@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState, type DragEvent, type ChangeEvent } from "react";
-import { FileUp, FolderUp, LoaderCircle } from "lucide-react";
+import { FolderUp, LoaderCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 type UploadResult = {name:string;status:string;id?:string;error?:string};
@@ -29,22 +29,22 @@ export function ImportDrop({titularId,canApprove}:{titularId:string;canApprove:b
     const selected=Array.from(data);
     if(!selected.length)return;
     setFiles(old=>[...old,...selected].slice(0,100));
-    setResults([]);setError("");setPhase("selecionar");
+    setResults([]);setError("");setPhase("enviando");
   }
   function drop(event:DragEvent<HTMLDivElement>) {
     event.preventDefault();setHover(false);
     accept(event.dataTransfer.files);
   }
 
-  async function upload() {
-    if(!files.length || !titularId || busy)return;
+  async function upload(pending:File[]) {
+    if(!pending.length || !titularId || busy)return;
     setBusy(true);setPhase("enviando");setError("");setResults([]);
     const all:UploadResult[]=[];
     try {
-      for(let i=0;i<files.length;i+=20) {
+      for(let i=0;i<pending.length;i+=20) {
         const form=new FormData();
         form.append("titularId",titularId);
-        for(const file of files.slice(i,i+20))form.append("files",file);
+        for(const file of pending.slice(i,i+20))form.append("files",file);
         const response=await fetch("/api/importar",{method:"POST",body:form,credentials:"same-origin"});
         const content=await response.json().catch(()=>({error:"Resposta inválida do servidor."}));
         if(!response.ok)throw Error(content.error||"Não foi possível enviar os arquivos.");
@@ -109,9 +109,13 @@ export function ImportDrop({titularId,canApprove}:{titularId:string;canApprove:b
     }finally {if(alive.current)setBusy(false);}
   }
 
+  useEffect(()=>{
+    if(files.length&&!busy)void upload(files);
+  },[files,busy]);
+
   const displayedFiles:UploadResult[]=results.length?results:files.map(f=>({name:f.name,status:"selecionado"}));
   const statusText:Record<string,string>={
-    selecionado:"Aguardando envio",importado:"Na fila de leitura",
+    selecionado:"Preparando envio",importado:"Na fila de leitura",
     duplicado:"Já cadastrado",aguardando:"Aguardando OCR",processando:"Lendo e identificando dados…",
     pronto:"Leitura concluída",erro:"Erro",
   };
@@ -127,7 +131,7 @@ export function ImportDrop({titularId,canApprove}:{titularId:string;canApprove:b
       aria-label="Selecionar ou arrastar documentos"
       aria-disabled={busy}>
       <FolderUp size={26}/>
-      <strong>Arraste documentos para leitura e conferência</strong>
+      <strong>Solte aqui para iniciar a leitura</strong>
       <span>PDF, XML, JPG e PNG • até 25 MB por arquivo</span>
       <input ref={input} type="file" accept=".pdf,.xml,.png,.jpg,.jpeg" multiple hidden disabled={busy}
         onChange={(e:ChangeEvent<HTMLInputElement>)=>{if(e.target.files)accept(e.target.files);e.target.value="";}}/>
@@ -138,11 +142,8 @@ export function ImportDrop({titularId,canApprove}:{titularId:string;canApprove:b
          phase==="lendo"?"Lendo, identificando e preparando a conferência…":
          files.length+" arquivo(s) selecionado(s)"}
       </strong>
-      {files.length>0&&!busy&&<button type="button" className="flat-button" onClick={()=>setFiles([])}>Limpar</button>}
-      <button className="primary-btn" type="button" disabled={busy||!files.length||!titularId} onClick={upload}>
-        {busy?<LoaderCircle size={15} className="spin"/>:<FileUp size={15}/>}
-        {phase==="lendo"?"Preparando conferência…":phase==="enviando"?"Enviando…":"Ler e conferir documentos"}
-      </button>
+      {busy&&<LoaderCircle size={17} className="spin"/>}
+      {!busy&&!files.length&&<span className="muted">Solte o arquivo: envio e leitura automáticos.</span>}
     </div>
     {error&&<p className="form-error" role="alert">{error}</p>}
     {(files.length>0||results.length>0)&&<div className="upload-files" aria-live="polite">

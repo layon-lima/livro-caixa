@@ -34,7 +34,7 @@ export default async function Importar({searchParams}:{searchParams:Promise<{tit
       <strong><FileUp size={17}/> Importação</strong><Link href="/conferencia">Conferência <ClipboardCheck size={15}/></Link></header>
     <main className="work-main">
       <div className="page-title-compact"><h1>Importar documentos</h1><span>Leitura e conferência automática</span></div>
-      <p className="muted">Leitura local por OCR, reconhecimento de dados e sugestões de organização. Revise os campos antes de aprovar.</p>
+      <p className="muted">Solte os arquivos para iniciar a leitura OCR e a interpretação pela IA Central. Você confere e aprova.</p>
       <section className="storage-meter" aria-label="Espaço usado pelos documentos">
         <div className="storage-meter-caption">
           <strong>Documentos compactados na VPS</strong>

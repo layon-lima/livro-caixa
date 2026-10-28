@@ -1,5 +1,6 @@
 import { Pool } from "pg";
 import { parseLocalDocument } from "./local-parser.mjs";
+import { analyzeWithOllama } from "./ollama-analyzer.mjs";
 import { XMLParser } from "fast-xml-parser";
 import { mkdtemp, writeFile, rm, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -134,10 +135,24 @@ async function processFile(file){
     const allowedBooks=books.rows;
     const defaultBook=allowedBooks.find(x=>String(x.id)===String(file.titular_envio_id));
     if(!defaultBook)throw Error("Titular do envio não está autorizado para o usuário.");
-    // Processamento 100% local, sem requisições externas ou serviços de IA.
-    const method=output.xml?"xml":"local";
-    const items=output.xml||parseLocalDocument(output.text,file.nome_original,file.mime);
+    // O modelo só carrega durante a análise e descarrega ao terminar (keep_alive: 0).
+    let method=output.xml?"xml":"local";
+    let items=output.xml||parseLocalDocument(output.text,file.nome_original,file.mime);
     if(!items.length)throw Error("Não foi possível identificar documentos no arquivo.");
+    if(method==="local" && process.env.OLLAMA_URL){
+      try{
+        const labels=cats.map(x=>x.nome+(x.subcategoria?" > "+x.subcategoria:""));
+        const maxPages=Number(output.text.match(/^PÁGINA \d+ DE (\d+)/m)?.[1]||1);
+        const fromOllama=await analyzeWithOllama({
+          text:output.text,filename:file.nome_original,categories:labels,
+          owners:allowedBooks,maxPages
+        });
+        if(fromOllama?.length){items=fromOllama;method="ia";}
+        else console.warn("IA Central sem dados válidos; mantido extrator local",file.id);
+      }catch(e){
+        console.warn("IA Central indisponível, mantido OCR local",file.id,String(e).slice(0,300));
+      }
+    }
 
     const connection=await db.connect();
     try{
