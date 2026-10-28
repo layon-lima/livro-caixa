@@ -4,7 +4,7 @@ import { getDatabase } from "@/lib/database";
 import { categorias, titularesPermitidos, type Proposta } from "@/lib/document-data";
 import { ArrowLeft, ClipboardCheck, FileText, ExternalLink } from "lucide-react";
 export const dynamic="force-dynamic";
-type Queued=Proposta&{nome_titular:string};
+type Queued=Proposta&{nome_titular:string;duplicada_de:string|null;arquivo_original_id:string|null;titular_original_id:string|null};
 
 export default async function Conferencia({searchParams}:{searchParams:Promise<{id?:string;revisada?:string;aprovados?:string;erro?:string}>}){
   const user=await requireUser();
@@ -13,9 +13,11 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
   const rows=await db.query<Queued>(
     "SELECT p.id::text,p.arquivo_id::text,p.titular_id::text,p.titulo,p.documento_tipo,p.contraparte,"+
     "p.competencia::text,p.competencia_estimada,p.categoria_id::text,p.tipo,p.descricao,p.valor::text,p.referencia,"+
-    "p.pagina_inicial,p.pagina_final,p.revisada_em::text,p.operacao_sugerida_id::text,p.aprovado_em::text,"+
+    "p.pagina_inicial,p.pagina_final,p.revisada_em::text,p.operacao_sugerida_id::text,p.aprovado_em::text,p.duplicada_de::text,"+
+    "orig.arquivo_id::text AS arquivo_original_id,orig.titular_id::text AS titular_original_id,"+
     "a.nome_original,a.status,a.erro,a.texto_extraido,t.nome AS nome_titular "+
     "FROM propostas p JOIN arquivos a ON a.id=p.arquivo_id JOIN titulares t ON t.id=p.titular_id "+
+    "LEFT JOIN propostas orig ON orig.id=p.duplicada_de "+
     (user.isAdmin?"":"JOIN user_titular_permissions up ON up.titular_id=p.titular_id AND up.user_id=$1 AND up.can_approve=true ")+
     "WHERE p.aprovado_em IS NULL ORDER BY p.id DESC LIMIT 200",
     user.isAdmin?[]:[user.id]);
@@ -37,17 +39,17 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
           <div className="file-columns review-columns"><div>Documento</div><div>Titular</div><div>Revisão</div></div>
           {all.map(p=><div key={p.id} className={"review-row"+(selected?.id===p.id?" selected":"")}>
             <label className="review-check" title={p.revisada_em?"Selecionar para aprovação":"Confira antes de aprovar"}>
-              <input type="checkbox" name="ids" value={p.id} disabled={!p.revisada_em}/>
+              <input type="checkbox" name="ids" value={p.id} disabled={!p.revisada_em || !!p.duplicada_de}/>
             </label>
             <Link href={"/conferencia?id="+p.id} className="review-row-link">
               <span className="ellipsis"><FileText size={14}/>{p.titulo}</span>
               <small>{p.nome_titular}</small>
-              <small>{p.revisada_em?"Conferido":"Pendente"}</small>
+              <small>{p.duplicada_de?"Duplicado":p.revisada_em?"Conferido":"Pendente"}</small>
             </Link>
           </div>)}
           {all.length===0&&<p className="empty-info">Nenhuma proposta aguardando aprovação.</p>}
           <div className="review-footer">
-            <button className="primary-btn" type="submit" disabled={!all.some(p=>p.revisada_em)}>Aprovar selecionados</button>
+            <button className="primary-btn" type="submit" disabled={!all.some(p=>p.revisada_em&&!p.duplicada_de)}>Aprovar selecionados</button>
           </div>
         </form>
       </section>
@@ -58,7 +60,13 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
           <div className="review-preview">
             <iframe title="Arquivo original" src={"/api/documentos/"+selected.arquivo_id}/>
           </div>
-          <form action={"/api/propostas/"+selected.id+"/revisar"} method="post" className="review-form">
+          {selected.duplicada_de && <div className="duplicate-alert">
+            <strong>Duplicidade confirmada — proposta #{selected.duplicada_de}</strong>
+            <span>Este documento não poderá ser aprovado novamente.</span>
+            {selected.arquivo_original_id && (user.isAdmin || selected.titular_original_id===selected.titular_id) &&
+              <a href={"/api/documentos/"+selected.arquivo_original_id} target="_blank" rel="noreferrer">Abrir documento original</a>}
+          </div>}
+          {!selected.duplicada_de && <form action={"/api/propostas/"+selected.id+"/revisar"} method="post" className="review-form">
             <div className="form-inline-two">
               <label>Titular
                 <select name="titularId" defaultValue={selected.titular_id} required>
@@ -107,7 +115,7 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
             {selected.operacao_sugerida_id&&<p className="muted">Foi encontrada uma possível operação relacionada. Confirme a escolha acima antes de salvar.</p>}
             <button type="submit" className="primary-btn">Salvar conferência</button>
             <span className="muted">Depois selecione a proposta na lista e aprove. Nada é lançado antes da aprovação.</span>
-          </form>
+          </form>}
           <details className="text-extracted"><summary>Texto extraído do documento</summary><pre>{selected.texto_extraido.slice(0,30000)}</pre></details>
         </>}
       </section>
