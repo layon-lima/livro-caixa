@@ -2,11 +2,12 @@ import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { getDatabase } from "@/lib/database";
 import { categorias, titularesPermitidos, type Proposta } from "@/lib/document-data";
-import { ArrowLeft, ClipboardCheck, FileText, ExternalLink } from "lucide-react";
+import { ArrowLeft, ClipboardCheck, FileText, ExternalLink, LoaderCircle } from "lucide-react";
+import { LiveReview } from "@/components/live-review";
 export const dynamic="force-dynamic";
 type Queued=Proposta&{nome_titular:string;duplicada_de:string|null;arquivo_original_id:string|null;titular_original_id:string|null};
 
-export default async function Conferencia({searchParams}:{searchParams:Promise<{id?:string;arquivos?:string;revisada?:string;aprovados?:string;erro?:string}>}){
+export default async function Conferencia({searchParams}:{searchParams:Promise<{id?:string;arquivo?:string;arquivos?:string;revisada?:string;aprovados?:string;erro?:string}>}){
   const user=await requireUser();
   const db=getDatabase();
   const [query,books,cats]=await Promise.all([searchParams,titularesPermitidos(user,"approve"),categorias()]);
@@ -30,7 +31,26 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
     "ORDER BY p.id DESC LIMIT 500",
     queryArgs);
   const all=rows.rows;
-  const selected=all.find(p=>p.id===query.id)||all[0];
+  // Arquivos recém-enviados aparecem imediatamente, ainda sem propostas gravadas.
+  const pending=batch?await db.query<{
+    id:string;nome_original:string;titular_envio_id:string;nome_titular:string;status:string;
+  }>(
+    "SELECT a.id::text,a.nome_original,a.titular_envio_id::text,t.nome AS nome_titular,a.status "+
+    "FROM arquivos a JOIN titulares t ON t.id=a.titular_envio_id "+
+    (user.isAdmin?"":"JOIN user_titular_permissions up ON up.titular_id=a.titular_envio_id "+
+      "AND up.user_id=$2 AND up.can_approve=true ")+
+    "WHERE a.id=ANY($1::bigint[]) AND a.status IN ('aguardando','processando','erro') "+
+    "AND NOT EXISTS (SELECT 1 FROM propostas p WHERE p.arquivo_id=a.id AND p.aprovado_em IS NULL) "+
+    "ORDER BY a.id",
+    user.isAdmin?[batch]:[batch,user.id]
+  ):null;
+  const inProgress=pending?.rows||[];
+  const requested=all.find(p=>p.id===query.id);
+  const activePending=requested?null:
+    (query.arquivo?inProgress.find(p=>p.id===query.arquivo):
+      (!query.id?inProgress[0]:undefined));
+  const selected=requested||(!activePending?
+    (query.arquivo?all.find(p=>p.arquivo_id===query.arquivo):undefined)||all[0]:undefined);
   const batchQuery=batch?"arquivos="+batch.join(",")+"&":"";
   const available=selected?await db.query<{id:string;titulo:string}>(
     "SELECT id::text,titulo FROM operacoes WHERE titular_id=$1 AND excluido_em IS NULL ORDER BY id DESC LIMIT 200",
@@ -40,12 +60,19 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
       <strong><ClipboardCheck size={16}/> Conferência</strong><Link href="/importar">Importar documentos</Link></header>
     <div className="review-grid">
       <section className="review-list">
-        <div className="page-title-compact"><h1>{batch?"Conferência desta importação":"Documentos aguardando aprovação"}</h1><span>{all.length} propostas</span></div>
+        <div className="page-title-compact"><h1>{batch?"Conferência desta importação":"Documentos aguardando aprovação"}</h1><span>{all.length+inProgress.length} documento(s)</span></div>
         {query.erro&&<p className="form-error">Não foi possível concluir: {query.erro}.</p>}
         {query.revisada&&<p className="form-success">Proposta conferida e salva.</p>}
         {query.aprovados&&<p className="form-success">{query.aprovados} proposta(s) aprovada(s).</p>}
         <form method="post" action="/api/propostas/aprovar">
           {batch&&<input type="hidden" name="arquivos" value={batch.join(",")}/>}
+          {inProgress.map(p=><div key={"pending-"+p.id} className={"review-row"+(activePending?.id===p.id?" selected":"")}>
+            <span className="review-check" aria-hidden="true"><LoaderCircle size={14} className={p.status==="erro"?"":"spin"}/></span>
+            <Link href={"/conferencia?"+batchQuery+"arquivo="+p.id} className="review-row-link">
+              <span className="review-row-title"><FileText size={14}/><span title={p.nome_original}>{p.nome_original}</span></span>
+              <span className="review-row-meta"><span>{p.nome_titular}</span><span>{p.status==="erro"?"Erro":"Analisando…"}</span></span>
+            </Link>
+          </div>)}
           {all.map(p=><div key={p.id} className={"review-row"+(selected?.id===p.id?" selected":"")}>
             <label className="review-check" title={p.revisada_em?"Selecionar para aprovação":"Confira antes de aprovar"}>
               <input type="checkbox" name="ids" value={p.id} disabled={!p.revisada_em || !!p.duplicada_de}/>
@@ -58,14 +85,17 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
               </span>
             </Link>
           </div>)}
-          {all.length===0&&<p className="empty-info">Nenhuma proposta aguardando aprovação.</p>}
+          {all.length===0&&inProgress.length===0&&<p className="empty-info">Nenhuma proposta aguardando aprovação.</p>}
           <div className="review-footer">
             <button className="primary-btn" type="submit" disabled={!all.some(p=>p.revisada_em&&!p.duplicada_de)}>Aprovar selecionados</button>
           </div>
         </form>
       </section>
       <section className="review-detail">
-        {!selected?<p className="empty-info">{batch?"Nenhuma proposta pendente neste envio.":"Importe um arquivo para começar."}</p>:<>
+        {activePending?<LiveReview key={activePending.id}
+          arquivoId={activePending.id} nome={activePending.nome_original}
+          titularPadrao={activePending.titular_envio_id} books={books} cats={cats}
+        />:!selected?<p className="empty-info">{batch?"Nenhuma proposta pendente neste envio.":"Importe um arquivo para começar."}</p>:<>
           <div className="page-title-compact"><h2>{selected.nome_original}</h2>
             <a href={"/api/documentos/"+selected.arquivo_id} target="_blank" rel="noreferrer">Abrir original <ExternalLink size={13}/></a></div>
           <div className="review-analysis-status">
