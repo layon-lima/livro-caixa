@@ -64,29 +64,28 @@ Se o resultado for maior que zero, **não apague arquivos do R2** nem suas crede
 - Mantenha backup externo: volume persistente não é backup; falhas da VPS ainda podem causar perda.
 - Caddy deve continuar apontando "livrocaixa-web:3000". Não publicar porta da aplicação ou do PostgreSQL no host.
 
-## Leitura inteligente e conferência automática (camada 06)
+## Leitura local automática (sem IA)
 
-A importação envia e guarda o arquivo compactado localmente. O worker faz OCR por página e prepara sugestões. A interface acompanha o status e leva o usuário autorizado automaticamente à conferência; o cadastro definitivo requer aprovação humana.
+O Livro Caixa funciona sem chave de API, sem assinatura de IA e sem conexões externas no trabalhador de OCR.
 
-**Atualização após instalar as migrações anteriores:**
+Após a importação, o Tesseract ou o pdftotext obtém o texto. Um extrator local identifica:
+- tipo (nota fiscal, boleto, comprovante, tributo, recibo ou contrato);
+- contraparte e referência quando aparecem no documento;
+- competência, data e valor por rótulos reconhecidos;
+- categoria com regras de termos em português;
+- titular quando o nome aparece no texto e está entre os titulares permitidos;
+- notas distintas em um PDF somente se houver referências fortes distintas.
+
+Não é possível garantir o reconhecimento de documentos arbitrários ou digitalizações ruins sem validação humana. Informações incertas geram avisos; valores e categorias não encontrados ficam pendentes. Nenhum documento é aprovado automaticamente.
+
+### Instalação do modo local
 
     cd /opt/apps/livro-caixa
     git pull --ff-only
-    docker compose exec -T database sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1' < db/migrations/005_intelligent_review.sql
     docker compose up -d --build
-    docker compose ps
 
-A migração 005 adiciona apenas informações de origem da leitura, confiança e alertas nas propostas existentes. Não apaga originais, categorias, nem operações aprovadas.
+A imagem Docker executa os testes básicos de extração local antes de construir o aplicativo. A migração 005_intelligent_review.sql deve já estar aplicada antes desta atualização.
 
-**OCR não equivale a análise inteligente.** Para interpretação de documentos complexos e separação de vários documentos em um PDF, configure um modelo externo. O worker oferece integração com OpenAI Responses API; usa OPENAI_API_KEY e, opcionalmente, OPENAI_MODEL (por padrão gpt-4.1-mini).
+A rede `egress` e as variáveis OPENAI foram removidas do serviço worker. A integração externa não faz parte do fluxo ativo. Para uso futuro, somente mediante escolha explícita do responsável e revisão de privacidade e custos.
 
-Antes de ativar, informe os usuários responsáveis: o TEXTO EXTRAÍDO dos documentos será enviado ao provedor de IA, e a cobrança da API é separada do ChatGPT. Não registre a chave no código nem no chat. Configure diretamente na VPS (script interativo, pergunta confirmação e oculta a digitação):
-
-    cd /opt/apps/livro-caixa
-    bash scripts/configurar-ia.sh
-
-Após configuração, arquivos novos usam IA; originais já importados podem ser reprocessados pela interface enquanto as propostas ainda não foram revisadas/aprovadas. Propostas já aprovadas nunca devem ser reprocessadas automaticamente, para preservar o histórico.
-
-Em caso de indisponibilidade da IA, o worker recorre ao OCR local e marca explicitamente essa origem na conferência. Usuário deve verificar avisos e dados de baixa confiança.
-
-Proteção de acesso: o trabalhador só sugere titulares que o usuário importador está autorizado a acessar; nenhum documento é publicado automaticamente. O endpoint que acompanha a fila também valida a permissão.
+Arquivos já importados e não revisados podem ser reprocessados na página de importação sem novo upload.
