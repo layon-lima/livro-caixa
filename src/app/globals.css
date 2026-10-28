@@ -343,3 +343,12 @@ button { cursor: pointer; }
   .review-fields-grid {grid-template-columns:minmax(0,1fr);}
   .review-fields-grid .review-span-half {grid-column:1 / -1;}
 }
+
+/* Formulário em tempo real: a IA alimenta os campos sem interromper a análise. */
+.review-live-fields {margin-top:9px;}
+.review-live-fields input[readonly],.review-live-fields textarea[readonly],.review-live-fields select:disabled {
+  background:#f9fbfe;color:#34475f;opacity:1;cursor:progress;
+}
+.review-live-fields input::placeholder,.review-live-fields textarea::placeholder {color:#9aaabd;}
+.review-live-fields .review-approval-actions {border-top:1px solid var(--line);padding-top:11px;}
+.review-live-fields .review-approval-actions .primary-btn:disabled {opacity:.65;}

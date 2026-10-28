@@ -30,7 +30,8 @@ export async function POST(request: Request){
     }
     await connection.query("DELETE FROM propostas WHERE arquivo_id=$1",[id]);
     await connection.query(
-      "UPDATE arquivos SET status='aguardando',erro=NULL,texto_extraido='',atualizado_em=now() WHERE id=$1",[id]);
+      "UPDATE arquivos SET status='aguardando',progresso_etapa='aguardando',progresso_dados='{}'::jsonb,"+
+      "erro=NULL,texto_extraido='',atualizado_em=now() WHERE id=$1",[id]);
     await connection.query("COMMIT");
     return backTo("/importar?reprocessado=1");
   }catch(error){
