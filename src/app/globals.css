@@ -298,3 +298,12 @@ button { cursor: pointer; }
 .storage-meter small {font-size:10px;color:#8a98a5;}
 
 .review-approval-actions {display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+
+/* Conferência orientada a exceções: informações já preenchidas, avisos apenas quando necessários. */
+.review-analysis-status {display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:6px 9px;margin:6px 0;background:var(--surface-muted,#f5f7fa);border:1px solid var(--line,#e5e7eb);border-radius:4px;font-size:11px;}
+.review-analysis-status strong {font-size:11px;}
+.review-analysis-status span {color:var(--muted,#64748b);}
+.review-notices {margin:6px 0;padding:7px 10px;border:1px solid #d1a65f;background:#fffaf0;border-radius:4px;font-size:11px;}
+.review-notices strong {font-size:11px;}
+.review-notices ul {margin:5px 0 0;padding-left:18px;}
+.review-notices li {margin:2px 0;}
