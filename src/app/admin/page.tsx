@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
 import { getDatabase } from "@/lib/database";
+import { AdminPasswordInput } from "@/components/admin-password-input";
 import { BookOpen, ChevronLeft, LockKeyhole, Settings2 } from "lucide-react";
 export const dynamic = "force-dynamic";
 
@@ -64,10 +65,10 @@ export default async function Admin({ searchParams }: {
             <label htmlFor="new-username" className="sr-only">Nome de usuário</label>
             <input id="new-username" name="username" placeholder="Usuário (a-z, 0-9, ponto, _ ou -)" minLength={3} maxLength={32} pattern="[a-z0-9._-]{3,32}" autoComplete="off" required />
             <label htmlFor="new-password" className="sr-only">Senha do usuário</label>
-            <input id="new-password" name="password" type="password" placeholder="Senha (mínimo 6 caracteres)" minLength={6} maxLength={128} autoComplete="new-password" required />
+            <AdminPasswordInput id="new-password" placeholder="Senha (mínimo 6 caracteres)" />
             <button type="submit">Criar usuário</button>
           </form>
-          <p className="muted">Contas criadas sem acesso aos livros até que suas permissões sejam definidas abaixo.</p>
+          <p className="muted">Contas criadas sem acesso aos livros até que suas permissões sejam definidas abaixo. A senha salva não pode ser recuperada; você pode definir outra quando necessário.</p>
         </section>
 
         <section className="admin-panel">
@@ -103,7 +104,7 @@ export default async function Admin({ searchParams }: {
               <form className="inline-form reset-form" action="/api/admin/reset-password" method="post">
                 <input type="hidden" name="userId" value={u.id} />
                 <label className="sr-only" htmlFor={"reset-" + u.id}>Nova senha de {u.username}</label>
-                <input id={"reset-" + u.id} type="password" name="password" placeholder="Nova senha (mínimo 6 caracteres)" minLength={6} maxLength={128} autoComplete="new-password" required />
+                <AdminPasswordInput id={"reset-" + u.id} placeholder="Nova senha (mínimo 6 caracteres)" />
                 <button type="submit">Alterar senha</button>
               </form>
             </div>
