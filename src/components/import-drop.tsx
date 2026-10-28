@@ -37,6 +37,9 @@ export function ImportDrop({titularId}:{titularId:string}) {
     }catch(e){setError(e instanceof Error?e.message:"Erro no envio");}
     finally{setBusy(false);}
   }
+  const displayedFiles: ImportResult[] = results.length
+    ? results
+    : files.map(f => ({ name: f.name, status: "selecionado" }));
   return <div className="uploader">
     <div className={"drop-area"+(hover?" drag-active":"")}
       onDragEnter={event=>{event.preventDefault();setHover(true);}}
@@ -62,7 +65,7 @@ export function ImportDrop({titularId}:{titularId:string}) {
     </div>
     {error&&<p className="form-error" role="alert">{error}</p>}
     {(files.length>0 || results.length>0)&&<div className="upload-files">
-      {(results.length?results:files.map(f=>({name:f.name,status:"selecionado"}))).map((f,i)=>
+      {displayedFiles.map((f,i)=>
         <div className="upload-file-row" key={f.name+i}><span>{f.name}</span>
           <span className={"file-state state-"+f.status}>{f.status}{f.error?" — "+f.error:""}</span>
         </div>)}
