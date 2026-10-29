@@ -301,7 +301,9 @@ async function processFile(file){
         const structuredOwner=seller&&!buyer?seller:buyer&&!seller?buyer:null;
         const byText=recognizedOwner(fullText,allowedBooks);
         const owner=structuredOwner||hinted||byText||defaultBook;
-        if(!structuredOwner&&!hinted&&!byText)notice.push("Titular não confirmado pelo documento; mantido o titular escolhido no envio.");
+        // O titular usado no armazenamento é técnico, não uma escolha do usuário.
+        // Se IA/OCR não encontrarem titular confiável, a conferência exige escolha.
+        if(!structuredOwner&&!hinted&&!byText)notice.push("Titular não identificado automaticamente; selecione o titular na conferência antes de aprovar.");
         if(hinted&&byText&&String(hinted.id)!==String(byText.id)){
           notice.push("Há divergência na identificação do titular; confira antes de aprovar.");
         }
@@ -384,6 +386,26 @@ async function processFile(file){
             cleanSuggested,JSON.stringify(companyRecord),
             categorySuggestion?.nome||"",categorySuggestion?.subcategoria||""]
         );
+      }
+      // Reatribuímos o arquivo ao titular identificado apenas quando todas
+      // as propostas do PDF têm um único titular reconhecido com confiança.
+      // Caso contrário permanece técnico e será resolvido na aprovação.
+      const resolved=await connection.query(
+        "SELECT DISTINCT titular_id FROM propostas WHERE arquivo_id=$1 AND NOT "+
+        "EXISTS(SELECT 1 FROM unnest(avisos) warning WHERE warning "+
+        "LIKE 'Titular não identificado automaticamente%')",[file.id]);
+      const total=await connection.query(
+        "SELECT count(*)::int AS total FROM propostas WHERE arquivo_id=$1",[file.id]);
+      if(resolved.rows.length===1&&Number(total.rows[0]?.total)===items.length){
+        const uncertain=await connection.query(
+          "SELECT 1 FROM propostas WHERE arquivo_id=$1 AND EXISTS("+
+          "SELECT 1 FROM unnest(avisos) warning "+
+          "WHERE warning LIKE 'Titular não identificado automaticamente%') LIMIT 1",
+          [file.id]);
+        if(!uncertain.rowCount){
+          await connection.query("UPDATE arquivos SET titular_envio_id=$2 WHERE id=$1",
+            [file.id,resolved.rows[0].titular_id]);
+        }
       }
       await connection.query(
         "UPDATE arquivos SET status='pronto',progresso_etapa='pronto',texto_extraido=$2,erro=NULL,atualizado_em=now() WHERE id=$1",
