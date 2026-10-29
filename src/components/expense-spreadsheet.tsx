@@ -7,7 +7,7 @@ import { OperationRows,type AttachedDocument,type OperationEntry } from "@/compo
 type Book={id:string;nome:string};
 type Category={id:string;nome:string;subcategoria:string};
 type ExpenseItem=OperationEntry&{
-  arquivo_id:string|null;documento:string|null;tem_documento:boolean;data_registro:string;
+  arquivo_id:string|null;documento:string|null;tem_documento:boolean;data_registro:string;data_pagamento:string|null;
 };
 type Month={mes:string;quantidade:number;total:string};
 type Data={rows:ExpenseItem[];summary:{total:string;quantidade:number};
@@ -130,7 +130,7 @@ export function ExpenseSpreadsheet({bookId,cats,books,canEdit,canDelete,months}:
     </div>
     {error&&<p className="form-error expense-error" role="alert">{error}</p>}
     <div className="expense-table-header" role="row">
-      <span>{sortButton("Registro","data")}</span>
+      <span>{sortButton("Pagamento","data")}</span>
       <span>{sortButton("Competência","competencia")}</span>
       <span>{sortButton("Título / descrição","titulo")}</span>
       <span>{sortButton("Categoria","categoria")}</span>

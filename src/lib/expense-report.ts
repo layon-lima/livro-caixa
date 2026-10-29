@@ -9,7 +9,7 @@ export type ExpenseFilters={
 export type ExpenseRow={
   id:string;titular_id:string;titulo:string;categoria_id:string|null;
   categoria:string|null;subcategoria:string|null;tipo:string;competencia:string;
-  data_registro:string;contraparte:string;descricao:string;referencia:string;
+  data_registro:string;data_pagamento:string|null;contraparte:string;descricao:string;referencia:string;
   valor:string|null;quantidade_documentos:string;documento:string|null;arquivo_id:string|null;
   tem_documento:boolean;
 };
@@ -31,7 +31,7 @@ export function parseExpenseFilters(p:URLSearchParams):ExpenseFilters{
 }
 
 const orderKeys:Record<ExpenseFilters["sort"],string>={
-  data:"o.criado_em",competencia:"o.competencia",titulo:"o.titulo",
+  data:"o.data_pagamento",competencia:"o.competencia",titulo:"o.titulo",
   categoria:"c.nome",contraparte:"o.contraparte",valor:"o.valor"
 };
 
@@ -62,7 +62,7 @@ function condition(filters:ExpenseFilters){
 
 const from=" FROM operacoes o LEFT JOIN categorias c ON c.id=o.categoria_id ";
 const select="SELECT o.id::text,o.titular_id::text,o.titulo,o.categoria_id::text,"+
-  "c.nome AS categoria,c.subcategoria,o.tipo,o.competencia::text,o.criado_em::text AS data_registro,"+
+  "c.nome AS categoria,c.subcategoria,o.tipo,o.competencia::text,o.criado_em::text AS data_registro,o.data_pagamento::text,"+
   "o.contraparte,o.descricao,o.referencia,o.valor::text,"+
   "(SELECT count(*)::text FROM operacao_arquivos oa WHERE oa.operacao_id=o.id) AS quantidade_documentos,"+
   "(SELECT a.nome_original FROM operacao_arquivos oa JOIN arquivos a ON a.id=oa.arquivo_id "+

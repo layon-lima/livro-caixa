@@ -53,7 +53,7 @@ export async function GET(request:Request,{params}:{params:Promise<{id:string}>}
       " | "+(filter.q||"sem busca")+" | "+filter.status+
       " | Exportado em "+new Date().toLocaleString("pt-BR");
     list.getCell("A3").font={size:9,color:{argb:"FF6B7D8E"}};
-    const headers=["Registro","Competência","Título / descrição","Categoria","Contraparte",
+    const headers=["Data do pagamento","Competência","Título / descrição","Categoria","Contraparte",
       "Documento","Referência","Tipo","Valor (R$)","Situação"];
     list.getRow(4).values=headers;
     list.getRow(4).height=27;
@@ -76,7 +76,7 @@ export async function GET(request:Request,{params}:{params:Promise<{id:string}>}
       const total=totals.get(mes)||{count:0,sum:0};
       total.count++;total.sum+=value;totals.set(mes,total);
       const added=list.addRow([
-        safeText(new Date(row.data_registro).toLocaleDateString("pt-BR")),
+        safeText(row.data_pagamento?row.data_pagamento.split("-").reverse().join("/"):""),
         mes,safeText(row.titulo),safeText([row.categoria,row.subcategoria].filter(Boolean).join(" / ")||"Sem categoria"),
         safeText(row.contraparte),safeText(row.documento||"Sem documento"),
         safeText(row.referencia),row.tipo==="outro"?"Não classificado":"Saída",
