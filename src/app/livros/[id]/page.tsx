@@ -33,11 +33,11 @@ export default async function Livro({params,searchParams}:{
   const q=String(query.q||"").trim().slice(0,200);
   const month=/^20\d{2}-(0[1-9]|1[0-2])$/.test(query.mes||"")?query.mes:null;
   const category=safeId(query.categoria);
-  const data=await db.query<Operacao>(
+  const data=spreadsheet?{rows:[] as Operacao[]}:await db.query<Operacao>(
     "SELECT o.id::text,o.titular_id::text,o.titulo,o.competencia::text,o.categoria_id::text,"+
     "c.nome AS categoria,c.subcategoria,o.tipo,o.descricao,o.contraparte,o.referencia,o.valor::text,o.criado_em::text,o.excluido_em::text,"+
     "(SELECT count(*)::text FROM operacao_arquivos oa WHERE oa.operacao_id=o.id) AS quantidade_documentos "+
-    "FROM operacoes o LEFT JOIN categorias c ON c.id=o.categoria_id WHERE o.titular_id=$1 AND o.excluido_em IS NULL "+
+    "FROM operacoes o LEFT JOIN categorias c ON c.id=o.categoria_id WHERE o.titular_id=$1 AND o.excluido_em IS NULL AND o.tipo IS DISTINCT FROM 'receita' "+
     "AND ($2::text IS NULL OR to_char(o.competencia,'YYYY-MM')=$2) "+
     "AND ($3::bigint IS NULL OR o.categoria_id=$3) "+
     "AND ($4::text IS NULL OR o.titulo ILIKE '%'||$4||'%' OR o.descricao ILIKE '%'||$4||'%' "+
@@ -47,7 +47,7 @@ export default async function Livro({params,searchParams}:{
     "ORDER BY o.competencia DESC,o.id DESC LIMIT 500",
     [id,month,category,q||null]);
   const ops=data.rows;
-  const attached=await db.query<Attached>(
+  const attached=spreadsheet?{rows:[] as Attached[]}:await db.query<Attached>(
     "SELECT oa.operacao_id::text,oa.arquivo_id::text,a.nome_original,p.documento_tipo "+
     "FROM operacao_arquivos oa JOIN arquivos a ON a.id=oa.arquivo_id "+
     "JOIN propostas p ON p.id=oa.proposta_id "+
@@ -55,7 +55,7 @@ export default async function Livro({params,searchParams}:{
     [id]);
   const all=await db.query<{competencia:string;categoria_id:string|null;nome:string|null}>(
     "SELECT DISTINCT to_char(o.competencia,'YYYY-MM') AS competencia,o.categoria_id::text,c.nome "+
-    "FROM operacoes o LEFT JOIN categorias c ON c.id=o.categoria_id WHERE o.titular_id=$1 AND o.excluido_em IS NULL "+
+    "FROM operacoes o LEFT JOIN categorias c ON c.id=o.categoria_id WHERE o.titular_id=$1 AND o.excluido_em IS NULL AND o.tipo IS DISTINCT FROM 'receita' "+
     "ORDER BY competencia DESC,nome",[id]);
   const years=new Map<string,Map<string,{id:string|null;nome:string|null}[]>>();
   for(const row of all.rows){
