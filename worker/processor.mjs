@@ -1,3 +1,4 @@
+import { paymentDateFromText,verifiedPaymentDate } from "./payment-date.mjs";
 import { Pool } from "pg";
 import { parseLocalDocument } from "./local-parser.mjs";
 import { analyzeWithOllama } from "./ollama-analyzer.mjs";
@@ -174,6 +175,7 @@ async function processFile(file){
       categoria:short(first.categoria,120),tipo:short(first.tipo,15),
       descricao:short(first.descricao,600),valor:short(first.valor,40),
       referencia:short(first.referencia,100),
+      data_pagamento:paymentDateFromText(output.text,first.documento_tipo),
       ...(matchingOwner?{titular_id:String(matchingOwner.id)}:{}),
       ...(localSuggestedOwner?{titular_sugerido:localSuggestedOwner}:{})
     };
@@ -370,12 +372,13 @@ async function processFile(file){
           Number.isFinite(confidenceNumber)&&item.confianca!==undefined?
             Math.max(0,Math.min(0.85,confidenceNumber)):0.3;
         const desc=short(item.descricao,2000)||title;
+        const paidAt=verifiedPaymentDate(fullText,item.documento_tipo,item.data_pagamento);
         await connection.query(
           "INSERT INTO propostas (arquivo_id,titular_id,titulo,documento_tipo,contraparte,competencia,"+
           "competencia_estimada,categoria_id,tipo,descricao,valor,referencia,pagina_inicial,pagina_final,"+
           "operacao_sugerida_id,duplicada_de,metodo_leitura,confianca,avisos,titular_sugerido,consulta_empresa,"+
-          "categoria_sugerida_nome,categoria_sugerida_subcategoria) "+
-          "VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)",
+          "categoria_sugerida_nome,categoria_sugerida_subcategoria,data_pagamento) "+
+          "VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)",
           [file.id,ownerId,title,docType,party,date.date,date.estimated,category?.id||null,
             ["receita","despesa","outro"].includes(type)?type:"outro",
             desc,value,reference,
@@ -384,7 +387,7 @@ async function processFile(file){
             chosen,duplicates?.rows[0]?.id||null,method,confidence,
             [...new Set([...notice,...extraWarnings])].slice(0,12),
             cleanSuggested,JSON.stringify(companyRecord),
-            categorySuggestion?.nome||"",categorySuggestion?.subcategoria||""]
+            categorySuggestion?.nome||"",categorySuggestion?.subcategoria||"",paidAt||null]
         );
       }
       // Reatribuímos o arquivo ao titular identificado apenas quando todas
