@@ -1,7 +1,7 @@
 import { Pool } from "pg";
 import { parseLocalDocument } from "./local-parser.mjs";
 import { analyzeWithOllama } from "./ollama-analyzer.mjs";
-import { candidateNewOwner, receiverCnpj, lookupPublicCnpj } from "./company-lookup.mjs";
+import { candidateNewOwner, receiverCnpj, lookupPublicCnpj, confirmedPixReceiver } from "./company-lookup.mjs";
 import { XMLParser } from "fast-xml-parser";
 import { mkdtemp, writeFile, rm, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -146,9 +146,16 @@ async function processFile(file){
     if(!items.length)throw Error("Não foi possível identificar documentos no arquivo.");
     // Primeira etapa: OCR detecta campos e possíveis titulares ainda não cadastrados.
     const first=items[0];
+    const protectedPixReceiver=items.length===1?confirmedPixReceiver(output.text):"";
+    // Dados estruturados do comprovante têm prioridade sobre interpretações do modelo.
+    if(protectedPixReceiver&&normalizeName(first.contraparte)!==normalizeName(protectedPixReceiver)){
+      first.contraparte=protectedPixReceiver;
+      first.titulo="Comprovante Pix — "+protectedPixReceiver;
+    }
     const knownNames=allNames;
     const localSuggestedOwner=candidateNewOwner(output.text,first.documento_tipo,knownNames);
     let companyInfo=null;
+    let companyRecord={};
     // Busca pública só por CNPJ válido e ancorado ao recebedor/contraparte.
     // Não enviar PDF, CPF nem conteúdo OCR para serviços externos.
     const possibleCnpj=items.length===1?
@@ -168,20 +175,53 @@ async function processFile(file){
       "UPDATE arquivos SET progresso_etapa=$2,progresso_dados=$3::jsonb,atualizado_em=now() WHERE id=$1",
       [file.id,output.xml?"xml":"ocr",JSON.stringify(initialFields)]
     );
-    // A consulta externa nunca segura os primeiros campos do OCR na tela.
+    // Consulta somente o CNPJ do beneficiário, nunca o texto do comprovante.
+    // OCR já está publicado: esta consulta não bloqueia a abertura da tela.
     if(possibleCnpj){
-      await db.query("UPDATE arquivos SET progresso_etapa='pesquisando',atualizado_em=now() WHERE id=$1",[file.id]);
+      await db.query("UPDATE arquivos SET progresso_etapa='pesquisando',"+
+        "progresso_dados=progresso_dados || $2::jsonb,atualizado_em=now() WHERE id=$1",
+        [file.id,JSON.stringify({consulta_empresa:{cnpj:possibleCnpj,status:"consultando"}})]);
       try{
-        companyInfo=await lookupPublicCnpj(possibleCnpj);
-        if(companyInfo){
-          await db.query("UPDATE arquivos SET progresso_dados=progresso_dados || $2::jsonb,atualizado_em=now() WHERE id=$1",
-            [file.id,JSON.stringify({consulta_empresa:companyInfo})]);
+        const result=await lookupPublicCnpj(possibleCnpj);
+        // Confirme que a empresa pública corresponde à linha Nome do recebedor.
+        // O CNPJ de um intermediário não pode substituir o beneficiário.
+        const payee=normalizeName(protectedPixReceiver||first.contraparte);
+        const fantasy=normalizeName(result?.nome_fantasia);
+        const legal=normalizeName(result?.razao_social);
+        const matches=payee.length>=4&&(fantasy===payee||legal===payee||
+          (payee.length>=9&&legal.includes(payee)));
+        if(matches){
+          companyInfo=result;
+          companyRecord={...result,status:"confirmado"};
+        }else{
+          companyRecord={cnpj:possibleCnpj,status:"divergente",fonte:"BrasilAPI"};
+          console.warn("Consulta CNPJ não confirmou nome do recebedor",file.id);
         }
       }catch(e){
-        console.warn("Consulta pública de CNPJ não disponível",possibleCnpj,String(e).slice(0,160));
+        companyRecord={cnpj:possibleCnpj,status:"indisponivel",fonte:"BrasilAPI"};
+        console.warn("Consulta pública de CNPJ não disponível",file.id,String(e).slice(0,150));
       }
+      await db.query("UPDATE arquivos SET progresso_dados=progresso_dados || $2::jsonb,atualizado_em=now() WHERE id=$1",
+        [file.id,JSON.stringify({consulta_empresa:companyRecord})]);
     }
-    if(method==="local" && process.env.OLLAMA_URL){
+    // Pix com beneficiário + CNPJ + valor + data + identificador confiáveis não
+    // precisa aguardar inferência pesada. A categoria é apenas uma sugestão.
+    const rapidPix=Boolean(protectedPixReceiver&&companyInfo&&
+      first.tipo==="despesa"&&first.valor&&first.competencia&&first.referencia&&
+      /^E[A-Za-z0-9]{20,}$/.test(first.referencia)&&!dateInitial.estimated&&
+      items.length===1);
+    if(rapidPix&&!first.categoria&&companyInfo.codigo_cnae==="4530703"&&
+       cats.some(x=>normalizeName(x.nome+" > "+x.subcategoria)===normalizeName("Manutenção > Peças"))){
+      first.categoria="Manutenção > Peças";
+      first.avisos=[...(first.avisos||[]),
+        "Categoria sugerida apenas pela atividade pública da empresa; confirme o que foi comprado."];
+      await db.query("UPDATE arquivos SET progresso_dados=progresso_dados || $2::jsonb,atualizado_em=now() WHERE id=$1",
+        [file.id,JSON.stringify({categoria:first.categoria})]);
+    }
+    if(rapidPix){
+      console.log("Comprovante Pix validado por OCR + CNPJ, sem inferência pesada",file.id);
+    }
+    if(!rapidPix&&method==="local" && process.env.OLLAMA_URL){
       try{
         const labels=cats.map(x=>x.nome+(x.subcategoria?" > "+x.subcategoria:""));
         const maxPages=Number(output.text.match(/^PÁGINA \d+ DE (\d+)/m)?.[1]||1);
@@ -191,6 +231,11 @@ async function processFile(file){
           owners:allowedBooks,maxPages,publicCompany:companyInfo,
           onPartial:async fields=>{
             if(!Object.keys(fields).length)return;
+            if(protectedPixReceiver&&fields.contraparte&&
+               normalizeName(fields.contraparte)!==normalizeName(protectedPixReceiver)){
+              fields.contraparte=protectedPixReceiver;
+              fields.titulo="Comprovante Pix — "+protectedPixReceiver;
+            }
             if(fields.titular_sugerido&&allNames.some(x=>normalizeName(x)===normalizeName(fields.titular_sugerido)))
               delete fields.titular_sugerido;
             if(!Object.keys(fields).length)return;
@@ -198,7 +243,16 @@ async function processFile(file){
               [file.id,JSON.stringify(fields)]);
           }
         });
-        if(fromOllama?.length){items=fromOllama;method="ia";}
+        if(fromOllama?.length){
+          items=fromOllama;method="ia";
+          if(protectedPixReceiver&&items.length===1&&
+             normalizeName(items[0].contraparte)!==normalizeName(protectedPixReceiver)){
+            items[0].contraparte=protectedPixReceiver;
+            items[0].titulo="Comprovante Pix — "+protectedPixReceiver;
+            items[0].avisos=[...(items[0].avisos||[]),
+              "O nome do recebedor foi corrigido pela seção explícita do comprovante."];
+          }
+        }
         else {
           aiNotice="IA Central retornou dados incompletos ou inválidos; mantida leitura OCR local.";
           console.warn("IA Central sem dados válidos; mantido extrator local",file.id);
@@ -304,7 +358,7 @@ async function processFile(file){
             Number.isInteger(end)&&end>=start?end:null,
             chosen,duplicates?.rows[0]?.id||null,method,confidence,
             [...new Set([...notice,...extraWarnings])].slice(0,12),
-            cleanSuggested,JSON.stringify(companyInfo||{})]
+            cleanSuggested,JSON.stringify(companyRecord)]
         );
       }
       await connection.query(
