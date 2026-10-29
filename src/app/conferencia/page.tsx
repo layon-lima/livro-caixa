@@ -118,7 +118,12 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
             <section className="review-auto-summary">
               <div><span>Documento</span><strong>{selected.documento_tipo}</strong></div>
               <div><span>Titular</span><strong>{selected.nome_titular}</strong></div>
-              <div><span>Categoria</span><strong>{cats.find(c=>c.id===selected.categoria_id)?.nome||"Não identificada"}</strong></div>
+              <div><span>Categoria</span><strong>{
+                cats.find(c=>c.id===selected.categoria_id)?.nome||
+                (selected.categoria_sugerida_nome?
+                  [selected.categoria_sugerida_nome,selected.categoria_sugerida_subcategoria].filter(Boolean).join(" → "):
+                  "Não identificada")
+              }</strong></div>
               <div><span>Competência</span><strong>{selected.competencia.slice(0,7)}</strong></div>
               <div><span>Valor</span><strong>{selected.valor?Number(selected.valor).toLocaleString("pt-BR",{style:"currency",currency:"BRL"}):"Não identificado"}</strong></div>
               <div><span>Contraparte</span><strong>{selected.contraparte||"Não identificada"}</strong></div>
@@ -168,7 +173,7 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
                     {books.map(b=><option key={b.id} value={b.id}>{b.nome}</option>)}
                   </select>
                 </label>
-                <ReviewCategoryPicker cats={cats} selectedId={selected.categoria_id}
+                <ReviewCategoryPicker key={selected.id} cats={cats} selectedId={selected.categoria_id}
                   suggestedName={selected.categoria_sugerida_nome||""}
                   suggestedSubcategory={selected.categoria_sugerida_subcategoria||""}/>
                 <label>Competência {selected.competencia_estimada&&<em>(estimada)</em>}
