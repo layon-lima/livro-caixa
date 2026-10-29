@@ -422,3 +422,77 @@ button { cursor: pointer; }
 .trash-table tbody tr[role="button"] {cursor:default;user-select:none;}
 .trash-table tbody tr[role="button"]:hover {background:#f6f9fd;}
 .trash-table tbody tr[role="button"].selected {background:#eaf2ff;}
+
+
+/* Duas visões para cada livro: pastas clássicas e planilha somente de saídas. */
+.book-subtabs {display:flex;align-items:flex-end;gap:4px;padding:0 14px;border-bottom:1px solid var(--line);height:42px;flex:0 0 42px;}
+.book-subtabs a {min-width:140px;height:39px;padding:0 14px;display:flex;align-items:center;justify-content:center;gap:9px;font-size:12px;font-weight:600;color:#576c82;background:#f7f9fc;border:1px solid transparent;border-radius:5px 5px 0 0;}
+.book-subtabs a:hover {background:#eef4fb;}
+.book-subtabs a.active {background:#fff;color:#2468b5;border-color:#cad9ea;border-bottom:2px solid #347ac5;}
+.expense-sheet {display:flex;flex:1;min-height:0;flex-direction:column;min-width:0;background:white;}
+.expense-toolbar {display:flex;align-items:center;gap:7px;padding:10px 12px;min-height:59px;border-bottom:1px solid var(--line);flex:0 0 auto;flex-wrap:wrap;}
+.expense-toolbar select,.expense-footer select {border:1px solid #cfdae6;border-radius:5px;padding:7px 8px;background:#fff;color:#364b62;font-size:11px;min-height:35px;}
+.expense-month-select select {width:165px;font-weight:600;}
+.expense-search {min-width:200px;flex:1;display:flex;align-items:center;gap:7px;border:1px solid #cfdae6;border-radius:5px;padding-left:10px;min-height:35px;}
+.expense-search svg {color:#73869b;}
+.expense-search input {border:0;background:transparent;flex:1;min-width:70px;outline:0;font-size:11px;}
+.expense-search button {align-self:stretch;padding:0 11px;border:0;border-left:1px solid #e4eaf1;background:#f5f8fc;color:#38648d;font-size:11px;}
+.expense-filter {display:flex;align-items:center;gap:3px;border:1px solid #cfdae6;border-radius:5px;padding-left:8px;}
+.expense-filter select {border:0;max-width:175px;min-height:33px;}
+.expense-excel {display:flex;align-items:center;gap:7px;border:1px solid #c1d4e9;background:#f6faff;color:#1e639e;border-radius:5px;padding:8px 10px;font-size:11px;font-weight:600;white-space:nowrap;min-height:35px;}
+.expense-excel:hover {background:#e5f1fc;}
+.expense-excel:disabled {opacity:.6;}
+.expense-table-header,.expense-sheet-row {display:grid;grid-template-columns:minmax(92px,.9fr) minmax(90px,.75fr) minmax(165px,1.6fr) minmax(145px,1.35fr) minmax(140px,1.35fr) minmax(120px,1fr) minmax(115px,.9fr) minmax(110px,1fr);}
+.expense-table-header {flex:0 0 auto;min-height:39px;align-items:center;background:#f6f8fb;border-bottom:1px solid var(--line);font-size:10px;font-weight:600;color:#64768a;}
+.expense-table-header>span,.expense-sheet-row>span {min-width:0;padding:7px 10px;border-right:1px solid #edf0f4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.expense-table-header>span:last-child,.expense-sheet-row>span:last-child {border-right:0;}
+.expense-table-header .align-right {text-align:right;}
+.expense-sort {display:inline-flex;align-items:center;gap:3px;background:transparent;border:0;color:inherit;font-size:inherit;font-weight:inherit;padding:0;text-align:left;}
+.expense-sort:hover {color:#1b65ad;}
+.expense-scroll {min-height:0;flex:1;overflow-y:auto;overflow-x:hidden;}
+.expense-month {display:block;}
+.expense-month-header {width:100%;display:flex;align-items:center;gap:10px;background:#eaf3fd;border:0;border-top:1px solid #d4e4f6;border-bottom:1px solid #d9e8f5;color:#27496d;padding:8px 12px;text-align:left;font-size:12px;min-height:40px;}
+.expense-month-header:hover {background:#e0eefb;}
+.expense-month-header strong {font-size:12px;}
+.expense-month-header>span {color:#6b8198;font-size:10px;}
+.expense-month-header .expense-month-total {margin-left:auto;white-space:nowrap;font-size:11px;color:#566c80;}
+.expense-month-header .expense-month-total strong {color:#b63939;font-size:12px;margin-left:4px;}
+.expense-sheet-row {min-height:38px;align-items:center;border-bottom:1px solid var(--line-soft);font-size:11px;cursor:default;user-select:none;}
+.expense-sheet-row:nth-child(odd) {background:#fdfefe;}
+.expense-sheet-row:hover {background:#f4f8fc;}
+.expense-sheet-row.selected {background:#e8f2ff;box-shadow:inset 3px 0 #347ac5;}
+.expense-sheet-row .expense-strong {font-weight:600;color:#324a63;}
+.expense-sheet-row .expense-value {color:#bc3a3a;font-weight:600;text-align:right;font-variant-numeric:tabular-nums;}
+.expense-status {font-size:10px;color:#5d6c7e;}
+.expense-status.linked {color:#286c59;}
+.expense-status.unlinked {color:#a27924;}
+.expense-footer {display:flex;align-items:center;gap:13px;justify-content:flex-end;flex:0 0 auto;padding:8px 12px;min-height:48px;border-top:1px solid var(--line);font-size:11px;color:#718094;}
+.expense-footer>span {margin-right:auto;}
+.expense-footer>strong {white-space:nowrap;color:#536579;font-size:11px;}
+.expense-footer>strong>span {color:#c03232;font-size:13px;margin-left:4px;}
+.expense-pagination {display:flex;align-items:center;gap:7px;color:#516b86;}
+.expense-pagination button {border:1px solid #d9e1eb;background:white;color:#436381;border-radius:5px;width:29px;height:31px;display:grid;place-items:center;}
+.expense-pagination button:disabled {opacity:.35;}
+.expense-loading {display:flex;align-items:center;justify-content:center;gap:9px;color:#62788c;min-height:90px;font-size:11px;}
+.expense-error {margin:7px 12px;}
+@media(max-width:1350px) {
+  .expense-table-header,.expense-sheet-row {grid-template-columns:82px 77px minmax(145px,1.5fr) minmax(125px,1fr) minmax(110px,1fr) minmax(95px,1fr) 105px 105px;}
+  .expense-table-header>span,.expense-sheet-row>span {padding:7px 6px;}
+  .expense-filter select {max-width:137px;}
+}
+@media(max-width:900px){
+  .expense-table-header,.expense-sheet-row {grid-template-columns:82px minmax(140px,1.5fr) minmax(110px,1fr) minmax(95px,1fr) 98px;}
+  .expense-table-header>span:nth-child(2),.expense-table-header>span:nth-child(6),.expense-table-header>span:nth-child(8),
+  .expense-sheet-row>span:nth-child(2),.expense-sheet-row>span:nth-child(6),.expense-sheet-row>span:nth-child(8){display:none;}
+  .expense-footer {flex-wrap:wrap;gap:8px;}
+}
+@media(max-width:580px){
+  .book-subtabs {padding:0 7px;}
+  .book-subtabs a {min-width:110px;padding:0 7px;}
+  .expense-toolbar {padding:7px;gap:6px;}
+  .expense-search {order:3;flex-basis:100%;}
+  .expense-table-header,.expense-sheet-row {grid-template-columns:72px minmax(110px,1.3fr) minmax(100px,1fr) 98px;}
+  .expense-table-header>span:nth-child(5),.expense-sheet-row>span:nth-child(5){display:none;}
+  .expense-month-header {gap:5px;padding:8px 6px;}
+  .expense-month-header .expense-month-total {font-size:9px;}
+}
