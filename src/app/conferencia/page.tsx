@@ -5,6 +5,7 @@ import { getDatabase } from "@/lib/database";
 import { categorias, titularesPermitidos, type Proposta } from "@/lib/document-data";
 import { ArrowLeft, ClipboardCheck, FileText, ExternalLink, LoaderCircle } from "lucide-react";
 import { LiveReview } from "@/components/live-review";
+import { ReviewCategoryPicker } from "@/components/review-category-picker";
 export const dynamic="force-dynamic";
 type Queued=Proposta&{nome_titular:string;duplicada_de:string|null;arquivo_original_id:string|null;titular_original_id:string|null};
 
@@ -21,7 +22,7 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
   const rows=await db.query<Queued>(
     "SELECT p.id::text,p.arquivo_id::text,p.titular_id::text,p.titulo,p.documento_tipo,p.contraparte,"+
     "p.competencia::text,p.competencia_estimada,p.categoria_id::text,p.tipo,p.descricao,p.valor::text,p.referencia,"+
-    "p.pagina_inicial,p.pagina_final,p.metodo_leitura,p.confianca::text,p.avisos,p.titular_sugerido,p.consulta_empresa,p.revisada_em::text,p.operacao_sugerida_id::text,p.aprovado_em::text,p.duplicada_de::text,"+
+    "p.pagina_inicial,p.pagina_final,p.metodo_leitura,p.confianca::text,p.avisos,p.titular_sugerido,p.consulta_empresa,p.categoria_sugerida_nome,p.categoria_sugerida_subcategoria,p.revisada_em::text,p.operacao_sugerida_id::text,p.aprovado_em::text,p.duplicada_de::text,"+
     "orig.arquivo_id::text AS arquivo_original_id,orig.titular_id::text AS titular_original_id,"+
     "a.nome_original,a.status,a.erro,a.texto_extraido,t.nome AS nome_titular "+
     "FROM propostas p JOIN arquivos a ON a.id=p.arquivo_id JOIN titulares t ON t.id=p.titular_id "+
@@ -156,7 +157,7 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
               <summary>{selected.avisos.length} ponto(s) para conferir <span>Ver detalhes</span></summary>
               <ul>{selected.avisos.map((notice,i)=><li key={i}>{notice}</li>)}</ul>
             </details>}
-            <details className="review-edit-data" open={(selected.avisos?.length??0)>1}>
+            <details className="review-edit-data" open={Boolean(selected.categoria_sugerida_nome)||(selected.avisos?.length??0)>1}>
               <summary>Corrigir informações sugeridas</summary>
               <div className="review-fields-grid">
                 <label className="review-span-all">Título da operação
@@ -167,12 +168,9 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
                     {books.map(b=><option key={b.id} value={b.id}>{b.nome}</option>)}
                   </select>
                 </label>
-                <label>Categoria
-                  <select name="categoriaId" defaultValue={selected.categoria_id||""}>
-                    <option value="">Sem categoria</option>
-                    {cats.map(c=><option value={c.id} key={c.id}>{c.nome}{c.subcategoria?" → "+c.subcategoria:""}</option>)}
-                  </select>
-                </label>
+                <ReviewCategoryPicker cats={cats} selectedId={selected.categoria_id}
+                  suggestedName={selected.categoria_sugerida_nome||""}
+                  suggestedSubcategory={selected.categoria_sugerida_subcategoria||""}/>
                 <label>Competência {selected.competencia_estimada&&<em>(estimada)</em>}
                   <input name="competencia" type="month" defaultValue={selected.competencia.slice(0,7)} required/>
                 </label>
