@@ -115,13 +115,14 @@ export function LiveReview({arquivoId,nome,titularPadrao,books,cats,isAdmin}:{
       {fields.consulta_empresa&&<div className="enrichment-line">
         <strong>Consulta pública do recebedor</strong>
         <small>{fields.consulta_empresa.status==="confirmado"?"Consulta confirmada":
+          fields.consulta_empresa.status==="identificado_cnpj"?"CNPJ identificado; nome comercial diferente":
           fields.consulta_empresa.status==="indisponivel"?"BrasilAPI indisponível":
           fields.consulta_empresa.status==="divergente"?"Divergência de CNPJ e recebedor":
           "Consultando CNPJ..."}</small>
         <span>{fields.consulta_empresa.razao_social||fields.contraparte}</span>
         <small>CNPJ: {fields.consulta_empresa.cnpj}</small>
         {fields.consulta_empresa.atividade&&<small>CNAE: {fields.consulta_empresa.atividade}</small>}
-        {fields.consulta_empresa.status==="confirmado"&&<small>Fonte: BrasilAPI. Atividade não comprova o tipo da despesa.</small>}
+        {["confirmado","identificado_cnpj"].includes(fields.consulta_empresa.status||"")&&<small>Fonte: BrasilAPI. Sugestão de categoria editável antes de aprovar.</small>}
       </div>}
       {fields.contraparte&&<div className="enrichment-line">
         <a href={"https://www.google.com/search?q="+encodeURIComponent(fields.contraparte)}

@@ -143,14 +143,15 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
                 <strong>Pesquisa do recebedor / fornecedor</strong>
                 {selected.consulta_empresa?.cnpj?<>
                   {selected.consulta_empresa.status==="confirmado"?<small>Consulta CNPJ confirmada</small>:
-                    <small>{selected.consulta_empresa.status==="indisponivel"?"BrasilAPI não respondeu à consulta":
+                    <small>{selected.consulta_empresa.status==="identificado_cnpj"?"CNPJ do recebedor identificado; nome público diferente do comercial":
+                      selected.consulta_empresa.status==="indisponivel"?"BrasilAPI não respondeu à consulta":
                       selected.consulta_empresa.status==="divergente"?"CNPJ não correspondeu ao recebedor":
                       "Consulta CNPJ pendente"}</small>}
                   <span>{selected.consulta_empresa.razao_social||selected.contraparte}
                     {selected.consulta_empresa.nome_fantasia?" ("+selected.consulta_empresa.nome_fantasia+")":""}</span>
                   <small>CNPJ: {selected.consulta_empresa.cnpj}</small>
                   {selected.consulta_empresa.atividade&&<small>Atividade pública (CNAE): {selected.consulta_empresa.atividade}</small>}
-                  {selected.consulta_empresa.status==="confirmado"&&<small>Fonte: BrasilAPI. A atividade não comprova o tipo do gasto.</small>}
+                  {["confirmado","identificado_cnpj"].includes(selected.consulta_empresa.status||"")&&<small>Fonte: BrasilAPI. Categoria sugerida pela atividade econômica, editável antes da aprovação.</small>}
                 </>:<small>Não foi possível confirmar o recebedor por CNPJ; nenhuma informação externa foi utilizada na classificação.</small>}
                 <a href={"https://www.google.com/search?q="+encodeURIComponent(selected.contraparte)}
                   target="_blank" rel="noopener noreferrer" className="flat-button">
