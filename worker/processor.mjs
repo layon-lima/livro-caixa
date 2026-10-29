@@ -390,22 +390,16 @@ async function processFile(file){
       // Reatribuímos o arquivo ao titular identificado apenas quando todas
       // as propostas do PDF têm um único titular reconhecido com confiança.
       // Caso contrário permanece técnico e será resolvido na aprovação.
-      const resolved=await connection.query(
-        "SELECT DISTINCT titular_id FROM propostas WHERE arquivo_id=$1 AND NOT "+
-        "EXISTS(SELECT 1 FROM unnest(avisos) warning WHERE warning "+
-        "LIKE 'Titular não identificado automaticamente%')",[file.id]);
-      const total=await connection.query(
-        "SELECT count(*)::int AS total FROM propostas WHERE arquivo_id=$1",[file.id]);
-      if(resolved.rows.length===1&&Number(total.rows[0]?.total)===items.length){
-        const uncertain=await connection.query(
-          "SELECT 1 FROM propostas WHERE arquivo_id=$1 AND EXISTS("+
-          "SELECT 1 FROM unnest(avisos) warning "+
-          "WHERE warning LIKE 'Titular não identificado automaticamente%') LIMIT 1",
-          [file.id]);
-        if(!uncertain.rowCount){
-          await connection.query("UPDATE arquivos SET titular_envio_id=$2 WHERE id=$1",
-            [file.id,resolved.rows[0].titular_id]);
-        }
+      const ownerRows=await connection.query(
+        "SELECT titular_id::text AS id,avisos FROM propostas WHERE arquivo_id=$1",
+        [file.id]);
+      const agreed=new Set(ownerRows.rows.map(x=>x.id));
+      const uncertain=ownerRows.rows.some(x=>Array.isArray(x.avisos)&&x.avisos.some(
+        warning=>String(warning).startsWith("Titular não identificado automaticamente")
+      ));
+      if(!uncertain&&agreed.size===1&&ownerRows.rows.length===items.length){
+        await connection.query("UPDATE arquivos SET titular_envio_id=$2 WHERE id=$1",
+          [file.id,ownerRows.rows[0].id]);
       }
       await connection.query(
         "UPDATE arquivos SET status='pronto',progresso_etapa='pronto',texto_extraido=$2,erro=NULL,atualizado_em=now() WHERE id=$1",
