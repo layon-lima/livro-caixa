@@ -6,7 +6,7 @@ import { LoaderCircle, ExternalLink } from "lucide-react";
 
 type LiveFields={
   titulo?:string;documento_tipo?:string;titular_id?:string;categoria?:string;
-  competencia?:string;tipo?:string;valor?:string;contraparte?:string;
+  competencia?:string;data_pagamento?:string;tipo?:string;valor?:string;contraparte?:string;
   referencia?:string;descricao?:string;titular_sugerido?:string;
   consulta_empresa?:{cnpj?:string;status?:string;razao_social?:string;nome_fantasia?:string;atividade?:string;fonte?:string};
 };
@@ -103,6 +103,7 @@ export function LiveReview({arquivoId,nome,books,cats,isAdmin}:{
       <div><span>Titular</span><strong>{titular?.nome||"Identificando…"}</strong></div>
       <div><span>Categoria</span><strong>{fields.categoria||"Identificando…"}</strong></div>
       <div><span>Competência</span><strong>{fields.competencia||"Identificando…"}</strong></div>
+      <div><span>Pagamento</span><strong>{fields.data_pagamento?fields.data_pagamento.split("-").reverse().join("/"):"Identificando…"}</strong></div>
       <div><span>Valor</span><strong>{currency(fields.valor)}</strong></div>
       <div><span>Contraparte</span><strong>{fields.contraparte||"Identificando…"}</strong></div>
     </section>
@@ -151,6 +152,9 @@ export function LiveReview({arquivoId,nome,books,cats,isAdmin}:{
         </label>
         <label>Competência
           <input type="month" value={field(fields.competencia)} readOnly/>
+        </label>
+        <label>Data do pagamento
+          <input type="date" value={field(fields.data_pagamento)} readOnly/>
         </label>
         <label>Documento
           <input value={field(fields.documento_tipo)} placeholder="Identificando…" readOnly/>
