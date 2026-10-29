@@ -15,7 +15,9 @@ export function parseOllamaOutput(raw, {text,categories,owners,maxPages=1}) {
   for(const o of list){
     if(!o||typeof o!=="object")continue;
     const categoryCandidate=SHORT(o.categoria,160).replace(/\s+/g," ");
-    const categoria=allowed.get(norm(categoryCandidate))||categoryCandidate;
+    // Não classificar automaticamente como Outras despesas; o usuário decide.
+    const generic=["OUTRAS DESPESAS","OUTRA DESPESA","RECEITAS"].includes(norm(categoryCandidate));
+    const categoria=generic?"":allowed.get(norm(categoryCandidate))||categoryCandidate;
     const owner=validOwner.get(String(o.titular_id||""));
     // Não atribuir titular só porque a IA retornou um ID: precisa aparecer por extenso no arquivo.
     const titular_id=owner && evidence.includes(norm(owner.nome))?String(owner.id):"";
@@ -32,7 +34,7 @@ export function parseOllamaOutput(raw, {text,categories,owners,maxPages=1}) {
     const titular_sugerido=suggestedName.length>=6&&evidence.includes(norm(suggestedName))&&
       !owners.some(x=>norm(x.nome)===norm(suggestedName))?suggestedName:"";
     const cautions=(Array.isArray(o.avisos)?o.avisos:[]).slice(0,5).map(x=>SHORT(x,160));
-    if(categoryCandidate&&!allowed.has(norm(categoryCandidate)))
+    if(!generic&&categoryCandidate&&!allowed.has(norm(categoryCandidate)))
       cautions.push("Nova categoria sugerida pela IA; será cadastrada somente se aprovada.");
     if(o.titular_id&&!titular_id)cautions.push("Titular sugerido sem correspondência textual segura.");
     const conf=Number(o.confianca);
