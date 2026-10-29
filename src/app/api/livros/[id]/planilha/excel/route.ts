@@ -76,12 +76,13 @@ export async function GET(request:Request,{params}:{params:Promise<{id:string}>}
       const total=totals.get(mes)||{count:0,sum:0};
       total.count++;total.sum+=value;totals.set(mes,total);
       const added=list.addRow([
-        safeText(row.data_pagamento?row.data_pagamento.split("-").reverse().join("/"):""),
+        row.data_pagamento?new Date(row.data_pagamento+"T12:00:00Z"):null,
         mes,safeText(row.titulo),safeText([row.categoria,row.subcategoria].filter(Boolean).join(" / ")||"Sem categoria"),
         safeText(row.contraparte),safeText(row.documento||"Sem documento"),
         safeText(row.referencia),row.tipo==="outro"?"Não classificado":"Saída",
         money(value),row.tem_documento?"Com documento":"Sem documento"
       ]);
+      added.getCell(1).numFmt="dd/mm/yyyy";
       added.getCell(9).numFmt=currencyFmt;
       if(added.number%2===0)added.eachCell(c=>{
         c.fill={type:"pattern",pattern:"solid",fgColor:{argb:"FFF5F8FC"}};
