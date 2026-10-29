@@ -161,3 +161,30 @@ Instalação:
 A IA usa as categorias aprovadas do PostgreSQL nos próximos documentos e
 evita a escolha automática genérica de "Outras despesas". Em Pix sem
 descrição da compra, o CNAE obtido por CNPJ é uma hipótese editável.
+
+
+## Explorador agrupado e data real de pagamento (migração 009)
+
+O Explorador apresenta pastas virtuais organizadas por ano, mês, categoria e
+recebedor. Dois lançamentos da mesma categoria e para o mesmo recebedor no
+mesmo mês aparecem sob a mesma pasta, mas **as operações e documentos
+continuam distintos no banco**. O menu de ações permanece em cada lançamento.
+
+A aba Planilha usa `operacoes.data_pagamento` (efetivação do Pix,
+transferência ou cobrança) na primeira coluna e no Excel, nunca
+`criado_em`. O OCR/IA só preenche data se o documento comprovar pagamento.
+Boleto não quitado e nota fiscal apenas emitida deixam a data em branco.
+A conferência e os lançamentos manuais permitem informar/corrigir a data.
+
+Atualização:
+
+    cd /opt/apps/livro-caixa
+    git pull --ff-only
+    docker compose exec -T database sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1' < db/migrations/009_payment_date.sql
+    docker compose up -d --build
+    docker compose exec -T worker node worker/backfill-payment-date.mjs
+
+O backfill examina os OCRs existentes, preenche somente operações sem data
+e com evidência válida de pagamento e informa quantas foram corrigidas.
+Sem evidência, mantém NULL para revisão manual. O comando pode ser repetido
+sem apagar dados anteriores.
