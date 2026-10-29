@@ -1,7 +1,7 @@
 import { Pool } from "pg";
 import { parseLocalDocument } from "./local-parser.mjs";
 import { analyzeWithOllama } from "./ollama-analyzer.mjs";
-import { candidateNewOwner, receiverCnpj, lookupPublicCnpj, confirmedPixReceiver } from "./company-lookup.mjs";
+import { candidateNewOwner, receiverCnpj, lookupPublicCnpj, confirmedPixReceiver, suggestCategoryFromCompany } from "./company-lookup.mjs";
 import { XMLParser } from "fast-xml-parser";
 import { mkdtemp, writeFile, rm, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -117,11 +117,13 @@ function fromAiOwner(value,books) {
   return books.find(b=>String(b.id)===String(value)||normalizeName(b.nome)===term)||null;
 }
 async function processFile(file){
+  const timing={started:Date.now(),ocr_ms:0,cnpj_ms:0,ia_ms:0};
   const folder=await mkdtemp(join(tmpdir(),"lc-"));
   try{
     if(file.armazenamento!=="local")throw Error("Arquivo anterior requer migração para a VPS");
     const bytes=gunzipSync(await readFile(compressedPath(file.chave_armazenamento)));
     const output=await extract(bytes,file.mime,folder);
+    timing.ocr_ms=Date.now()-timing.started;
     const [categories,books]=await Promise.all([
       db.query("SELECT id::text,nome,subcategoria FROM categorias"),
       db.query(
@@ -178,6 +180,7 @@ async function processFile(file){
     // Consulta somente o CNPJ do beneficiário, nunca o texto do comprovante.
     // OCR já está publicado: esta consulta não bloqueia a abertura da tela.
     if(possibleCnpj){
+      const lookupStarted=Date.now();
       await db.query("UPDATE arquivos SET progresso_etapa='pesquisando',"+
         "progresso_dados=progresso_dados || $2::jsonb,atualizado_em=now() WHERE id=$1",
         [file.id,JSON.stringify({consulta_empresa:{cnpj:possibleCnpj,status:"consultando"}})]);
@@ -203,6 +206,15 @@ async function processFile(file){
       }
       await db.query("UPDATE arquivos SET progresso_dados=progresso_dados || $2::jsonb,atualizado_em=now() WHERE id=$1",
         [file.id,JSON.stringify({consulta_empresa:companyRecord})]);
+      timing.cnpj_ms=Date.now()-lookupStarted;
+    }
+    // Categoria por atividade pública é um palpite, já preenchido para o usuário
+    // ajustar se necessário. Não exige uma confirmação separada da aprovação comum.
+    const companyCategory=companyInfo?suggestCategoryFromCompany(companyInfo,cats):"";
+    if(companyCategory&&!first.categoria){
+      first.categoria=companyCategory;
+      await db.query("UPDATE arquivos SET progresso_dados=progresso_dados || $2::jsonb,atualizado_em=now() WHERE id=$1",
+        [file.id,JSON.stringify({categoria:companyCategory})]);
     }
     // Pix com beneficiário + CNPJ + valor + data + identificador confiáveis não
     // precisa aguardar inferência pesada. A categoria é apenas uma sugestão.
@@ -210,18 +222,11 @@ async function processFile(file){
       first.tipo==="despesa"&&first.valor&&first.competencia&&first.referencia&&
       /^E[A-Za-z0-9]{20,}$/.test(first.referencia)&&!dateInitial.estimated&&
       items.length===1);
-    if(rapidPix&&!first.categoria&&companyInfo.codigo_cnae==="4530703"&&
-       cats.some(x=>normalizeName(x.nome+" > "+x.subcategoria)===normalizeName("Manutenção > Peças"))){
-      first.categoria="Manutenção > Peças";
-      first.avisos=[...(first.avisos||[]),
-        "Categoria sugerida apenas pela atividade pública da empresa; confirme o que foi comprado."];
-      await db.query("UPDATE arquivos SET progresso_dados=progresso_dados || $2::jsonb,atualizado_em=now() WHERE id=$1",
-        [file.id,JSON.stringify({categoria:first.categoria})]);
-    }
     if(rapidPix){
       console.log("Comprovante Pix validado por OCR + CNPJ, sem inferência pesada",file.id);
     }
     if(!rapidPix&&method==="local" && process.env.OLLAMA_URL){
+      const aiStarted=Date.now();
       try{
         const labels=cats.map(x=>x.nome+(x.subcategoria?" > "+x.subcategoria:""));
         const maxPages=Number(output.text.match(/^PÁGINA \d+ DE (\d+)/m)?.[1]||1);
@@ -245,6 +250,9 @@ async function processFile(file){
         });
         if(fromOllama?.length){
           items=fromOllama;method="ia";
+          // Se a IA não encontrou categoria, aproveita o palpite público já disponível.
+          if(items.length===1&&!items[0].categoria&&companyCategory)
+            items[0].categoria=companyCategory;
           if(protectedPixReceiver&&items.length===1&&
              normalizeName(items[0].contraparte)!==normalizeName(protectedPixReceiver)){
             items[0].contraparte=protectedPixReceiver;
@@ -261,6 +269,8 @@ async function processFile(file){
         const detail=String(e instanceof Error?e.message:e).slice(0,125);
         aiNotice="IA Central não concluiu a leitura ("+detail+"); mantido OCR local.";
         console.warn("IA Central indisponível, mantido OCR local",file.id,detail);
+      }finally{
+        timing.ia_ms=Date.now()-aiStarted;
       }
     }
 
@@ -366,7 +376,9 @@ async function processFile(file){
         [file.id,output.text.slice(0,1500000)]
       );
       await connection.query("COMMIT");
-      console.log("Arquivo processado",file.id,"método",method,"documentos",items.length);
+      console.log("Arquivo processado",file.id,"método",method,"documentos",items.length,
+        "tempos_ms",JSON.stringify({ocr:timing.ocr_ms,cnpj:timing.cnpj_ms,ia:timing.ia_ms,total:Date.now()-timing.started}),
+        "consulta_cnpj",companyRecord.status||"nao_consultado");
     }catch(error){
       await connection.query("ROLLBACK");
       throw error;
