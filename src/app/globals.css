@@ -532,3 +532,16 @@ button { cursor: pointer; }
   .global-upload-toast {right:16px;bottom:101px;}
   .global-review-return {right:16px;bottom:95px;}
 }
+
+/* Pastas virtuais: ano -> mês -> categoria -> recebedor -> lançamentos. */
+.explorer-tree-count {margin-left:auto;color:#8999a9;font-size:10px;font-weight:400;font-variant-numeric:tabular-nums;}
+.explorer-tree-category {font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;}
+.explorer-recipient-leaf {padding-left:4px;gap:7px;overflow-wrap:anywhere;color:#455a6d;}
+.explorer-recipient-leaf.active {background:#e7f0fe;color:#2769aa;font-weight:650;border-radius:4px;}
+.explorer-breadcrumbs {display:flex;align-items:center;gap:7px;flex:0 0 auto;min-height:32px;padding:7px 14px;border-bottom:1px solid var(--line);font-size:11px;color:#63778b;flex-wrap:wrap;}
+.explorer-breadcrumbs a:hover {color:#2268ac;text-decoration:underline;}
+.explorer-breadcrumbs strong {color:#284867;font-weight:600;}
+.explorer-folder-row {text-decoration:none;color:#3b4c60;}
+.explorer-folder-row:hover {background:#f0f6fe;color:#275f98;}
+.explorer-folder-row>span:last-child {color:#708397;font-size:11px;}
+.explorer-folder-row .operation-name strong {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;font-weight:600;}
