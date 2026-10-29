@@ -3,8 +3,9 @@ import { notFound } from "next/navigation";
 import { requireUser, canAccessTitular } from "@/lib/auth";
 import { getDatabase } from "@/lib/database";
 import { ExplorerShell, type Titular } from "@/components/explorer-shell";
-import { categorias, safeId, type Operacao } from "@/lib/document-data";
-import { FileText, Folder, Search, Pencil } from "lucide-react";
+import { categorias, titularesPermitidos, safeId, type Operacao } from "@/lib/document-data";
+import { OperationRows } from "@/components/operation-rows";
+import { Folder, Search } from "lucide-react";
 export const dynamic="force-dynamic";
 
 type Attached = {operacao_id:string;arquivo_id:string;nome_original:string;documento_tipo:string};
@@ -52,8 +53,7 @@ export default async function Livro({params,searchParams}:{
     [id]);
   const byOp=new Map<string,Attached[]>();
   for(const file of attached.rows)byOp.set(file.operacao_id,[...(byOp.get(file.operacao_id)||[]),file]);
-  const active=ops.find(o=>o.id===query.op);
-  const all=await db.query<{competencia:string;categoria_id:string|null;nome:string|null}>(
+    const all=await db.query<{competencia:string;categoria_id:string|null;nome:string|null}>(
     "SELECT DISTINCT to_char(o.competencia,'YYYY-MM') AS competencia,o.categoria_id::text,c.nome "+
     "FROM operacoes o LEFT JOIN categorias c ON c.id=o.categoria_id WHERE o.titular_id=$1 AND o.excluido_em IS NULL "+
     "ORDER BY competencia DESC,nome",[id]);
@@ -77,20 +77,11 @@ export default async function Livro({params,searchParams}:{
       </details>)}
     </details>)}
   </div>;
-  const preview=active?<div className="op-preview">
-    <h3>{active.titulo}</h3>
-    <p>{active.competencia.slice(0,7)} • {active.categoria||"Sem categoria"}</p>
-    <div className="op-preview-files">
-      {(byOp.get(active.id)||[]).map(f=><div key={f.arquivo_id}>
-        <a href={"/api/documentos/"+f.arquivo_id} target="_blank" rel="noreferrer">
-          <FileText size={13}/>{f.nome_original}</a>
-      </div>)}
-    </div>
-    {byOp.get(active.id)?.[0]&&<iframe title="Visualização do documento"
-      src={"/api/documentos/"+byOp.get(active.id)![0].arquivo_id}/>}
-    <Link className="flat-button" href={"/operacoes/"+active.id}><Pencil size={13}/> Editar operação</Link>
-  </div>:undefined;
-  return <ExplorerShell user={user} titulares={books.rows} selected={selected} folderContent={folder} preview={preview} operationCount={ops.length}>
+  const [canEdit,canDelete,editBooks]=await Promise.all([
+    canAccessTitular(user,id,"edit"),canAccessTitular(user,id,"delete"),
+    titularesPermitidos(user,"edit")
+  ]);
+  return <ExplorerShell user={user} titulares={books.rows} selected={selected} folderContent={folder} operationCount={ops.length}>
     <div className="list-toolbar">
       <form action={"/livros/"+id} className="search-bar">
         <Search size={15}/>
@@ -114,29 +105,7 @@ export default async function Livro({params,searchParams}:{
       <div className="col-main">Operação</div><div className="col-category">Categoria</div>
       <div className="col-period">Competência</div><div className="col-docs">Documentos</div>
     </div>
-    <div className="operation-scroll">
-      {ops.map(o=><details className="operation-row" key={o.id} open={o.id===active?.id}>
-        <summary>
-          <span className="operation-name"><Folder size={15} className="folder-icon"/><span>{o.titulo}</span></span>
-          <span>{o.categoria||"Sem categoria"}{o.subcategoria?" / "+o.subcategoria:""}</span>
-          <span>{o.competencia.slice(0,7)}</span>
-          <span>{o.quantidade_documentos}</span>
-        </summary>
-        <div className="operation-expanded">
-          <div className="operation-meta">
-            <span>{o.contraparte||"Sem contraparte"}</span><span>{o.tipo}</span>
-            {o.valor!==null&&<span>R$ {Number(o.valor).toLocaleString("pt-BR",{minimumFractionDigits:2})}</span>}
-            <Link href={"/livros/"+id+"?op="+o.id}>Visualizar</Link>
-            <Link href={"/operacoes/"+o.id}>Editar</Link>
-          </div>
-          {(byOp.get(o.id)||[]).map(f=><a key={f.arquivo_id} href={"/api/documentos/"+f.arquivo_id}
-            target="_blank" rel="noreferrer" className="operation-document">
-            <FileText size={13}/>{f.nome_original}<small>{f.documento_tipo}</small>
-          </a>)}
-          {!byOp.has(o.id)&&<p className="muted">Operação manual sem documentos vinculados.</p>}
-        </div>
-      </details>)}
-      {ops.length===0&&<p className="empty-info">Nenhuma operação para os filtros selecionados.</p>}
-    </div>
+    <OperationRows operations={ops} documents={attached.rows} books={editBooks}
+      canEdit={canEdit} canDelete={canDelete} bookId={String(id)}/>
   </ExplorerShell>;
 }
