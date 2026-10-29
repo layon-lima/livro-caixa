@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { requireUser, canAccessTitular } from "@/lib/auth";
 import { getDatabase } from "@/lib/database";
 import { ExplorerShell, type Titular } from "@/components/explorer-shell";
@@ -92,14 +93,16 @@ export default async function Livro({params,searchParams}:{
       <summary><Folder size={14} className="folder-icon"/>{year}</summary>
       {months.map(m=><details key={m.mes} open={m.mes===month}>
         <summary><Folder size={14} className="folder-icon"/>
-          {monthTitle(m.mes).replace(/ de \d{4}$/,"")}
+          <Link href={explorerHref(id,{mes:m.mes})}>{monthTitle(m.mes).replace(/ de \d{4}$/,"")}</Link>
           <span className="explorer-tree-count">{m.count}</span>
         </summary>
         {m.categories.map(cat=><details key={cat.key}
           open={m.mes===month&&activeCategory?.key===cat.key}>
           <summary className="explorer-tree-category">
             <Folder size={13} className="folder-icon"/>
-            {categoryName(cat.name,cat.subcategoria)}
+            <Link href={explorerHref(id,{mes:m.mes,categoria:cat.ids[0]||"sem"})}>
+              {categoryName(cat.name,cat.subcategoria)}
+            </Link>
             <span className="explorer-tree-count">{cat.count}</span>
           </summary>
           {cat.recipients.map(rec=><a key={rec.key}
