@@ -12,7 +12,7 @@ type LiveFields={
 };
 type FileState={
   id:string;nome_original:string;status:string;erro:string|null;
-  propostas:number;progresso_etapa:string;progresso_dados:LiveFields;
+  propostas:number;proposta_id:string|null;progresso_etapa:string;progresso_dados:LiveFields;
 };
 type Book={id:string;nome:string};
 type Category={id:string;nome:string;subcategoria:string};
@@ -57,8 +57,18 @@ export function LiveReview({arquivoId,nome,titularPadrao,books,cats,isAdmin}:{
         if(row.status==="erro")setError(row.erro||"Falha ao processar o arquivo.");
         else setError("");
         if(row.status==="pronto"){
-          if(row.propostas>0)router.refresh();
-          else setError("A leitura terminou, mas não foi criada uma proposta para conferência.");
+          if(row.proposta_id&&/^\d+$/.test(row.proposta_id)){
+            // Mudar de rota para o registro pronto; refresh() repetido da mesma
+            // página pode deixá-la presa em "Abrindo conferência".
+            const current=new URL(window.location.href);
+            current.searchParams.delete("arquivo");
+            current.searchParams.set("id",row.proposta_id);
+            router.replace(current.pathname+current.search);
+          }else if(row.propostas>0){
+            router.refresh();
+          }else{
+            setError("A leitura terminou, mas não foi criada uma proposta para conferência.");
+          }
         }
       }catch(e){
         if(alive)setError(e instanceof Error?e.message:"Falha ao acompanhar o processamento.");

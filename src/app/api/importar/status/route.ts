@@ -11,6 +11,7 @@ type Item = {
   status: "aguardando"|"processando"|"pronto"|"erro";
   erro: string|null;
   propostas: number;
+  proposta_id: string|null;
   nome_original: string;
   progresso_etapa: string;
   progresso_dados: Record<string,string>;
@@ -30,7 +31,8 @@ export async function GET(request: Request) {
   const rows=await getDatabase().query<Item>(
     "SELECT a.id::text,a.titular_envio_id::text AS titular_id,a.nome_original,a.status,a.erro,"+
     "a.progresso_etapa,a.progresso_dados,"+
-    "(SELECT count(*)::integer FROM propostas p WHERE p.arquivo_id=a.id AND p.aprovado_em IS NULL) AS propostas "+
+    "(SELECT count(*)::integer FROM propostas p WHERE p.arquivo_id=a.id AND p.aprovado_em IS NULL) AS propostas,"+
+    "(SELECT p.id::text FROM propostas p WHERE p.arquivo_id=a.id AND p.aprovado_em IS NULL ORDER BY p.id LIMIT 1) AS proposta_id "+
     "FROM arquivos a WHERE a.id=ANY($1::bigint[])",
     [ids],
   );
