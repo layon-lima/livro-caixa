@@ -8,7 +8,7 @@ export function splitSuggestion(value){
   const parts=raw.split(/\s*(?:>|→)\s*/);
   if(parts.length>2)return null;
   const [nome,subcategoria=""]=parts;
-  if(!nome||nome.length>80||subcategoria.length>80||/[<>{}\[\]\r\n\t]/.test(raw))return null;
+  if(!nome||nome.length>80||subcategoria.length>80||/[<>{}\[\]\r\n\t]/.test(nome+subcategoria))return null;
   return {nome,subcategoria};
 }
 export function existingCategory(value,categories){
