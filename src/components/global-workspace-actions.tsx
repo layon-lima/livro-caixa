@@ -104,10 +104,15 @@ export function GlobalWorkspaceActions(){
         results.push(...(body.results||[]));
       }
       const failures=results.filter(x=>x.status==="erro");
+      const alreadyApproved=results.filter(x=>x.status==="ja_aprovado");
       const ids=[...new Set(results.filter(x=>x.id&&
         ["importado","reprocessado","duplicado"].includes(x.status)).map(x=>x.id!))];
-      if(!ids.length)throw Error(failures.map(x=>x.name+": "+(x.error||"Erro")).join("; ")||
-        "Não foi possível obter os documentos para conferência.");
+      if(!ids.length)throw Error(
+        alreadyApproved.length?
+          "Este documento já foi aprovado e está no Livro Caixa. Para preservar a operação, ele não será analisado novamente.":
+        failures.map(x=>x.name+": "+(x.error||"Erro")).join("; ")||
+          "O arquivo já está cadastrado ou não pode ser aberto para conferência."
+      );
       setFiles([]);setError("");
       // Quem só pode importar acompanha o processamento sem acessar dados
       // de conferência para os quais não recebeu permissão.

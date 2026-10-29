@@ -89,10 +89,16 @@ export async function POST(request: Request) {
               continue;
             }
           }
+          // Documento já aprovado: não reprocessar nem abrir conferência vazia.
+          const belongs=original.titular_envio_id===String(titularId);
+          const approved=belongs?await connection.query(
+            "SELECT 1 FROM propostas WHERE arquivo_id=$1 AND aprovado_em IS NOT NULL LIMIT 1",
+            [original.id]
+          ):null;
           await connection.query("COMMIT");
-          results.push(original.titular_envio_id===String(titularId)
-            ? {name,status:"duplicado",id:original.id}
-            : {name,status:"duplicado"});
+          results.push(approved?.rowCount?
+            {name,status:"ja_aprovado"}:
+            belongs?{name,status:"duplicado",id:original.id}:{name,status:"duplicado"});
           continue;
         }
         await writeCompressedOriginal(key, compressed);
