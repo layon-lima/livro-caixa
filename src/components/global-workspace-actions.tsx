@@ -19,6 +19,9 @@ export function GlobalWorkspaceActions(){
   const [error,setError]=useState("");
   const input=useRef<HTMLInputElement>(null);
   const nested=useRef(0);
+  const requestSeq=useRef(0);
+  const submitted=useRef(0);
+  const [dropRequest,setDropRequest]=useState(0);
   useEffect(()=>{
     let alive=true;
     setContext(null);
@@ -33,12 +36,12 @@ export function GlobalWorkspaceActions(){
   useEffect(()=>{
     if(!context?.importBooks.length)return;
     const preferred=context.importBooks.find(x=>x.id===currentBook)?.id||
-      (context.importBooks.length===1?context.importBooks[0].id:"");
+      context.importBooks[0].id;
     setBookId(preferred);
   },[context,currentBook]);
 
   useEffect(()=>{
-    if(!context?.importBooks.length)return;
+    if(!context?.importBooks.length||busy||files.length>0)return;
     const hasFiles=(e:DragEvent|globalThis.DragEvent)=>{
       const dt=e.dataTransfer;
       return Boolean(dt && Array.from(dt.types||[]).includes("Files"));
@@ -66,6 +69,7 @@ export function GlobalWorkspaceActions(){
       const list=Array.from(e.dataTransfer.files||[]);
       if(!list.length)return;
       setFiles(list.slice(0,100));
+      requestSeq.current+=1;setDropRequest(requestSeq.current);
       setError(list.length>100?"Envie no máximo 100 arquivos por lote.":"");
     };
     // Captura no documento: funciona no explorador, tabelas, cabeçalhos e formulários.
@@ -79,7 +83,7 @@ export function GlobalWorkspaceActions(){
       document.removeEventListener("dragleave",leave,true);
       document.removeEventListener("drop",drop,true);
     };
-  },[context]);
+  },[context,busy,files.length]);
 
   const close=()=>{if(!busy){setFiles([]);setError("");}};
   async function send(){
@@ -113,6 +117,14 @@ export function GlobalWorkspaceActions(){
     }finally{setBusy(false);}
   }
 
+  // Se há titular permitido, o arquivo começa a ser enviado ao soltar,
+  // sem pedir clique em Iniciar leitura. O titular é provisório e pode ser revisto.
+  useEffect(()=>{
+    if(!dropRequest||submitted.current===dropRequest||!files.length||!bookId)return;
+    submitted.current=dropRequest;
+    void send();
+  },[dropRequest,files,bookId]);
+
   if(!context)return null;
   const visibleFab=context.editBooks.length>0&&!pathname.startsWith("/manual");
   const fabBook=context.editBooks.find(x=>x.id===currentBook)||
@@ -137,7 +149,7 @@ export function GlobalWorkspaceActions(){
           <strong><FileUp size={17}/> Importar {files.length} arquivo(s)</strong>
           <button onClick={close} disabled={busy} aria-label="Fechar"><X size={17}/></button>
         </header>
-        <p>Os arquivos serão enviados e a conferência abrirá imediatamente, com preenchimento durante o OCR e a IA.</p>
+        <p>Enviando automaticamente. A conferência abrirá assim que o arquivo estiver salvo; OCR e IA preencherão o formulário.</p>
         <label>Titular provisório
           <select disabled={busy} value={bookId} onChange={e=>setBookId(e.target.value)}>
             <option value="">Selecione o titular</option>
@@ -152,7 +164,7 @@ export function GlobalWorkspaceActions(){
           <button className="flat-button" onClick={close} disabled={busy}>Cancelar</button>
           <button className="primary-btn" onClick={()=>void send()} disabled={!bookId||busy}>
             {busy&&<LoaderCircle size={15} className="spin"/>}
-            {busy?"Enviando…":"Iniciar leitura"}
+            {busy?"Enviando…":"Tentar novamente"}
           </button>
         </footer>
       </section>
