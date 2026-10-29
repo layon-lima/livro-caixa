@@ -21,7 +21,6 @@ export default async function Editar({params}:{params:Promise<{id:string}>}){
       "WHERE oa.operacao_id=$1",[id]),
   ]);
   const editable=await canAccessTitular(user,Number(op.titular_id),"edit");
-  const deletable=await canAccessTitular(user,Number(op.titular_id),"delete");
   return <div className="work-page">
     <header className="work-bar"><Link href={"/livros/"+op.titular_id}><ArrowLeft size={16}/> Voltar ao livro</Link><strong><Pencil size={16}/> Operação #{id}</strong></header>
     <main className="work-main narrow-work">
@@ -56,10 +55,6 @@ export default async function Editar({params}:{params:Promise<{id:string}>}){
         <a href={"/api/documentos/"+f.arquivo_id} target="_blank" rel="noreferrer"><FileText size={14}/>{f.nome_original}</a>
       </div>)}
       {files.rows.length===0&&<p className="muted">Nenhum documento vinculado.</p>}
-      {deletable&&<form action={"/api/operacoes/"+id} method="post" className="delete-form">
-        <input type="hidden" name="acao" value={op.excluido_em?"restaurar":"excluir"}/>
-        <button className="flat-button" type="submit">{op.excluido_em?"Restaurar operação":"Enviar operação para a lixeira"}</button>
-      </form>}
     </main>
   </div>;
 }
