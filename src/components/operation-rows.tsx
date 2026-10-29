@@ -36,7 +36,7 @@ export function OperationRows({operations,documents,books,canEdit,canDelete,book
   // O recebedor é a última pasta: mostrar arquivos reais, um por anexo.
   // Operações sem PDF continuam visíveis como lançamentos manuais, sem pasta extra.
   const fileEntries:{op:OperationEntry;doc:AttachedDocument|null;key:string}[]=
-    operations.flatMap(op=>{
+    operations.flatMap<{op:OperationEntry;doc:AttachedDocument|null;key:string}>(op=>{
       const linked=docs.get(op.id)||[];
       return linked.length?linked.map(doc=>({op,doc,key:op.id+":"+doc.arquivo_id})):
         [{op,doc:null,key:op.id+":sem-anexo"}];
