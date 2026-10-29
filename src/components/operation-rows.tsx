@@ -2,18 +2,19 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { FileText, Folder, FolderInput, Pencil, Trash2, X, Eye, ChevronLeft } from "lucide-react";
+import { FileText, Folder, FolderInput, Pencil, Trash2, X, Eye, ChevronLeft, ChevronDown, ChevronRight } from "lucide-react";
 
 export type OperationEntry={
   id:string;titular_id:string;titulo:string;categoria:string|null;subcategoria:string|null;
   categoria_id:string|null;competencia:string;tipo:string;descricao:string;
-  contraparte:string;referencia:string;valor:string|null;quantidade_documentos:string;
+  contraparte:string;referencia:string;valor:string|null;quantidade_documentos:string; data_registro?:string; documento?:string|null; tem_documento?:boolean;
 };
 export type AttachedDocument={operacao_id:string;arquivo_id:string;nome_original:string;documento_tipo:string};
 type Book={id:string;nome:string};
 type Props={
   operations:OperationEntry[];documents:AttachedDocument[];books:Book[];
   canEdit:boolean;canDelete:boolean;bookId:string;
+  variant?:"explorer"|"spreadsheet";monthlyTotals?:{mes:string;quantidade:number;total:string}[];
 };
 type Menu={id:string;x:number;y:number;view:"actions"|"files"|"move"|"delete"|"info"};
 const money=(v:string|null)=>v===null?"":Number(v).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
@@ -22,7 +23,8 @@ const place=(x:number,y:number)=>({
   y:Math.max(8,Math.min(y,window.innerHeight-350))
 });
 
-export function OperationRows({operations,documents,books,canEdit,canDelete,bookId}:Props){
+export function OperationRows({operations,documents,books,canEdit,canDelete,bookId,variant="explorer",monthlyTotals=[]}:Props){
+  const [collapsed,setCollapsed]=useState<string[]>([]);
   const [selected,setSelected]=useState<string|null>(null);
   const [menu,setMenu]=useState<Menu|null>(null);
   const [destination,setDestination]=useState("");
@@ -47,8 +49,57 @@ export function OperationRows({operations,documents,books,canEdit,canDelete,book
     setMenu({id,...position,view:"actions"});
   }
   const view=(kind:Menu["view"])=>setMenu(m=>m?{...m,view:kind}:null);
-  return <div className="operation-scroll" aria-label="Operações do livro">
-    {operations.map(op=><div key={op.id}
+  return <div className={"operation-scroll"+(variant==="spreadsheet"?" expense-scroll":"")} aria-label="Operações do livro">
+    {variant==="spreadsheet"?(()=>{
+      const monthly=new Map<string,OperationEntry[]>();
+      for(const op of operations){
+        const month=op.competencia.slice(0,7);
+        monthly.set(month,[...(monthly.get(month)||[]),op]);
+      }
+      const monthLabel=(month:string)=>{
+        const [year,m]=month.split("-");
+        return new Intl.DateTimeFormat("pt-BR",{month:"long",year:"numeric"})
+          .format(new Date(Number(year),Number(m)-1,1));
+      };
+      return [...monthly].map(([month,entries])=>{
+        const total=monthlyTotals.find(x=>x.mes===month);
+        const closed=collapsed.includes(month);
+        return <section className="expense-month" key={month}>
+          <button type="button" className="expense-month-header"
+            onClick={()=>setCollapsed(old=>closed?old.filter(x=>x!==month):[...old,month])}
+            aria-expanded={!closed}>
+            {closed?<ChevronRight size={15}/>:<ChevronDown size={15}/>}
+            <strong>{monthLabel(month)}</strong>
+            <span>{total?.quantidade??entries.length} lançamentos</span>
+            <span className="expense-month-total">Total do mês: <strong>{money(total?.total||"0")}</strong></span>
+          </button>
+          {!closed&&entries.map(op=><div key={op.id} className={"expense-sheet-row"+(selected===op.id?" selected":"")}
+            role="button" tabIndex={0} title="Clique para selecionar, duplo clique para ações"
+            aria-label={op.titulo+". Dois cliques para ações"}
+            onClick={()=>{setSelected(op.id);setMenu(null);}}
+            onDoubleClick={e=>show(op.id,e.clientX,e.clientY)}
+            onContextMenu={e=>{e.preventDefault();show(op.id,e.clientX,e.clientY);}}
+            onKeyDown={e=>{
+              if(e.key==="Enter"||e.key===" "){
+                e.preventDefault();const b=e.currentTarget.getBoundingClientRect();
+                show(op.id,b.left+80,b.top+20);
+              }
+            }}>
+            <span>{op.data_registro?new Date(op.data_registro).toLocaleDateString("pt-BR"):"—"}</span>
+            <span>{op.competencia.slice(0,7)}</span>
+            <span className="expense-strong" title={op.titulo}>{op.titulo}</span>
+            <span title={[op.categoria,op.subcategoria].filter(Boolean).join(" / ")}>
+              {op.categoria||"Sem categoria"}{op.subcategoria?" / "+op.subcategoria:""}</span>
+            <span title={op.contraparte||""}>{op.contraparte||"—"}</span>
+            <span title={op.documento||""}>{op.documento||"—"}</span>
+            <span className="expense-value">{op.valor!==null?money(op.valor):"—"}</span>
+            <span className={"expense-status"+(op.tem_documento?" linked":" unlinked")}>
+              {op.tem_documento?"Com documento":"Sem documento"}
+            </span>
+          </div>)}
+        </section>;
+      });
+    })():operations.map(op=><div key={op.id}
       className={"operation-row operation-popup-row"+(selected===op.id?" selected":"")}
       role="button" tabIndex={0} aria-label={op.titulo+". Dois cliques para ações"}
       title="Clique para selecionar; dois cliques para ações"
