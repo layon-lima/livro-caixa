@@ -1,3 +1,4 @@
+import { StandaloneWorkspace } from "@/components/standalone-workspace";
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { getDatabase } from "@/lib/database";
@@ -55,7 +56,7 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
   const available=selected?await db.query<{id:string;titulo:string}>(
     "SELECT id::text,titulo FROM operacoes WHERE titular_id=$1 AND excluido_em IS NULL ORDER BY id DESC LIMIT 200",
     [selected.titular_id]):null;
-  return <div className="work-page">
+  return <StandaloneWorkspace title="Conferência" section="livros"><div className="work-page">
     <header className="work-bar"><Link href="/" className="work-back"><ArrowLeft size={16}/> Livros Caixa</Link>
       <strong><ClipboardCheck size={16}/> Conferência</strong><Link href="/importar">Importar documentos</Link></header>
     <div className="review-grid">
@@ -220,5 +221,5 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
         </>}
       </section>
     </div>
-  </div>;
+  </div></StandaloneWorkspace>;
 }

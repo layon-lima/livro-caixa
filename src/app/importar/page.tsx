@@ -1,3 +1,4 @@
+import { StandaloneWorkspace } from "@/components/standalone-workspace";
 import Link from "next/link";
 import { requireUser, canAccessTitular } from "@/lib/auth";
 import { titularesPermitidos } from "@/lib/document-data";
@@ -30,7 +31,7 @@ export default async function Importar({searchParams}:{searchParams:Promise<{tit
   ]);
   const percent=Math.min(100,(usedBytes/STORAGE_LIMIT_BYTES)*100);
   const gb=(bytes:number)=>(bytes/1_000_000_000).toLocaleString("pt-BR",{maximumFractionDigits:2});
-  return <div className="work-page">
+  return <StandaloneWorkspace title="Importação" section="livros"><div className="work-page">
     <header className="work-bar"><Link href="/" className="work-back"><ArrowLeft size={16}/> Livros Caixa</Link>
       <strong><FileUp size={17}/> Importação</strong><Link href="/conferencia">Conferência <ClipboardCheck size={15}/></Link></header>
     <main className="work-main">
@@ -63,5 +64,5 @@ export default async function Importar({searchParams}:{searchParams:Promise<{tit
       <ImportedFileRows files={list.rows}/>
       <p className="muted">Depois que o OCR terminar, a conferência do lote abre automaticamente para quem tem permissão de aprovar. Arquivos não conferidos podem ser reprocessados sem novo envio.</p>
     </main>
-  </div>;
+  </div></StandaloneWorkspace>;
 }

@@ -1,3 +1,4 @@
+import { StandaloneWorkspace } from "@/components/standalone-workspace";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser, canAccessTitular } from "@/lib/auth";
@@ -21,7 +22,7 @@ export default async function Editar({params}:{params:Promise<{id:string}>}){
       "WHERE oa.operacao_id=$1",[id]),
   ]);
   const editable=await canAccessTitular(user,Number(op.titular_id),"edit");
-  return <div className="work-page">
+  return <StandaloneWorkspace title="Editar operação" section="livros"><div className="work-page">
     <header className="work-bar"><Link href={"/livros/"+op.titular_id}><ArrowLeft size={16}/> Voltar ao livro</Link><strong><Pencil size={16}/> Operação #{id}</strong></header>
     <main className="work-main narrow-work">
       <h1 className="work-heading">Editar operação</h1>
@@ -59,5 +60,5 @@ export default async function Editar({params}:{params:Promise<{id:string}>}){
       </div>)}
       {files.rows.length===0&&<p className="muted">Nenhum documento vinculado.</p>}
     </main>
-  </div>;
+  </div></StandaloneWorkspace>;
 }

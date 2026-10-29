@@ -1,3 +1,4 @@
+import { StandaloneWorkspace } from "@/components/standalone-workspace";
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { categorias, titularesPermitidos } from "@/lib/document-data";
@@ -7,7 +8,7 @@ export default async function Manual({searchParams}:{searchParams:Promise<{titul
   const user=await requireUser();
   const [books,cats,query]=await Promise.all([titularesPermitidos(user,"edit"),categorias(),searchParams]);
   const selected=books.find(t=>t.id===query.titular)||books[0];
-  return <div className="work-page">
+  return <StandaloneWorkspace title="Lançamento manual" section="livros"><div className="work-page">
     <header className="work-bar"><Link href="/"><ArrowLeft size={16}/> Livros Caixa</Link>
       <strong><PenLine size={16}/> Lançamento manual</strong></header>
     <main className="work-main narrow-work">
@@ -36,5 +37,5 @@ export default async function Manual({searchParams}:{searchParams:Promise<{titul
       </form>}
       <p className="muted">Você pode vincular notas, boletos e comprovantes a este lançamento posteriormente, durante a conferência.</p>
     </main>
-  </div>;
+  </div></StandaloneWorkspace>;
 }

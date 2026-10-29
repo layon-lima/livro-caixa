@@ -1,3 +1,4 @@
+import { StandaloneWorkspace } from "@/components/standalone-workspace";
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
 import { getDatabase } from "@/lib/database";
@@ -35,6 +36,7 @@ export default async function Admin({ searchParams }: {
   );
   const matrix = new Map(permissoes.rows.map(p => [p.user_id + ":" + p.titular_id, p]));
   return (
+    <StandaloneWorkspace title="Administração" section="admin">
     <div className="admin-shell">
       <header className="admin-header">
         <div className="admin-brand"><BookOpen size={18} /><strong>Livro Caixa</strong><span> / Administração</span></div>
@@ -140,5 +142,6 @@ export default async function Admin({ searchParams }: {
         </section>
       </main>
     </div>
+    </StandaloneWorkspace>
   );
 }
