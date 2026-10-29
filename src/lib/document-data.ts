@@ -8,12 +8,13 @@ export type Operacao = {
   id: string; titular_id: string; titulo: string; competencia: string; categoria_id: string | null;
   categoria: string | null; subcategoria: string | null;
   tipo: string; contraparte: string; descricao: string; referencia: string;
-  valor: string | null; quantidade_documentos: string; criado_em: string; excluido_em: string | null;
+  valor: string | null; data_pagamento:string|null; quantidade_documentos: string; criado_em: string; excluido_em: string | null;
 };
 export type Proposta = {
   id: string; arquivo_id: string; titular_id: string; titulo: string; documento_tipo: string;
   contraparte: string; competencia: string; competencia_estimada: boolean;
   categoria_id: string | null; tipo: string; descricao: string; valor: string | null; referencia: string;
+  data_pagamento:string|null;
   nome_original: string; status: string; erro: string | null; texto_extraido: string;
   pagina_inicial: number | null; pagina_final: number | null;
   metodo_leitura: "local"|"ia"|"xml"; confianca: string|null; avisos: string[];
