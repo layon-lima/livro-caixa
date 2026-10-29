@@ -112,9 +112,12 @@ export function GlobalWorkspaceActions(){
       // Quem só pode importar acompanha o processamento sem acessar dados
       // de conferência para os quais não recebeu permissão.
       const canApprove=context?.approveBooks.some(x=>x.id===bookId);
-      router.push(canApprove?"/conferencia?arquivos="+encodeURIComponent(ids.join(",")):
+      // Uma navegação única deixa o Next carregar o estado atualizado.
+      // Atualizar a rota antiga no mesmo instante pode interromper a transição
+      // para a conferência ao vivo (OCR/IA).
+      router.push(canApprove?"/conferencia?arquivos="+encodeURIComponent(ids.join(","))+
+        "&arquivo="+encodeURIComponent(ids[0]):
         "/importar?titular="+encodeURIComponent(bookId));
-      router.refresh();
     }catch(e){
       setError(e instanceof Error?e.message:"Falha ao importar.");
     }finally{setBusy(false);}
