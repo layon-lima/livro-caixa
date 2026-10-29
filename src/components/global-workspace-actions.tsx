@@ -53,7 +53,7 @@ export function GlobalWorkspaceActions(){
     };
     const over=(e:globalThis.DragEvent)=>{
       if(!hasFiles(e))return;
-      e.preventDefault();e.dataTransfer.dropEffect="copy";
+      e.preventDefault();if(e.dataTransfer)e.dataTransfer.dropEffect="copy";
       setDragging(true);
     };
     const leave=(e:globalThis.DragEvent)=>{
@@ -65,7 +65,7 @@ export function GlobalWorkspaceActions(){
       if(!hasFiles(e))return;
       e.preventDefault();e.stopPropagation();
       nested.current=0;setDragging(false);
-      const list=Array.from(e.dataTransfer.files||[]);
+      const list=Array.from(e.dataTransfer?.files||[]);
       if(!list.length)return;
       setFiles(list.slice(0,100));
       requestSeq.current+=1;setDropRequest(requestSeq.current);
@@ -125,7 +125,7 @@ export function GlobalWorkspaceActions(){
   },[dropRequest,files,bookId]);
 
   if(!context)return null;
-  const visibleFab=context.editBooks.length>0&&!pathname.startsWith("/manual");
+  const visibleFab=context.editBooks.length>0&&!(pathname||"").startsWith("/manual");
   const fabBook=context.editBooks.find(x=>x.id===currentBook)||
     (context.editBooks.length===1?context.editBooks[0]:null);
   return <>
