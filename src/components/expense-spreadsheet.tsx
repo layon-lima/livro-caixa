@@ -43,7 +43,7 @@ export function ExpenseSpreadsheet({bookId,cats,books,canEdit,canDelete,months}:
   },[month,category,status,q,sort,direction,page,pageSize]);
   useEffect(()=>{
     const ctrl=new AbortController();
-    setLoading(true);setError("");
+    setLoading(true);setError("");setData(null);
     fetch("/api/livros/"+bookId+"/planilha?"+params,{
       signal:ctrl.signal,credentials:"same-origin",cache:"no-store"
     }).then(async response=>{
