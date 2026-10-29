@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import Link from "next/link";
-import { FileText, Folder, FolderInput, Pencil, RotateCcw, Trash2, X, Eye, ChevronLeft } from "lucide-react";
+import { FileText, Folder, FolderInput, Pencil, Trash2, X, Eye, ChevronLeft } from "lucide-react";
 
 export type OperationEntry={
   id:string;titular_id:string;titulo:string;categoria:string|null;subcategoria:string|null;
@@ -106,22 +106,15 @@ export function OperationRows({operations,documents,books,canEdit,canDelete,book
         {currentDocs.map(f=><a key={f.arquivo_id} href={"/api/documentos/"+f.arquivo_id}
           target="_blank" rel="noopener noreferrer"><FileText size={15}/><span className="truncate">{f.nome_original}</span></a>)}
       </div>}
-      {menu.view==="move"&&<form className="entity-popup-form" action={"/api/operacoes/"+current.id} method="post">
-        <p>Mover esta operação e seus vínculos para outro livro autorizado.</p>
+      {menu.view==="move"&&<form className="entity-popup-form"
+        action={"/api/operacoes/"+current.id+"/mover"} method="post">
+        <p>Mover para outro livro autorizado. Se o arquivo for compartilhado com outras operações, o sistema bloqueará a mudança para proteger os documentos.</p>
         <label>Novo titular
-          <select name="titularId" value={destination} onChange={e=>setDestination(e.target.value)}>
+          <select name="destinoId" value={destination} onChange={e=>setDestination(e.target.value)}>
             <option value={bookId}>Selecione outro titular</option>
             {books.filter(b=>b.id!==bookId).map(b=><option key={b.id} value={b.id}>{b.nome}</option>)}
           </select>
         </label>
-        <input name="titulo" type="hidden" value={current.titulo}/>
-        <input name="competencia" type="hidden" value={current.competencia.slice(0,7)}/>
-        <input name="categoriaId" type="hidden" value={current.categoria_id||""}/>
-        <input name="tipo" type="hidden" value={current.tipo}/>
-        <input name="descricao" type="hidden" value={current.descricao||""}/>
-        <input name="contraparte" type="hidden" value={current.contraparte||""}/>
-        <input name="referencia" type="hidden" value={current.referencia||""}/>
-        <input name="valor" type="hidden" value={current.valor||""}/>
         <button type="submit" className="primary-btn" disabled={destination===bookId||!destination}>Mover operação</button>
       </form>}
       {menu.view==="delete"&&<form className="entity-popup-form" action={"/api/operacoes/"+current.id} method="post">
