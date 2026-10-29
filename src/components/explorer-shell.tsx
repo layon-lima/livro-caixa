@@ -20,6 +20,12 @@ export function ExplorerShell({ user, titulares, selected, children, folderConte
         <Link className="rail-item rail-item-active" href="/" aria-label="Livros Caixa">
           <BookOpen size={19} strokeWidth={1.8} aria-hidden="true" /><span>Livros</span>
         </Link>
+        <Link className="rail-item" href="/lixeira" aria-label="Lixeira">
+          <Trash2 size={19} strokeWidth={1.8}/><span>Lixeira</span>
+        </Link>
+        {user.isAdmin&&<Link className="rail-item" href="/admin" aria-label="Administração">
+          <Settings2 size={19} strokeWidth={1.8}/><span>Admin</span>
+        </Link>}
       </aside>
 
       <aside className="folder-pane" aria-label="Pastas e titulares">
@@ -38,12 +44,6 @@ export function ExplorerShell({ user, titulares, selected, children, folderConte
         {titulares.length === 0 && <p className="tree-empty">Nenhum livro autorizado</p>}
         <div className="explorer-divider" role="separator" aria-label="Outras pastas"/>
         {folderContent}
-        <Link className="tree-link explorer-utility" href="/lixeira">
-          <Trash2 size={15}/><span>Lixeira</span>
-        </Link>
-        {user.isAdmin&&<Link className="tree-link explorer-utility" href="/admin">
-          <Settings2 size={15}/><span>Administração</span>
-        </Link>}
       </aside>
 
       <main className="content-pane">
