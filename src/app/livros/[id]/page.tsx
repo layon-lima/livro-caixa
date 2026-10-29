@@ -9,7 +9,7 @@ import { Folder, Search } from "lucide-react";
 export const dynamic="force-dynamic";
 
 type Attached = {operacao_id:string;arquivo_id:string;nome_original:string;documento_tipo:string};
-type Params = {mes?:string;categoria?:string;q?:string;op?:string};
+type Params = {mes?:string;categoria?:string;q?:string;op?:string;erro?:string};
 export default async function Livro({params,searchParams}:{
   params:Promise<{id:string}>; searchParams:Promise<Params>;
 }){
@@ -51,9 +51,7 @@ export default async function Livro({params,searchParams}:{
     "JOIN propostas p ON p.id=oa.proposta_id "+
     "JOIN operacoes o ON o.id=oa.operacao_id WHERE o.titular_id=$1 AND o.excluido_em IS NULL ORDER BY oa.proposta_id",
     [id]);
-  const byOp=new Map<string,Attached[]>();
-  for(const file of attached.rows)byOp.set(file.operacao_id,[...(byOp.get(file.operacao_id)||[]),file]);
-    const all=await db.query<{competencia:string;categoria_id:string|null;nome:string|null}>(
+  const all=await db.query<{competencia:string;categoria_id:string|null;nome:string|null}>(
     "SELECT DISTINCT to_char(o.competencia,'YYYY-MM') AS competencia,o.categoria_id::text,c.nome "+
     "FROM operacoes o LEFT JOIN categorias c ON c.id=o.categoria_id WHERE o.titular_id=$1 AND o.excluido_em IS NULL "+
     "ORDER BY competencia DESC,nome",[id]);
@@ -82,6 +80,7 @@ export default async function Livro({params,searchParams}:{
     titularesPermitidos(user,"edit")
   ]);
   return <ExplorerShell user={user} titulares={books.rows} selected={selected} folderContent={folder} operationCount={ops.length}>
+    {query.erro==="arquivo-compartilhado"&&<p className="form-error" role="alert">Esta operação contém arquivos compartilhados com outros lançamentos. Para evitar misturar documentos, o movimento foi bloqueado.</p>}
     <div className="list-toolbar">
       <form action={"/livros/"+id} className="search-bar">
         <Search size={15}/>

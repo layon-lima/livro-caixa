@@ -27,9 +27,12 @@ export default async function Editar({params}:{params:Promise<{id:string}>}){
       <h1 className="work-heading">Editar operação</h1>
       <form action={"/api/operacoes/"+id} method="post" className="review-form">
         <div className="form-inline-two">
-          <label>Titular<select name="titularId" defaultValue={op.titular_id} disabled={!editable}>
+          <label>Titular
+          <select value={op.titular_id} disabled>
             {books.map(t=><option key={t.id} value={t.id}>{t.nome}</option>)}
-          </select></label>
+          </select>
+          <input type="hidden" name="titularId" value={op.titular_id}/>
+        </label>
           <label>Competência<input type="month" name="competencia" defaultValue={op.competencia.slice(0,7)} disabled={!editable}/></label>
         </div>
         <label>Título<input name="titulo" defaultValue={op.titulo} required maxLength={170} disabled={!editable}/></label>
