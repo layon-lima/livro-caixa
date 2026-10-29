@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { FileUp, LoaderCircle, Plus, X } from "lucide-react";
 type Book={id:string;nome:string};
-type Context={importBooks:Book[];editBooks:Book[]};
+type Context={importBooks:Book[];editBooks:Book[];approveBooks:Book[]};
 type UploadResult={name:string;status:string;id?:string;error?:string};
 const accepted=new Set(["pdf","xml","png","jpg","jpeg"]);
 
@@ -109,7 +109,11 @@ export function GlobalWorkspaceActions(){
       if(!ids.length)throw Error(failures.map(x=>x.name+": "+(x.error||"Erro")).join("; ")||
         "Não foi possível obter os documentos para conferência.");
       setFiles([]);setError("");
-      router.push("/conferencia?arquivos="+encodeURIComponent(ids.join(",")));
+      // Quem só pode importar acompanha o processamento sem acessar dados
+      // de conferência para os quais não recebeu permissão.
+      const canApprove=context?.approveBooks.some(x=>x.id===bookId);
+      router.push(canApprove?"/conferencia?arquivos="+encodeURIComponent(ids.join(",")):
+        "/importar?titular="+encodeURIComponent(bookId));
       router.refresh();
     }catch(e){
       setError(e instanceof Error?e.message:"Falha ao importar.");
