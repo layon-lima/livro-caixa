@@ -94,7 +94,7 @@ export function ExplorerShell({ user, titulares, selected, children, folderConte
           </div>}
         </section>
         <footer className="statusbar">
-          <span><LayoutList size={13} /> {selected ? (operationCount ?? 0) + " operações" : titulares.length + " livros"}</span>
+          <span><LayoutList size={13} /> {selected ? (activeTab==="planilha"?"Planilha de saídas":(operationCount ?? 0) + " operações") : titulares.length + " livros"}</span>
           <span>Livro Caixa Inteligente</span>
         </footer>
       </main>
