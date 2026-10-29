@@ -1,7 +1,7 @@
 import Link from "next/link";
 import {
-  BookOpen, ChevronDown, ChevronRight, FileSearch, Folder, FolderOpen,
-  LayoutList, LogOut, PanelRight, Settings2, FileUp, ClipboardCheck, PenLine, Trash2,
+  BookOpen, ChevronDown, ChevronRight, Folder, FolderOpen,
+  LayoutList, LogOut, Settings2, Trash2,
 } from "lucide-react";
 import type { AuthUser } from "@/lib/auth";
 
@@ -9,10 +9,10 @@ export type Titular = { id: string; nome: string };
 type Props = {
   user: AuthUser; titulares: Titular[]; selected?: Titular;
   children?: React.ReactNode; folderContent?: React.ReactNode;
-  preview?: React.ReactNode; operationCount?: number;
+  operationCount?: number;
 };
 
-export function ExplorerShell({ user, titulares, selected, children, folderContent, preview, operationCount }: Props) {
+export function ExplorerShell({ user, titulares, selected, children, folderContent, operationCount }: Props) {
   return (
     <div className="workspace">
       <aside className="rail" aria-label="Navegação">
@@ -20,23 +20,6 @@ export function ExplorerShell({ user, titulares, selected, children, folderConte
         <Link className="rail-item rail-item-active" href="/" aria-label="Livros Caixa">
           <BookOpen size={19} strokeWidth={1.8} aria-hidden="true" /><span>Livros</span>
         </Link>
-        <Link className="rail-item" href="/importar" aria-label="Importar documentos">
-          <FileUp size={19} strokeWidth={1.8}/><span>Importar</span>
-        </Link>
-        <Link className="rail-item" href="/conferencia" aria-label="Conferência">
-          <ClipboardCheck size={19} strokeWidth={1.8}/><span>Conferir</span>
-        </Link>
-        <Link className="rail-item" href="/manual" aria-label="Novo lançamento manual">
-          <PenLine size={19} strokeWidth={1.8}/><span>Manual</span>
-        </Link>
-        <Link className="rail-item" href="/lixeira" aria-label="Lixeira">
-          <Trash2 size={19} strokeWidth={1.8}/><span>Lixeira</span>
-        </Link>
-        {user.isAdmin && (
-          <Link className="rail-item" href="/admin" aria-label="Administração">
-            <Settings2 size={19} strokeWidth={1.8} /><span>Admin</span>
-          </Link>
-        )}
       </aside>
 
       <aside className="folder-pane" aria-label="Pastas e titulares">
@@ -52,8 +35,15 @@ export function ExplorerShell({ user, titulares, selected, children, folderConte
             <Folder size={15} className="folder-icon" /><span>{t.nome}</span>
           </Link>
         ))}
-        {folderContent}
         {titulares.length === 0 && <p className="tree-empty">Nenhum livro autorizado</p>}
+        <div className="explorer-divider" role="separator" aria-label="Outras pastas"/>
+        {folderContent}
+        <Link className="tree-link explorer-utility" href="/lixeira">
+          <Trash2 size={15}/><span>Lixeira</span>
+        </Link>
+        {user.isAdmin&&<Link className="tree-link explorer-utility" href="/admin">
+          <Settings2 size={15}/><span>Administração</span>
+        </Link>}
       </aside>
 
       <main className="content-pane">
@@ -102,14 +92,6 @@ export function ExplorerShell({ user, titulares, selected, children, folderConte
         </footer>
       </main>
 
-      <aside className="preview-pane" aria-label="Visualização de documentos">
-        <div className="preview-title"><span><PanelRight size={15} /> Visualização</span></div>
-        {preview || <div className="preview-empty">
-          <FileSearch size={33} strokeWidth={1.3} />
-          <strong>Nenhum documento selecionado</strong>
-          <p>Selecione uma operação para visualizar seus documentos.</p>
-        </div>}
-      </aside>
     </div>
   );
 }
