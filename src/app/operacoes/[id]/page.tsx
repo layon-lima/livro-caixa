@@ -42,8 +42,8 @@ export default async function Editar({params}:{params:Promise<{id:string}>}){
             <option value="">Sem categoria</option>
             {cats.map(c=><option value={c.id} key={c.id}>{c.nome}{c.subcategoria?" → "+c.subcategoria:""}</option>)}
           </select></label>
-          <label>Tipo<select name="tipo" defaultValue={op.tipo} disabled={!editable}>
-            <option value="despesa">Despesa</option><option value="receita">Receita</option><option value="outro">Outro</option>
+          <label>Tipo<select name="tipo" defaultValue={op.tipo==="receita"?"outro":op.tipo} disabled={!editable}>
+            <option value="despesa">Despesa</option><option value="outro">Outro</option>
           </select></label>
         </div>
         <div className="form-inline-two">

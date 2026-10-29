@@ -142,9 +142,9 @@ export function LiveReview({arquivoId,nome,titularPadrao,books,cats,isAdmin}:{
           <input value={field(fields.documento_tipo)} placeholder="Identificando…" readOnly/>
         </label>
         <label>Tipo
-          <select value={field(fields.tipo)} disabled>
+          <select value={fields.tipo==="receita"?"outro":field(fields.tipo)} disabled>
             <option value="">Identificando…</option>
-            <option value="despesa">Despesa</option><option value="receita">Receita</option><option value="outro">Outro</option>
+            <option value="despesa">Despesa</option><option value="outro">Outro</option>
           </select>
         </label>
         <label>Valor

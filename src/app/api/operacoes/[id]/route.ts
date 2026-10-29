@@ -36,7 +36,7 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
   const moneyRaw=String(f.get("valor")||"").trim().replace(",",".");
   const money=moneyRaw===""?null:Number(moneyRaw);
   // Troca de titular só pela rota dedicada /mover: evita quebrar vínculos de PDFs.
-  if(!titular||titular!==oldTitular||!title||!date||!["receita","despesa","outro"].includes(tipo)||
+  if(!titular||titular!==oldTitular||!title||!date||!["despesa","outro"].includes(tipo)||
      (money!==null&&(!Number.isFinite(money)||money<0))||
      !await canAccessTitular(user,titular,"edit"))return forbidden();
   const conn=await db.connect();

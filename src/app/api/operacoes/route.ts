@@ -15,7 +15,7 @@ export async function POST(request:Request){
   const descricao=String(f.get("descricao")||"").trim().slice(0,2000);
   const valorRaw=String(f.get("valor")||"").trim().replace(",",".");
   const valor=valorRaw?Number(valorRaw):null;
-  if(!titular||!titulo||!competencia||!["receita","despesa","outro"].includes(tipo)||
+  if(!titular||!titulo||!competencia||!["despesa","outro"].includes(tipo)||
      (valor!==null&&(!Number.isFinite(valor)||valor<0))||
      !await canAccessTitular(user,titular,"edit"))return forbidden();
   const r=await getDatabase().query<{id:string}>(

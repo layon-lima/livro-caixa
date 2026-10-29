@@ -182,9 +182,9 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
                   </select>
                 </label>
                 <label>Tipo
-                  <select name="tipo" defaultValue={selected.tipo}>
+                  <select name="tipo" defaultValue={selected.tipo==="receita"?"outro":selected.tipo}>
                     <option value="despesa">Despesa</option>
-                    <option value="receita">Receita</option>
+                    
                     <option value="outro">Outro</option>
                   </select>
                 </label>
