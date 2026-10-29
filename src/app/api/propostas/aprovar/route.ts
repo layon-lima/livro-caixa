@@ -19,12 +19,12 @@ export async function POST(request:Request){
     await cx.query("BEGIN");
     const found=await cx.query<{
       id:string;arquivo_id:string;titular_id:string;titulo:string;documento_tipo:string;
-      competencia:string;categoria_id:string|null;tipo:string;descricao:string;contraparte:string;
+      competencia:string;data_pagamento:string|null;categoria_id:string|null;tipo:string;descricao:string;contraparte:string;
       valor:string|null;referencia:string;operacao_sugerida_id:string|null;revisada_em:string|null;
       aprovado_em:string|null;status:string;duplicada_de:string|null;
       categoria_sugerida_nome:string;categoria_sugerida_subcategoria:string;
     }>(
-      "SELECT p.id::text,p.arquivo_id::text,p.titular_id::text,p.titulo,p.documento_tipo,p.competencia::text,"+
+      "SELECT p.id::text,p.arquivo_id::text,p.titular_id::text,p.titulo,p.documento_tipo,p.competencia::text,p.data_pagamento::text,"+
       "p.categoria_id::text,p.tipo,p.descricao,p.contraparte,p.valor::text,p.referencia,p.operacao_sugerida_id::text,"+
       "p.revisada_em::text,p.aprovado_em::text,p.duplicada_de::text,"+
       "p.categoria_sugerida_nome,p.categoria_sugerida_subcategoria,a.status "+
@@ -54,9 +54,9 @@ export async function POST(request:Request){
         if(!match.rowCount){await cx.query("ROLLBACK");return backTo("/conferencia?erro=vinculo");}
       }else{
         const created=await cx.query<{id:string}>(
-          "INSERT INTO operacoes(titular_id,titulo,competencia,categoria_id,tipo,descricao,contraparte,valor,referencia,criado_por)"+
-          " VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id::text",
-          [p.titular_id,p.titulo,p.competencia,categoryId,p.tipo,p.descricao,p.contraparte,p.valor,p.referencia,user.id],
+          "INSERT INTO operacoes(titular_id,titulo,competencia,categoria_id,tipo,descricao,contraparte,valor,referencia,criado_por,data_pagamento)"+
+          " VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id::text",
+          [p.titular_id,p.titulo,p.competencia,categoryId,p.tipo,p.descricao,p.contraparte,p.valor,p.referencia,user.id,p.data_pagamento],
         );
         operationId=Number(created.rows[0].id);
       }
