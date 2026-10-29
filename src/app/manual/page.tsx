@@ -20,6 +20,7 @@ export default async function Manual({searchParams}:{searchParams:Promise<{titul
             {books.map(t=><option key={t.id} value={t.id}>{t.nome}</option>)}
           </select></label>
           <label>Competência<input type="month" name="competencia" defaultValue={new Date().toISOString().slice(0,7)} required/></label>
+          <label>Data do pagamento<input type="date" name="dataPagamento"/></label>
         </div>
         <label>Título<input name="titulo" required maxLength={170} placeholder="Descrição objetiva da operação"/></label>
         <div className="form-inline-two">

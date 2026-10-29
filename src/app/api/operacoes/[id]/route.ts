@@ -2,6 +2,7 @@ import { currentUser, canAccessTitular } from "@/lib/auth";
 import { getDatabase } from "@/lib/database";
 import { safeId, competence } from "@/lib/document-data";
 import { backTo, forbidden, sameOriginPost } from "@/lib/request-security";
+import { parsePaymentDate } from "@/lib/payment-date";
 export const runtime="nodejs";
 
 export async function POST(request:Request,{params}:{params:Promise<{id:string}>}){
@@ -29,6 +30,7 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
   const titular=safeId(f.get("titularId")),cat=safeId(f.get("categoriaId"));
   const title=String(f.get("titulo")||"").trim().slice(0,170);
   const date=competence(f.get("competencia"));
+  const dataPagamento=parsePaymentDate(f.get("dataPagamento"));
   const tipo=String(f.get("tipo")||"outro");
   const description=String(f.get("descricao")||"").trim().slice(0,2000);
   const contraparte=String(f.get("contraparte")||"").trim().slice(0,150);
@@ -36,7 +38,7 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
   const moneyRaw=String(f.get("valor")||"").trim().replace(",",".");
   const money=moneyRaw===""?null:Number(moneyRaw);
   // Troca de titular só pela rota dedicada /mover: evita quebrar vínculos de PDFs.
-  if(!titular||titular!==oldTitular||!title||!date||!["despesa","outro"].includes(tipo)||
+  if(!titular||titular!==oldTitular||!title||!date||dataPagamento===undefined||!["despesa","outro"].includes(tipo)||
      (money!==null&&(!Number.isFinite(money)||money<0))||
      !await canAccessTitular(user,titular,"edit"))return forbidden();
   const conn=await db.connect();
@@ -44,8 +46,8 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
     await conn.query("BEGIN");
     await conn.query(
       "UPDATE operacoes SET titular_id=$2,titulo=$3,competencia=$4,categoria_id=$5,tipo=$6,descricao=$7,"+
-      "contraparte=$8,referencia=$9,valor=$10,alterado_por=$11,atualizado_em=now() WHERE id=$1",
-      [id,titular,title,date,cat,tipo,description,contraparte,referencia,money,user.id],
+      "contraparte=$8,referencia=$9,valor=$10,alterado_por=$11,data_pagamento=$12,atualizado_em=now() WHERE id=$1",
+      [id,titular,title,date,cat,tipo,description,contraparte,referencia,money,user.id,dataPagamento],
     );
     await conn.query("UPDATE propostas SET titular_id=$2 WHERE operacao_id=$1",[id,titular]);
     await conn.query("INSERT INTO historico_operacoes(operacao_id,usuario_id,acao) VALUES($1,$2,'edição')",[id,user.id]);

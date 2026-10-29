@@ -11,7 +11,7 @@ export default async function Editar({params}:{params:Promise<{id:string}>}){
   const id=safeId((await params).id);if(!id)notFound();
   const db=getDatabase();
   const data=await db.query<Operacao>(
-    "SELECT id::text,titular_id::text,titulo,competencia::text,categoria_id::text,tipo,descricao,contraparte,referencia,valor::text,excluido_em::text "+
+    "SELECT id::text,titular_id::text,titulo,competencia::text,data_pagamento::text,categoria_id::text,tipo,descricao,contraparte,referencia,valor::text,excluido_em::text "+
     "FROM operacoes WHERE id=$1",[id]);
   const op=data.rows[0];
   if(!op||!await canAccessTitular(user,Number(op.titular_id),"view"))notFound();
@@ -35,6 +35,7 @@ export default async function Editar({params}:{params:Promise<{id:string}>}){
           <input type="hidden" name="titularId" value={op.titular_id}/>
         </label>
           <label>Competência<input type="month" name="competencia" defaultValue={op.competencia.slice(0,7)} disabled={!editable}/></label>
+          <label>Data do pagamento<input type="date" name="dataPagamento" defaultValue={op.data_pagamento||""} disabled={!editable}/></label>
         </div>
         <label>Título<input name="titulo" defaultValue={op.titulo} required maxLength={170} disabled={!editable}/></label>
         <div className="form-inline-two">
