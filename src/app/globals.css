@@ -520,3 +520,15 @@ button { cursor: pointer; }
   .review-category-new {grid-template-columns:1fr;}
   .review-category-new small {grid-column:1;}
 }
+
+/* Importação direta: sem popup de seleção prévia de titular. */
+.global-upload-toast {position:fixed;right:52px;bottom:122px;z-index:1000;display:flex;align-items:center;gap:9px;max-width:min(450px,calc(100vw - 30px));padding:11px 13px;background:#fff;border:1px solid #cad6e5;border-radius:8px;box-shadow:0 7px 23px #18365025;color:#425b77;font-size:12px;}
+.global-upload-toast span {flex:1;overflow-wrap:anywhere;}
+.global-upload-toast button {border:0;background:transparent;color:#60788b;cursor:pointer;display:grid;place-items:center;}
+.global-review-return {position:fixed;right:52px;bottom:121px;z-index:280;display:flex;align-items:center;gap:8px;background:#fff;color:#1f659c;border:1px solid #b9cfe6;padding:9px 12px;border-radius:20px;box-shadow:0 4px 14px #1836501b;font-size:11px;font-weight:650;white-space:nowrap;}
+.global-review-return:hover {background:#edf6ff;}
+.global-upload-toast~.global-review-return {bottom:181px;}
+@media(max-width:720px) {
+  .global-upload-toast {right:16px;bottom:101px;}
+  .global-review-return {right:16px;bottom:95px;}
+}
