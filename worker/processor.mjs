@@ -197,9 +197,13 @@ async function processFile(file){
         const legal=normalizeName(result?.razao_social);
         const matches=payee.length>=4&&(fantasy===payee||legal===payee||
           (payee.length>=9&&legal.includes(payee)));
-        if(matches){
+        // O CNPJ veio da seção "Dados de quem recebeu" do comprovante Pix.
+        // Mesmo que o banco mostre nome comercial abreviado, ele identifica
+        // a mesma pessoa jurídica; preservar SEMPRE o recebedor do comprovante.
+        const cnpjAnchored=Boolean(protectedPixReceiver);
+        if(matches||cnpjAnchored){
           companyInfo=result;
-          companyRecord={...result,status:"confirmado"};
+          companyRecord={...result,status:matches?"confirmado":"identificado_cnpj"};
         }else{
           companyRecord={cnpj:possibleCnpj,status:"divergente",fonte:"BrasilAPI"};
           console.warn("Consulta CNPJ não confirmou nome do recebedor",file.id);
