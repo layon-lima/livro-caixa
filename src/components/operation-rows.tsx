@@ -130,7 +130,7 @@ export function OperationRows({operations,documents,books,canEdit,canDelete,book
       {menu.view==="actions"&&<div className="entity-popup-options">
         <button type="button" onClick={()=>view("info")}><Eye size={15}/> Detalhes da operação</button>
         {currentDocs.length>0&&<button type="button" onClick={()=>view("files")}>
-          <FileText size={15}/> Documentos ({currentDocs.length})
+          <FileText size={15}/> Documentos ({current.quantidade_documentos})
         </button>}
         {canEdit&&<Link href={"/operacoes/"+current.id} onClick={()=>setMenu(null)}>
           <Pencil size={15}/> Editar dados
@@ -155,6 +155,10 @@ export function OperationRows({operations,documents,books,canEdit,canDelete,book
       {menu.view==="files"&&<div className="entity-popup-options">
         {currentDocs.map(f=><a key={f.arquivo_id} href={"/api/documentos/"+f.arquivo_id}
           target="_blank" rel="noopener noreferrer"><FileText size={15}/><span className="truncate">{f.nome_original}</span></a>)}
+        {Number(current.quantidade_documentos)>currentDocs.length&&
+          <Link href={"/operacoes/"+current.id} onClick={()=>setMenu(null)}>
+            <FileText size={15}/> Ver todos os documentos
+          </Link>}
       </div>}
       {menu.view==="move"&&<form className="entity-popup-form"
         action={"/api/operacoes/"+current.id+"/mover"} method="post">
