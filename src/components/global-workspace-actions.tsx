@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { FileUp, LoaderCircle, Plus, X } from "lucide-react";
 type Book={id:string;nome:string};
 type Context={importBooks:Book[];editBooks:Book[];approveBooks:Book[]};
-type UploadResult={name:string;status:string;id?:string;error?:string};
+type UploadResult={name:string;status:string;id?:string;error?:string;titular_nome?:string};
 const accepted=new Set(["pdf","xml","png","jpg","jpeg"]);
 
 export function GlobalWorkspaceActions(){
@@ -17,6 +17,7 @@ export function GlobalWorkspaceActions(){
   const [bookId,setBookId]=useState("");
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
+  const [existing,setExisting]=useState<{id:string;owner:string;name:string}|null>(null);
   const nested=useRef(0);
   const requestSeq=useRef(0);
   const submitted=useRef(0);
@@ -35,7 +36,7 @@ export function GlobalWorkspaceActions(){
   useEffect(()=>{
     if(!context?.importBooks.length)return;
     const preferred=context.importBooks.find(x=>x.id===currentBook)?.id||
-      context.importBooks[0].id;
+      (context.importBooks.length===1?context.importBooks[0].id:"");
     setBookId(preferred);
   },[context,currentBook]);
 
@@ -67,6 +68,7 @@ export function GlobalWorkspaceActions(){
       nested.current=0;setDragging(false);
       const list=Array.from(e.dataTransfer?.files||[]);
       if(!list.length)return;
+      setExisting(null);
       setFiles(list.slice(0,100));
       requestSeq.current+=1;setDropRequest(requestSeq.current);
       setError(list.length>100?"Envie no máximo 100 arquivos por lote.":"");
@@ -84,10 +86,10 @@ export function GlobalWorkspaceActions(){
     };
   },[context,busy,files.length]);
 
-  const close=()=>{if(!busy){setFiles([]);setError("");}};
+  const close=()=>{if(!busy){setFiles([]);setExisting(null);setError("");}};
   async function send(){
     if(!bookId||!files.length||busy)return;
-    setBusy(true);setError("");
+    setBusy(true);setError("");setExisting(null);
     const results:UploadResult[]=[];
     try{
       for(let i=0;i<files.length;i+=20){
@@ -104,14 +106,27 @@ export function GlobalWorkspaceActions(){
         results.push(...(body.results||[]));
       }
       const failures=results.filter(x=>x.status==="erro");
-      const alreadyApproved=results.filter(x=>x.status==="ja_aprovado");
+      const alreadyApproved=results.filter(x=>x.status==="ja_aprovado"||x.status==="aprovado_outro_titular");
+      const otherBook=results.find(x=>x.status==="outro_titular"&&x.id);
+      const restricted=results.some(x=>x.status==="duplicado_restrito");
       const ids=[...new Set(results.filter(x=>x.id&&
         ["importado","reprocessado","duplicado"].includes(x.status)).map(x=>x.id!))];
+      if(otherBook){
+        setExisting({id:otherBook.id!,owner:otherBook.titular_nome||"outro livro",name:otherBook.name});
+        setError(ids.length?
+          "Parte do lote foi importada; outro arquivo já pertence a um livro diferente. Abra a conferência existente ou envie os demais arquivos separadamente.":
+          "");
+        return;
+      }
       if(!ids.length)throw Error(
         alreadyApproved.length?
-          "Este documento já foi aprovado e está no Livro Caixa. Para preservar a operação, ele não será analisado novamente.":
+          alreadyApproved[0].status==="aprovado_outro_titular"?
+            "Este PDF já foi aprovado em "+(alreadyApproved[0].titular_nome||"outro livro")+". Não será lançado novamente.":
+            "Este documento já foi aprovado e está no Livro Caixa. Para preservar a operação, ele não será analisado novamente.":
+        restricted?
+          "Este PDF já está cadastrado em um livro para o qual você não tem permissão de conferência. Consulte o administrador.":
         failures.map(x=>x.name+": "+(x.error||"Erro")).join("; ")||
-          "O arquivo já está cadastrado ou não pode ser aberto para conferência."
+          "Este arquivo já está cadastrado e não há uma conferência pendente para abrir."
       );
       setFiles([]);setError("");
       // Quem só pode importar acompanha o processamento sem acessar dados
@@ -157,7 +172,10 @@ export function GlobalWorkspaceActions(){
           <strong><FileUp size={17}/> Importar {files.length} arquivo(s)</strong>
           <button onClick={close} disabled={busy} aria-label="Fechar"><X size={17}/></button>
         </header>
-        <p>Enviando automaticamente. A conferência abrirá assim que o arquivo estiver salvo; OCR e IA preencherão o formulário.</p>
+        {existing?<p>Este PDF já existe em <strong>{existing.owner}</strong>. Não vamos duplicar o documento nem mudar seu titular automaticamente. Você pode abrir a conferência existente.</p>:
+          <p>{!bookId&&context.importBooks.length>1?
+            "Escolha o titular provisório para iniciar o envio. A IA poderá sugerir outra pessoa durante a leitura.":
+            "O envio começa automaticamente. Depois, o OCR e a IA preencherão a conferência."}</p>}
         <label>Titular provisório
           <select disabled={busy} value={bookId} onChange={e=>setBookId(e.target.value)}>
             <option value="">Selecione o titular</option>
@@ -167,13 +185,24 @@ export function GlobalWorkspaceActions(){
         <div className="global-upload-names">
           {files.map((f,i)=><div key={i}>{f.name}</div>)}
         </div>
+        {existing&&<p className="muted" role="status">Localizado: {existing.name} • Titular: {existing.owner}</p>}
         {error&&<p className="form-error" role="alert">{error}</p>}
         <footer>
           <button className="flat-button" onClick={close} disabled={busy}>Cancelar</button>
-          <button className="primary-btn" onClick={()=>void send()} disabled={!bookId||busy}>
+          {existing&&<button className="primary-btn" onClick={()=>{
+            const id=existing.id;
+            setFiles([]);setExisting(null);setError("");
+            router.push("/conferencia?arquivos="+encodeURIComponent(id)+"&arquivo="+encodeURIComponent(id));
+          }}>
+            Abrir conferência existente
+          </button>}
+          {!existing&&<button className="primary-btn" onClick={()=>void send()} disabled={!bookId||busy}>
             {busy&&<LoaderCircle size={15} className="spin"/>}
-            {busy?"Enviando…":"Tentar novamente"}
-          </button>
+            {busy?"Enviando…":bookId?"Tentar novamente":"Selecione um titular"}
+          </button>}
+          {existing&&<button type="button" className="flat-button" onClick={()=>{
+            setExisting(null);setError("");
+          }}>Escolher outro titular</button>}
         </footer>
       </section>
     </div>}
