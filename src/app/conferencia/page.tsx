@@ -34,18 +34,24 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
     queryArgs);
   const all=rows.rows;
   // Arquivos recém-enviados aparecem imediatamente, ainda sem propostas gravadas.
-  const pending=batch?await db.query<{
+  // Análises podem ser retomadas sem o lote original depois de navegar.
+  const pendingIds=batch||(query.arquivo&&/^\d+$/.test(query.arquivo)?[Number(query.arquivo)]:null);
+  const pendingArgs:(number|number[])[]=user.isAdmin?[]:[user.id];
+  const pendingExtra=pendingIds?
+    "AND a.id=ANY($"+(pendingArgs.length+1)+"::bigint[]) ":"";
+  if(pendingIds)pendingArgs.push(pendingIds);
+  const pending=await db.query<{
     id:string;nome_original:string;titular_envio_id:string;nome_titular:string;status:string;
   }>(
     "SELECT a.id::text,a.nome_original,a.titular_envio_id::text,t.nome AS nome_titular,a.status "+
     "FROM arquivos a JOIN titulares t ON t.id=a.titular_envio_id "+
     (user.isAdmin?"":"JOIN user_titular_permissions up ON up.titular_id=a.titular_envio_id "+
-      "AND up.user_id=$2 AND up.can_approve=true ")+
-    "WHERE a.id=ANY($1::bigint[]) AND a.status IN ('aguardando','processando','erro') "+
+      "AND up.user_id=$1 AND up.can_approve=true ")+
+    "WHERE a.status IN ('aguardando','processando','erro') "+
     "AND NOT EXISTS (SELECT 1 FROM propostas p WHERE p.arquivo_id=a.id AND p.aprovado_em IS NULL) "+
-    "ORDER BY a.id",
-    user.isAdmin?[batch]:[batch,user.id]
-  ):null;
+    pendingExtra+"ORDER BY a.id DESC LIMIT 100",
+    pendingArgs
+  );
   const inProgress=pending?.rows||[];
   const requested=all.find(p=>p.id===query.id);
   const activePending=requested?null:
@@ -72,7 +78,7 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
             <span className="review-check" aria-hidden="true"><LoaderCircle size={14} className={p.status==="erro"?"":"spin"}/></span>
             <Link href={"/conferencia?"+batchQuery+"arquivo="+p.id} className="review-row-link">
               <span className="review-row-title"><FileText size={14}/><span title={p.nome_original}>{p.nome_original}</span></span>
-              <span className="review-row-meta"><span>{p.nome_titular}</span><span>{p.status==="erro"?"Erro":"Analisando…"}</span></span>
+              <span className="review-row-meta"><span>Titular em identificação</span><span>{p.status==="erro"?"Erro":"Analisando…"}</span></span>
             </Link>
           </div>)}
           {all.map(p=><div key={p.id} className={"review-row"+(selected?.id===p.id?" selected":"")}>
@@ -117,7 +123,10 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
             {batch&&<input type="hidden" name="arquivos" value={batch.join(",")}/>}
             <section className="review-auto-summary">
               <div><span>Documento</span><strong>{selected.documento_tipo}</strong></div>
-              <div><span>Titular</span><strong>{selected.nome_titular}</strong></div>
+              <div><span>Titular</span><strong>{
+                selected.avisos?.some(x=>x.startsWith("Titular não identificado automaticamente"))?
+                "Aguardando sua identificação":selected.nome_titular
+              }</strong></div>
               <div><span>Categoria</span><strong>{
                 cats.find(c=>c.id===selected.categoria_id)?.nome||
                 (selected.categoria_sugerida_nome?
@@ -163,14 +172,20 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
               <summary>{selected.avisos.length} ponto(s) para conferir <span>Ver detalhes</span></summary>
               <ul>{selected.avisos.map((notice,i)=><li key={i}>{notice}</li>)}</ul>
             </details>}
-            <details className="review-edit-data" open={Boolean(selected.categoria_sugerida_nome)||(selected.avisos?.length??0)>1}>
+            <details className="review-edit-data" open={Boolean(selected.categoria_sugerida_nome)||
+              selected.avisos?.some(x=>x.startsWith("Titular não identificado automaticamente"))||
+              (selected.avisos?.length??0)>1}>
               <summary>Corrigir informações sugeridas</summary>
               <div className="review-fields-grid">
                 <label className="review-span-all">Título da operação
                   <input name="titulo" defaultValue={selected.titulo} required maxLength={170}/>
                 </label>
                 <label>Titular
-                  <select name="titularId" defaultValue={selected.titular_id} required>
+                  <select name="titularId" defaultValue={
+                    selected.avisos?.some(x=>x.startsWith("Titular não identificado automaticamente"))?
+                    "":selected.titular_id
+                  } required>
+                    <option value="">Selecione o titular do documento</option>
                     {books.map(b=><option key={b.id} value={b.id}>{b.nome}</option>)}
                   </select>
                 </label>
