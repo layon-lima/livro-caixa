@@ -24,12 +24,12 @@ test("validar extração estruturada e correspondência de titular",()=>{
   assert.equal(result.confianca,0.8);
 });
 
-test("não aceitar titular inventado ou categoria inexistente",()=>{
+test("sugerir categoria inédita sem permitir titular inventado",()=>{
   const data={itens:[{titulo:"Pix",documento_tipo:"comprovante",
     categoria:"Categoria inventada",titular_id:"2",
     valor:"R$ 36.027,03",pagina_inicial:1,pagina_final:1}]};
   const [result]=parseOllamaOutput(JSON.stringify(data),options);
-  assert.equal(result.categoria,"");
+  assert.equal(result.categoria,"Categoria inventada");
   assert.equal(result.titular_id,"");
   assert.ok(result.avisos.length>=2);
 });
@@ -60,6 +60,13 @@ test("Nao publica titular sem nome completo no OCR",()=>{
     categories:options.categories,owners:options.owners,text:options.text
   });
   assert.equal(found.titular_id,undefined);
-  assert.equal(found.categoria,undefined);
+  assert.equal(found.categoria,"Outra categoria");
   assert.equal(found.competencia,"2026-10");
+});
+
+test("Evitar Outras despesas quando a IA não especifica gasto",()=>{
+  const data={itens:[{categoria:"Outras despesas",pagina_inicial:1,pagina_final:1}]};
+  const [item]=parseOllamaOutput(JSON.stringify(data),
+    {...options,categories:[...options.categories,"Outras despesas"]});
+  assert.equal(item.categoria,"");
 });

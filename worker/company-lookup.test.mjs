@@ -62,5 +62,5 @@ test("Categoria por CNAE: sugere Manutenção > Peças sem exigir nota fiscal",(
   const categories=[{nome:"Manutenção",subcategoria:"Peças"},
     {nome:"Manutenção",subcategoria:"Serviços"}];
   assert.equal(suggestCategoryFromCompany(publicCompany,categories),"Manutenção > Peças");
-  assert.equal(suggestCategoryFromCompany(publicCompany,[{nome:"Outras despesas",subcategoria:""}]),"");
+  assert.equal(suggestCategoryFromCompany(publicCompany,[{nome:"Outras despesas",subcategoria:""}]),"Manutenção > Peças");
 });
