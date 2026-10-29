@@ -32,8 +32,8 @@ function currency(raw:string|undefined){
   return Number.isFinite(parsed)?parsed.toLocaleString("pt-BR",{style:"currency",currency:"BRL"}):raw;
 }
 
-export function LiveReview({arquivoId,nome,titularPadrao,books,cats,isAdmin}:{
-  arquivoId:string;nome:string;titularPadrao:string;books:Book[];cats:Category[];isAdmin:boolean;
+export function LiveReview({arquivoId,nome,books,cats,isAdmin}:{
+  arquivoId:string;nome:string;books:Book[];cats:Category[];isAdmin:boolean;
 }){
   const router=useRouter();
   const [fields,setFields]=useState<LiveFields>({});
@@ -78,8 +78,8 @@ export function LiveReview({arquivoId,nome,titularPadrao,books,cats,isAdmin}:{
     const timer=setInterval(()=>void refresh(),1300);
     return ()=>{alive=false;clearInterval(timer);};
   },[arquivoId,router]);
-  const titular=books.find(x=>x.id===fields.titular_id)||
-    books.find(x=>x.id===titularPadrao);
+  // Nunca apresentar o titular técnico de armazenamento como identificado.
+  const titular=books.find(x=>x.id===fields.titular_id);
   const categoryNames=cats.map(c=>({id:c.id,label:c.nome+(c.subcategoria?" > "+c.subcategoria:"")}));
   const known=categoryNames.find(c=>c.label===fields.categoria);
   const finished=stage==="pronto";
@@ -100,7 +100,7 @@ export function LiveReview({arquivoId,nome,titularPadrao,books,cats,isAdmin}:{
     {error&&<p className="form-error" role="alert">{error}</p>}
     <section className="review-auto-summary">
       <div><span>Documento</span><strong>{fields.documento_tipo||"Identificando…"}</strong></div>
-      <div><span>Titular</span><strong>{titular?.nome||"Identificando…"}{!fields.titular_id?" (provisório)":""}</strong></div>
+      <div><span>Titular</span><strong>{titular?.nome||"Identificando…"}</strong></div>
       <div><span>Categoria</span><strong>{fields.categoria||"Identificando…"}</strong></div>
       <div><span>Competência</span><strong>{fields.competencia||"Identificando…"}</strong></div>
       <div><span>Valor</span><strong>{currency(fields.valor)}</strong></div>
