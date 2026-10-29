@@ -140,8 +140,11 @@ export function LiveReview({arquivoId,nome,titularPadrao,books,cats,isAdmin}:{
           </select>
         </label>
         <label>Categoria
-          <select value={known?.id||""} disabled>
+          <select value={known?.id||(fields.categoria?"__sugerida__":"")} disabled>
             <option value="">Identificando…</option>
+            {fields.categoria&&!known&&<option value="__sugerida__">
+              {fields.categoria} (nova sugestão)
+            </option>}
             {categoryNames.map(c=><option key={c.id} value={c.id}>{c.label}</option>)}
           </select>
         </label>
