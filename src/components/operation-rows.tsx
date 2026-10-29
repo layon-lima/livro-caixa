@@ -1,0 +1,137 @@
+"use client";
+
+import { useEffect, useRef, useState, type MouseEvent } from "react";
+import Link from "next/link";
+import { FileText, Folder, FolderInput, Pencil, RotateCcw, Trash2, X, Eye, ChevronLeft } from "lucide-react";
+
+export type OperationEntry={
+  id:string;titular_id:string;titulo:string;categoria:string|null;subcategoria:string|null;
+  categoria_id:string|null;competencia:string;tipo:string;descricao:string;
+  contraparte:string;referencia:string;valor:string|null;quantidade_documentos:string;
+};
+export type AttachedDocument={operacao_id:string;arquivo_id:string;nome_original:string;documento_tipo:string};
+type Book={id:string;nome:string};
+type Props={
+  operations:OperationEntry[];documents:AttachedDocument[];books:Book[];
+  canEdit:boolean;canDelete:boolean;bookId:string;
+};
+type Menu={id:string;x:number;y:number;view:"actions"|"files"|"move"|"delete"|"info"};
+const money=(v:string|null)=>v===null?"":Number(v).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+const place=(x:number,y:number)=>({
+  x:Math.max(8,Math.min(x,window.innerWidth-310)),
+  y:Math.max(8,Math.min(y,window.innerHeight-350))
+});
+
+export function OperationRows({operations,documents,books,canEdit,canDelete,bookId}:Props){
+  const [selected,setSelected]=useState<string|null>(null);
+  const [menu,setMenu]=useState<Menu|null>(null);
+  const [destination,setDestination]=useState("");
+  const popup=useRef<HTMLDivElement>(null);
+  const docs=new Map<string,AttachedDocument[]>();
+  for(const f of documents)docs.set(f.operacao_id,[...(docs.get(f.operacao_id)||[]),f]);
+  const current=operations.find(o=>o.id===menu?.id);
+  const currentDocs=current?docs.get(current.id)||[]:[];
+  useEffect(()=>{
+    if(!menu)return;
+    const onKey=(e:KeyboardEvent)=>{if(e.key==="Escape")setMenu(null);};
+    const onClick=(e:globalThis.MouseEvent)=>{
+      if(popup.current&&!popup.current.contains(e.target as Node))setMenu(null);
+    };
+    document.addEventListener("keydown",onKey);
+    document.addEventListener("pointerdown",onClick);
+    return ()=>{document.removeEventListener("keydown",onKey);document.removeEventListener("pointerdown",onClick);};
+  },[menu]);
+  function show(id:string,e:MouseEvent|globalThis.MouseEvent){
+    e.preventDefault();
+    const position=place(e.clientX,e.clientY);
+    setSelected(id);setDestination(bookId);
+    setMenu({id,...position,view:"actions"});
+  }
+  const view=(kind:Menu["view"])=>setMenu(m=>m?{...m,view:kind}:null);
+  return <div className="operation-scroll" aria-label="Operações do livro">
+    {operations.map(op=><div key={op.id}
+      className={"operation-row operation-popup-row"+(selected===op.id?" selected":"")}
+      role="button" tabIndex={0} aria-label={op.titulo+". Dois cliques para ações"}
+      title="Clique para selecionar; dois cliques para ações"
+      onClick={()=>{setSelected(op.id);setMenu(null);}}
+      onDoubleClick={e=>show(op.id,e)}
+      onContextMenu={e=>show(op.id,e)}
+      onKeyDown={e=>{
+        if(e.key==="Enter"||e.key===" "){
+          e.preventDefault();
+          const b=e.currentTarget.getBoundingClientRect();
+          show(op.id,{preventDefault:()=>{},clientX:b.left+75,clientY:b.top+25} as MouseEvent);
+        }
+      }}>
+      <span className="operation-name"><Folder size={15} className="folder-icon"/><span>{op.titulo}</span></span>
+      <span>{op.categoria||"Sem categoria"}{op.subcategoria?" / "+op.subcategoria:""}</span>
+      <span>{op.competencia.slice(0,7)}</span>
+      <span>{op.quantidade_documentos}</span>
+    </div>)}
+    {operations.length===0&&<p className="empty-info">Nenhuma operação para os filtros selecionados.</p>}
+    {menu&&current&&<div ref={popup} className="entity-actions-popup" role="dialog"
+      aria-label={"Ações de "+current.titulo} style={{left:menu.x,top:menu.y}}
+      onClick={e=>e.stopPropagation()}>
+      <div className="entity-popup-header">
+        {menu.view!=="actions"&&<button type="button" aria-label="Voltar às ações" onClick={()=>view("actions")}><ChevronLeft size={16}/></button>}
+        <strong title={current.titulo}>{current.titulo}</strong>
+        <button type="button" onClick={()=>setMenu(null)} aria-label="Fechar ações"><X size={16}/></button>
+      </div>
+      {menu.view==="actions"&&<div className="entity-popup-options">
+        <button type="button" onClick={()=>view("info")}><Eye size={15}/> Detalhes da operação</button>
+        {currentDocs.length>0&&<button type="button" onClick={()=>view("files")}>
+          <FileText size={15}/> Documentos ({currentDocs.length})
+        </button>}
+        {canEdit&&<Link href={"/operacoes/"+current.id} onClick={()=>setMenu(null)}>
+          <Pencil size={15}/> Editar dados
+        </Link>}
+        {canEdit&&books.length>1&&<button type="button" onClick={()=>view("move")}>
+          <FolderInput size={15}/> Mover para outro titular
+        </button>}
+        {canDelete&&<button type="button" className="entity-destructive" onClick={()=>view("delete")}>
+          <Trash2 size={15}/> Enviar para a lixeira
+        </button>}
+        {!canEdit&&!canDelete&&currentDocs.length===0&&<small>Sem outras ações autorizadas.</small>}
+      </div>}
+      {menu.view==="info"&&<div className="entity-popup-details">
+        <div><span>Categoria</span><strong>{current.categoria||"Sem categoria"}</strong></div>
+        <div><span>Competência</span><strong>{current.competencia.slice(0,7)}</strong></div>
+        <div><span>Tipo</span><strong>{current.tipo}</strong></div>
+        <div><span>Valor</span><strong>{money(current.valor)||"—"}</strong></div>
+        <div><span>Contraparte</span><strong>{current.contraparte||"—"}</strong></div>
+        <div><span>Referência</span><strong>{current.referencia||"—"}</strong></div>
+        {current.descricao&&<p>{current.descricao}</p>}
+      </div>}
+      {menu.view==="files"&&<div className="entity-popup-options">
+        {currentDocs.map(f=><a key={f.arquivo_id} href={"/api/documentos/"+f.arquivo_id}
+          target="_blank" rel="noopener noreferrer"><FileText size={15}/><span className="truncate">{f.nome_original}</span></a>)}
+      </div>}
+      {menu.view==="move"&&<form className="entity-popup-form" action={"/api/operacoes/"+current.id} method="post">
+        <p>Mover esta operação e seus vínculos para outro livro autorizado.</p>
+        <label>Novo titular
+          <select name="titularId" value={destination} onChange={e=>setDestination(e.target.value)}>
+            <option value={bookId}>Selecione outro titular</option>
+            {books.filter(b=>b.id!==bookId).map(b=><option key={b.id} value={b.id}>{b.nome}</option>)}
+          </select>
+        </label>
+        <input name="titulo" type="hidden" value={current.titulo}/>
+        <input name="competencia" type="hidden" value={current.competencia.slice(0,7)}/>
+        <input name="categoriaId" type="hidden" value={current.categoria_id||""}/>
+        <input name="tipo" type="hidden" value={current.tipo}/>
+        <input name="descricao" type="hidden" value={current.descricao||""}/>
+        <input name="contraparte" type="hidden" value={current.contraparte||""}/>
+        <input name="referencia" type="hidden" value={current.referencia||""}/>
+        <input name="valor" type="hidden" value={current.valor||""}/>
+        <button type="submit" className="primary-btn" disabled={destination===bookId||!destination}>Mover operação</button>
+      </form>}
+      {menu.view==="delete"&&<form className="entity-popup-form" action={"/api/operacoes/"+current.id} method="post">
+        <input type="hidden" name="acao" value="excluir"/>
+        <p>Enviar <strong>{current.titulo}</strong> para a lixeira? A operação poderá ser restaurada.</p>
+        <div className="entity-popup-confirm">
+          <button type="button" className="flat-button" onClick={()=>view("actions")}>Cancelar</button>
+          <button type="submit" className="primary-btn">Confirmar exclusão</button>
+        </div>
+      </form>}
+    </div>}
+  </div>;
+}
