@@ -61,7 +61,7 @@ export function OperationRows({operations,documents,books,canEdit,canDelete,book
         return new Intl.DateTimeFormat("pt-BR",{month:"long",year:"numeric"})
           .format(new Date(Number(year),Number(m)-1,1));
       };
-      return [...monthly].map(([month,entries])=>{
+      return [...monthly].sort((a,b)=>b[0].localeCompare(a[0])).map(([month,entries])=>{
         const total=monthlyTotals.find(x=>x.mes===month);
         const closed=collapsed.includes(month);
         return <section className="expense-month" key={month}>
