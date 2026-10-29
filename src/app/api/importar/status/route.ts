@@ -38,7 +38,11 @@ export async function GET(request: Request) {
   );
   if (rows.rows.length!==ids.length) return NextResponse.json({error:"Arquivo não encontrado."},{status:404});
   for (const item of rows.rows) {
-    if (!await canAccessTitular(user,Number(item.titular_id),"import")) {
+    // Revisores podem acompanhar a leitura mesmo quando não têm permissão de
+    // importar, especialmente ao abrir uma conferência já iniciada.
+    const titular=Number(item.titular_id);
+    if (!await canAccessTitular(user,titular,"import") &&
+        !await canAccessTitular(user,titular,"approve")) {
       return NextResponse.json({error:"Sem permissão de acompanhar este arquivo."},{status:403});
     }
   }
