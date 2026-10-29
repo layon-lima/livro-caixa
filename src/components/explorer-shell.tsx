@@ -10,20 +10,21 @@ type Props = {
   user: AuthUser; titulares: Titular[]; selected?: Titular;
   children?: React.ReactNode; folderContent?: React.ReactNode;
   operationCount?: number; tabBookId?:string; activeTab?:"explorador"|"planilha";
+  pageTitle?:string; activeSection?:"livros"|"admin"|"lixeira";
 };
 
-export function ExplorerShell({ user, titulares, selected, children, folderContent, operationCount, tabBookId, activeTab="explorador" }: Props) {
+export function ExplorerShell({ user, titulares, selected, children, folderContent, operationCount, tabBookId, activeTab="explorador", pageTitle, activeSection="livros" }: Props) {
   return (
     <div className="workspace">
       <aside className="rail" aria-label="Navegação">
         <div className="rail-mark" aria-label="Livro Caixa Inteligente">LC</div>
-        <Link className="rail-item rail-item-active" href="/" aria-label="Livros Caixa">
+        <Link className={"rail-item"+(activeSection==="livros"?" rail-item-active":"")} href="/" aria-label="Livros Caixa">
           <BookOpen size={19} strokeWidth={1.8} aria-hidden="true" /><span>Livros</span>
         </Link>
-        <Link className="rail-item" href="/lixeira" aria-label="Lixeira">
+        <Link className={"rail-item"+(activeSection==="lixeira"?" rail-item-active":"")} href="/lixeira" aria-label="Lixeira">
           <Trash2 size={19} strokeWidth={1.8}/><span>Lixeira</span>
         </Link>
-        {user.isAdmin&&<Link className="rail-item" href="/admin" aria-label="Administração">
+        {user.isAdmin&&<Link className={"rail-item"+(activeSection==="admin"?" rail-item-active":"")} href="/admin" aria-label="Administração">
           <Settings2 size={19} strokeWidth={1.8}/><span>Admin</span>
         </Link>}
       </aside>
@@ -54,7 +55,7 @@ export function ExplorerShell({ user, titulares, selected, children, folderConte
             {selected ? (
               <><Link href="/">Livros Caixa</Link><ChevronRight size={14} className="crumb-chevron" />
                 <strong>{selected.nome}</strong></>
-            ) : <strong>Livros Caixa</strong>}
+            ) : <strong>{pageTitle||"Livros Caixa"}</strong>}
           </div>
           <div className="top-actions">
             <span className="content-header-caption">{user.username}</span>
@@ -66,8 +67,8 @@ export function ExplorerShell({ user, titulares, selected, children, folderConte
 
         <section className="file-list" aria-label="Livros e operações">
           <div className="list-titlebar">
-            <div><h1>{selected ? selected.nome : "Livros Caixa"}</h1>
-              <p>{selected ? "Operações e documentos" : "Selecione o titular para abrir seu livro"}</p></div>
+            <div><h1>{selected ? selected.nome : pageTitle||"Livros Caixa"}</h1>
+              <p>{selected ? "Operações e documentos" : pageTitle?"Área de trabalho":"Selecione o titular para abrir seu livro"}</p></div>
           </div>
 
           {tabBookId&&<nav className="book-subtabs" aria-label="Visualização do livro">
@@ -76,7 +77,7 @@ export function ExplorerShell({ user, titulares, selected, children, folderConte
             <Link className={activeTab==="planilha"?"active":""}
               href={"/livros/"+tabBookId+"?aba=planilha"}><Table2 size={15}/> Planilha</Link>
           </nav>}
-          {selected && children ? children : selected ? <>
+          {children ? children : selected ? <>
             <div className="file-columns" aria-hidden="true">
               <div className="col-main">Nome da operação</div><div className="col-category">Categoria</div>
               <div className="col-period">Competência</div><div className="col-docs">Documentos</div>
