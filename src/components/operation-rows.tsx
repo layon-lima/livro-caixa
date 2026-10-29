@@ -35,11 +35,12 @@ export function OperationRows({operations,documents,books,canEdit,canDelete,book
   const currentDocs=current?docs.get(current.id)||[]:[];
   // O recebedor é a última pasta: mostrar arquivos reais, um por anexo.
   // Operações sem PDF continuam visíveis como lançamentos manuais, sem pasta extra.
-  const fileEntries=operations.flatMap(op=>{
-    const linked=docs.get(op.id)||[];
-    return linked.length?linked.map(doc=>({op,doc,key:op.id+":"+doc.arquivo_id})):
-      [{op,doc:null as AttachedDocument|null,key:op.id+":manual"}];
-  });
+  const fileEntries:{op:OperationEntry;doc:AttachedDocument|null;key:string}[]=
+    operations.flatMap(op=>{
+      const linked=docs.get(op.id)||[];
+      return linked.length?linked.map(doc=>({op,doc,key:op.id+":"+doc.arquivo_id})):
+        [{op,doc:null,key:op.id+":sem-anexo"}];
+    });
   useEffect(()=>{
     if(!menu)return;
     const onKey=(e:KeyboardEvent)=>{if(e.key==="Escape")setMenu(null);};
@@ -124,8 +125,8 @@ export function OperationRows({operations,documents,books,canEdit,canDelete,book
       }}>
       <span className="operation-name">
         <FileText size={15} className="explorer-document-icon"/>
-        <span title={doc?.nome_original||"Lançamento manual — "+op.titulo}>
-          {doc?.nome_original||"Lançamento manual — "+op.titulo}
+        <span title={doc?.nome_original||"Lançamento sem anexo — "+op.titulo}>
+          {doc?.nome_original||"Lançamento sem anexo — "+op.titulo}
         </span>
       </span>
       <span title={op.titulo}>{op.titulo}</span>
