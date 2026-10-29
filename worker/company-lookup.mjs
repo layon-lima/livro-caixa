@@ -72,15 +72,47 @@ export function candidateNewOwner(text,docKind,registeredNames){
   if(registeredNames.some(v=>normalize(v)===normalized))return "";
   return name.toLocaleUpperCase("pt-BR");
 }
+// Sugestão por atividade pública da empresa. Usa SOMENTE categorias já cadastradas.
+// Não afirma o produto efetivamente comprado: o usuário pode corrigir a sugestão.
+export function suggestCategoryFromCompany(company,categories){
+  const evidence=normalize([company?.atividade,company?.razao_social,company?.nome_fantasia].filter(Boolean).join(" "));
+  const cnae=String(company?.codigo_cnae||"").replace(/\D/g,"");
+  if(!evidence&&!cnae)return "";
+  const candidate=
+    cnae.startsWith("4530")||/(?:PE[CÇ]AS|AUTOPE[CÇ]AS|ACESS[OÓ]RIOS\s+(?:NOVOS|USADOS)?\s*(?:PARA\s+)?VE[IÍ]CULOS|PE[CÇ]AS\s+AUTOMOTIVAS)/i.test(evidence)?
+      "Manutenção > Peças":
+    /(?:OFICINA|REPARA[CÇ][AÃ]O\s+DE\s+(?:VE[IÍ]CULOS|M[AÁ]QUINAS)|MANUTEN[CÇ][AÃ]O\s+(?:MEC[AÂ]NICA|DE\s+M[AÁ]QUINAS))/i.test(evidence)?
+      "Manutenção > Serviços":
+    /(?:FERTILIZANTE|ADUBO|CORRETIVO\s+DO\s+SOLO)/i.test(evidence)?
+      "Insumos Agrícolas > Fertilizantes":
+    /(?:COM[EÉ]RCIO\s+DE\s+SEMENTES|PRODU[CÇ][AÃ]O\s+DE\s+SEMENTES)/i.test(evidence)?
+      "Insumos Agrícolas > Sementes":
+    /(?:DEFENSIV[OA]S?\s+AGR[IÍ]COLAS?|AGROT[OÓ]XIC[OA]S?)/i.test(evidence)?
+      "Insumos Agrícolas > Defensivos":
+    /(?:COMBUST[IÍ]VEIS|POSTO\s+DE\s+GASOLINA|DIESEL)/i.test(evidence)?
+      "Combustíveis > Diesel":
+    "";
+  if(!candidate)return "";
+  const norm=v=>normalize(v).replace(/[^A-Z0-9]/g," ").replace(/\s+/g," ").trim();
+  const possible=categories.find(c=>norm(typeof c==="string"?c:
+    c.nome+(c.subcategoria?" > "+c.subcategoria:""))===norm(candidate));
+  return possible?candidate:"";
+}
+
+// Cache curta para não consultar repetidamente a mesma empresa a cada comprovante.
+// Limitado a um único worker; não mantém dados de documentos no cache.
+const companyCache=new Map();
 export async function lookupPublicCnpj(cnpj){
   if(!validCnpj(cnpj))return null;
+  const hit=companyCache.get(cnpj);
+  if(hit&&Date.now()-hit.at<86400000)return hit.data;
   // Host fixo, somente CNPJ validado; nenhum nome, texto OCR ou documento é enviado.
   const url="https://brasilapi.com.br/api/cnpj/v1/"+cnpj;
   const response=await fetch(url,{headers:{Accept:"application/json"},signal:AbortSignal.timeout(4000)});
   if(!response.ok)throw Error("Consulta pública indisponível (HTTP "+response.status+")");
   const data=await response.json();
   if(formatDigits(data.cnpj)!==cnpj)throw Error("CNPJ retornado não corresponde ao consultado.");
-  return {
+  const company={
     cnpj,
     razao_social:tidy(data.razao_social,150),
     nome_fantasia:tidy(data.nome_fantasia,150),
@@ -88,4 +120,7 @@ export async function lookupPublicCnpj(cnpj){
     codigo_cnae:String(data.cnae_fiscal||"").slice(0,12),
     fonte:"BrasilAPI (dados públicos da Receita Federal)"
   };
+  if(companyCache.size>=256)companyCache.delete(companyCache.keys().next().value);
+  companyCache.set(cnpj,{data:company,at:Date.now()});
+  return company;
 }
