@@ -1,7 +1,7 @@
 import Link from "next/link";
 import {
   BookOpen, ChevronDown, ChevronRight, Folder, FolderOpen,
-  LayoutList, LogOut, Settings2, Trash2,
+  LayoutList, LogOut, Settings2, Trash2, Table2,
 } from "lucide-react";
 import type { AuthUser } from "@/lib/auth";
 
@@ -9,10 +9,10 @@ export type Titular = { id: string; nome: string };
 type Props = {
   user: AuthUser; titulares: Titular[]; selected?: Titular;
   children?: React.ReactNode; folderContent?: React.ReactNode;
-  operationCount?: number;
+  operationCount?: number; tabBookId?:string; activeTab?:"explorador"|"planilha";
 };
 
-export function ExplorerShell({ user, titulares, selected, children, folderContent, operationCount }: Props) {
+export function ExplorerShell({ user, titulares, selected, children, folderContent, operationCount, tabBookId, activeTab="explorador" }: Props) {
   return (
     <div className="workspace">
       <aside className="rail" aria-label="Navegação">
@@ -70,6 +70,12 @@ export function ExplorerShell({ user, titulares, selected, children, folderConte
               <p>{selected ? "Operações e documentos" : "Selecione o titular para abrir seu livro"}</p></div>
           </div>
 
+          {tabBookId&&<nav className="book-subtabs" aria-label="Visualização do livro">
+            <Link className={activeTab==="explorador"?"active":""}
+              href={"/livros/"+tabBookId}><Folder size={15}/> Explorador</Link>
+            <Link className={activeTab==="planilha"?"active":""}
+              href={"/livros/"+tabBookId+"?aba=planilha"}><Table2 size={15}/> Planilha</Link>
+          </nav>}
           {selected && children ? children : selected ? <>
             <div className="file-columns" aria-hidden="true">
               <div className="col-main">Nome da operação</div><div className="col-category">Categoria</div>

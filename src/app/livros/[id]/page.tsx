@@ -5,11 +5,12 @@ import { getDatabase } from "@/lib/database";
 import { ExplorerShell, type Titular } from "@/components/explorer-shell";
 import { categorias, titularesPermitidos, safeId, type Operacao } from "@/lib/document-data";
 import { OperationRows } from "@/components/operation-rows";
+import { ExpenseSpreadsheet } from "@/components/expense-spreadsheet";
 import { Folder, Search } from "lucide-react";
 export const dynamic="force-dynamic";
 
 type Attached = {operacao_id:string;arquivo_id:string;nome_original:string;documento_tipo:string};
-type Params = {mes?:string;categoria?:string;q?:string;op?:string;erro?:string};
+type Params = {aba?:string;mes?:string;categoria?:string;q?:string;op?:string;erro?:string};
 export default async function Livro({params,searchParams}:{
   params:Promise<{id:string}>; searchParams:Promise<Params>;
 }){
@@ -17,6 +18,7 @@ export default async function Livro({params,searchParams}:{
   const id=safeId((await params).id);
   if(!id||!await canAccessTitular(user,id,"view"))notFound();
   const query=await searchParams;
+  const spreadsheet=query.aba==="planilha";
   const db=getDatabase();
   const [titles,cats]=await Promise.all([
     db.query<Titular>("SELECT id::text AS id,nome FROM titulares WHERE id=$1",[id]),
@@ -79,7 +81,12 @@ export default async function Livro({params,searchParams}:{
     canAccessTitular(user,id,"edit"),canAccessTitular(user,id,"delete"),
     titularesPermitidos(user,"edit")
   ]);
-  return <ExplorerShell user={user} titulares={books.rows} selected={selected} folderContent={folder} operationCount={ops.length}>
+  return <ExplorerShell user={user} titulares={books.rows} selected={selected}
+    folderContent={folder} operationCount={ops.length} tabBookId={String(id)}
+    activeTab={spreadsheet?"planilha":"explorador"}>
+    {spreadsheet?<ExpenseSpreadsheet bookId={String(id)} cats={cats}
+      books={editBooks} canEdit={canEdit} canDelete={canDelete}
+      months={[...new Set(all.rows.map(r=>r.competencia))]}/> : <>
     {query.erro==="arquivo-compartilhado"&&<p className="form-error" role="alert">Esta operação contém arquivos compartilhados com outros lançamentos. Para evitar misturar documentos, o movimento foi bloqueado.</p>}
     <div className="list-toolbar">
       <form action={"/livros/"+id} className="search-bar">
@@ -106,5 +113,6 @@ export default async function Livro({params,searchParams}:{
     </div>
     <OperationRows operations={ops} documents={attached.rows} books={editBooks}
       canEdit={canEdit} canDelete={canDelete} bookId={String(id)}/>
+    </>}
   </ExplorerShell>;
 }
