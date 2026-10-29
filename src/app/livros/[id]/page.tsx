@@ -58,7 +58,7 @@ export default async function Livro({params,searchParams}:{
   const data=fetchOperations?await db.query<Operacao>(
     "SELECT o.id::text,o.titular_id::text,o.titulo,o.competencia::text,o.categoria_id::text,"+
     "c.nome AS categoria,c.subcategoria,o.tipo,o.descricao,o.contraparte,o.referencia,"+
-    "o.valor::text,o.criado_em::text,o.excluido_em::text,"+
+    "o.valor::text,o.data_pagamento::text,o.criado_em::text,o.excluido_em::text,"+
     "(SELECT count(*)::text FROM operacao_arquivos oa WHERE oa.operacao_id=o.id) AS quantidade_documentos "+
     "FROM operacoes o LEFT JOIN categorias c ON c.id=o.categoria_id "+
     "WHERE o.titular_id=$1 AND o.excluido_em IS NULL AND o.tipo IS DISTINCT FROM 'receita' "+
@@ -136,10 +136,10 @@ export default async function Livro({params,searchParams}:{
       {q&&<a className="flat-button" href={explorerHref(id)}>Limpar pesquisa</a>}
     </div>
     <div className="file-columns" aria-hidden="true">
-      <div className="col-main">{q||activeRecipient?"Lançamento":"Pasta"}</div>
-      <div className="col-category">{q||activeRecipient?"Categoria":"Nível"}</div>
-      <div className="col-period">Competência</div>
-      <div className="col-docs">{q||activeRecipient?"Documentos":"Itens"}</div>
+      <div className="col-main">{q||activeRecipient?"Arquivo":"Pasta"}</div>
+      <div className="col-category">{q||activeRecipient?"Lançamento":"Nível"}</div>
+      <div className="col-period">{q||activeRecipient?"Pagamento":"Competência"}</div>
+      <div className="col-docs">{q||activeRecipient?"Valor":"Itens"}</div>
     </div>
     <GroupedExplorer bookId={String(id)} months={groups}
       activeMonth={activeMonth} activeCategory={activeCategory}

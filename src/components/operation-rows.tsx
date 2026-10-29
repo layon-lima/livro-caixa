@@ -16,7 +16,7 @@ type Props={
   canEdit:boolean;canDelete:boolean;bookId:string;
   variant?:"explorer"|"spreadsheet";monthlyTotals?:{mes:string;quantidade:number;total:string}[];
 };
-type Menu={id:string;x:number;y:number;view:"actions"|"files"|"move"|"delete"|"info"};
+type Menu={id:string;x:number;y:number;view:"actions"|"files"|"move"|"delete"|"info";arquivoId?:string};
 const money=(v:string|null)=>v===null?"":Number(v).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 const place=(x:number,y:number)=>({
   x:Math.max(8,Math.min(x,window.innerWidth-310)),
@@ -33,6 +33,13 @@ export function OperationRows({operations,documents,books,canEdit,canDelete,book
   for(const f of documents)docs.set(f.operacao_id,[...(docs.get(f.operacao_id)||[]),f]);
   const current=operations.find(o=>o.id===menu?.id);
   const currentDocs=current?docs.get(current.id)||[]:[];
+  // O recebedor é a última pasta: mostrar arquivos reais, um por anexo.
+  // Operações sem PDF continuam visíveis como lançamentos manuais, sem pasta extra.
+  const fileEntries=operations.flatMap(op=>{
+    const linked=docs.get(op.id)||[];
+    return linked.length?linked.map(doc=>({op,doc,key:op.id+":"+doc.arquivo_id})):
+      [{op,doc:null as AttachedDocument|null,key:op.id+":manual"}];
+  });
   useEffect(()=>{
     if(!menu)return;
     const onKey=(e:KeyboardEvent)=>{if(e.key==="Escape")setMenu(null);};
@@ -43,10 +50,10 @@ export function OperationRows({operations,documents,books,canEdit,canDelete,book
     document.addEventListener("pointerdown",onClick);
     return ()=>{document.removeEventListener("keydown",onKey);document.removeEventListener("pointerdown",onClick);};
   },[menu]);
-  function show(id:string,x:number,y:number){
+  function show(id:string,x:number,y:number,arquivoId?:string){
     const position=place(x,y);
     setSelected(id);setDestination(bookId);
-    setMenu({id,...position,view:"actions"});
+    setMenu({id,...position,view:"actions",arquivoId});
   }
   const view=(kind:Menu["view"])=>setMenu(m=>m?{...m,view:kind}:null);
   return <div className={"operation-scroll"+(variant==="spreadsheet"?" expense-scroll":"")} aria-label="Operações do livro">
@@ -99,24 +106,31 @@ export function OperationRows({operations,documents,books,canEdit,canDelete,book
           </div>)}
         </section>;
       });
-    })():operations.map(op=><div key={op.id}
-      className={"operation-row operation-popup-row"+(selected===op.id?" selected":"")}
-      role="button" tabIndex={0} aria-label={op.titulo+". Dois cliques para ações"}
-      title="Clique para selecionar; dois cliques para ações"
-      onClick={()=>{setSelected(op.id);setMenu(null);}}
-      onDoubleClick={e=>show(op.id,e.clientX,e.clientY)}
-      onContextMenu={e=>{e.preventDefault();show(op.id,e.clientX,e.clientY);}}
+    })():fileEntries.map(({op,doc,key})=><div key={key}
+      className={"operation-row operation-popup-row explorer-file-row"+(selected===key?" selected":"")}
+      role="button" tabIndex={0}
+      aria-label={(doc?.nome_original||op.titulo)+". Dois cliques para ações"}
+      title="Clique para selecionar; dois cliques para abrir as opções do arquivo"
+      onClick={()=>{setSelected(key);setMenu(null);}}
+      onDoubleClick={e=>{show(op.id,e.clientX,e.clientY,doc?.arquivo_id);setSelected(key);}}
+      onContextMenu={e=>{e.preventDefault();show(op.id,e.clientX,e.clientY,doc?.arquivo_id);setSelected(key);}}
       onKeyDown={e=>{
         if(e.key==="Enter"||e.key===" "){
           e.preventDefault();
           const b=e.currentTarget.getBoundingClientRect();
-          show(op.id,b.left+75,b.top+25);
+          show(op.id,b.left+75,b.top+25,doc?.arquivo_id);
+          setSelected(key);
         }
       }}>
-      <span className="operation-name"><Folder size={15} className="folder-icon"/><span>{op.titulo}</span></span>
-      <span>{op.categoria||"Sem categoria"}{op.subcategoria?" / "+op.subcategoria:""}</span>
-      <span>{op.competencia.slice(0,7)}</span>
-      <span>{op.quantidade_documentos}</span>
+      <span className="operation-name">
+        <FileText size={15} className="explorer-document-icon"/>
+        <span title={doc?.nome_original||"Lançamento manual — "+op.titulo}>
+          {doc?.nome_original||"Lançamento manual — "+op.titulo}
+        </span>
+      </span>
+      <span title={op.titulo}>{op.titulo}</span>
+      <span>{op.data_pagamento?op.data_pagamento.split("-").reverse().join("/"):"—"}</span>
+      <span className="explorer-file-value">{money(op.valor)||"—"}</span>
     </div>)}
     {operations.length===0&&<p className="empty-info">Nenhuma operação para os filtros selecionados.</p>}
     {menu&&current&&<div ref={popup} className="entity-actions-popup" role="dialog"
@@ -128,6 +142,10 @@ export function OperationRows({operations,documents,books,canEdit,canDelete,book
         <button type="button" onClick={()=>setMenu(null)} aria-label="Fechar ações"><X size={16}/></button>
       </div>
       {menu.view==="actions"&&<div className="entity-popup-options">
+        {menu.arquivoId&&<a href={"/api/documentos/"+menu.arquivoId}
+          target="_blank" rel="noopener noreferrer" onClick={()=>setMenu(null)}>
+          <FileText size={15}/> Abrir documento original
+        </a>}
         <button type="button" onClick={()=>view("info")}><Eye size={15}/> Detalhes da operação</button>
         {currentDocs.length>0&&<button type="button" onClick={()=>view("files")}>
           <FileText size={15}/> Documentos ({current.quantidade_documentos})

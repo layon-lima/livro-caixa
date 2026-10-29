@@ -545,3 +545,10 @@ button { cursor: pointer; }
 .explorer-folder-row:hover {background:#f0f6fe;color:#275f98;}
 .explorer-folder-row>span:last-child {color:#708397;font-size:11px;}
 .explorer-folder-row .operation-name strong {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;font-weight:600;}
+
+/* Último nível do Explorador: documentos reais, não pastas virtuais. */
+.explorer-file-row .explorer-document-icon {color:#487da9;}
+.explorer-file-row .operation-name {font-weight:500;}
+.explorer-file-row .explorer-file-value {font-weight:600;color:#ab3434;text-align:right;font-variant-numeric:tabular-nums;}
+.explorer-file-row>span:nth-child(2) {color:#566b80;}
+.explorer-file-row>span:nth-child(3) {font-variant-numeric:tabular-nums;}
