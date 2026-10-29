@@ -21,7 +21,7 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
   if(batch) queryArgs.push(batch);
   const rows=await db.query<Queued>(
     "SELECT p.id::text,p.arquivo_id::text,p.titular_id::text,p.titulo,p.documento_tipo,p.contraparte,"+
-    "p.competencia::text,p.competencia_estimada,p.categoria_id::text,p.tipo,p.descricao,p.valor::text,p.referencia,"+
+    "p.competencia::text,p.data_pagamento::text,p.competencia_estimada,p.categoria_id::text,p.tipo,p.descricao,p.valor::text,p.referencia,"+
     "p.pagina_inicial,p.pagina_final,p.metodo_leitura,p.confianca::text,p.avisos,p.titular_sugerido,p.consulta_empresa,p.categoria_sugerida_nome,p.categoria_sugerida_subcategoria,p.revisada_em::text,p.operacao_sugerida_id::text,p.aprovado_em::text,p.duplicada_de::text,"+
     "orig.arquivo_id::text AS arquivo_original_id,orig.titular_id::text AS titular_original_id,"+
     "a.nome_original,a.status,a.erro,a.texto_extraido,t.nome AS nome_titular "+
@@ -134,6 +134,7 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
                   "Não identificada")
               }</strong></div>
               <div><span>Competência</span><strong>{selected.competencia.slice(0,7)}</strong></div>
+              <div><span>Pagamento</span><strong>{selected.data_pagamento?selected.data_pagamento.split("-").reverse().join("/"):"Não informado"}</strong></div>
               <div><span>Valor</span><strong>{selected.valor?Number(selected.valor).toLocaleString("pt-BR",{style:"currency",currency:"BRL"}):"Não identificado"}</strong></div>
               <div><span>Contraparte</span><strong>{selected.contraparte||"Não identificada"}</strong></div>
               {selected.operacao_sugerida_id&&<div><span>Vinculação</span><strong>Operação relacionada #{selected.operacao_sugerida_id}</strong></div>}
@@ -194,6 +195,10 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
                   suggestedSubcategory={selected.categoria_sugerida_subcategoria||""}/>
                 <label>Competência {selected.competencia_estimada&&<em>(estimada)</em>}
                   <input name="competencia" type="month" defaultValue={selected.competencia.slice(0,7)} required/>
+                </label>
+                <label>Data do pagamento
+                  <input name="dataPagamento" type="date" defaultValue={selected.data_pagamento||""}/>
+                  <small>Data da efetivação; deixe vazia se o documento não comprovar o pagamento.</small>
                 </label>
                 <label>Documento
                   <select name="documentoTipo" defaultValue={selected.documento_tipo}>
