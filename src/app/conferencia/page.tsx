@@ -109,7 +109,7 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
           <div className="review-analysis-status">
             <strong>{selected.metodo_leitura==="ia"?"Analisado por inteligência artificial":
               selected.metodo_leitura==="xml"?"Dados estruturados do XML":
-              selected.consulta_empresa?.status==="confirmado"?"Conferência rápida: OCR validado + consulta de CNPJ":"Leitura automática local (OCR + regras)"}</strong>
+              "Leitura automática local (OCR + regras)"}</strong>
             {selected.confianca&&<span>Indicador aproximado de extração: {Math.round(Number(selected.confianca)*100)}%</span>}
             {selected.pagina_inicial&&<span>Páginas: {selected.pagina_inicial}{selected.pagina_final&&selected.pagina_final!==selected.pagina_inicial?"–"+selected.pagina_final:""}</span>}
           </div>
@@ -139,7 +139,7 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
               <div><span>Contraparte</span><strong>{selected.contraparte||"Não identificada"}</strong></div>
               {selected.operacao_sugerida_id&&<div><span>Vinculação</span><strong>Operação relacionada #{selected.operacao_sugerida_id}</strong></div>}
             </section>
-            {(selected.titular_sugerido||selected.contraparte)&&<section className="review-enrichment">
+            {selected.titular_sugerido&&<section className="review-enrichment">
               {selected.titular_sugerido&&<div className="enrichment-line">
                 <strong>Possível novo titular</strong>
                 <span>{selected.titular_sugerido}</span>
@@ -149,25 +149,7 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
                     className="flat-button">Conferir e cadastrar titular</Link>:
                   <small>O cadastro de titulares depende de um administrador.</small>}
               </div>}
-              {selected.contraparte&&<div className="enrichment-line">
-                <strong>Pesquisa do recebedor / fornecedor</strong>
-                {selected.consulta_empresa?.cnpj?<>
-                  {selected.consulta_empresa.status==="confirmado"?<small>Consulta CNPJ confirmada</small>:
-                    <small>{selected.consulta_empresa.status==="identificado_cnpj"?"CNPJ do recebedor identificado; nome público diferente do comercial":
-                      selected.consulta_empresa.status==="indisponivel"?"BrasilAPI não respondeu à consulta":
-                      selected.consulta_empresa.status==="divergente"?"CNPJ não correspondeu ao recebedor":
-                      "Consulta CNPJ pendente"}</small>}
-                  <span>{selected.consulta_empresa.razao_social||selected.contraparte}
-                    {selected.consulta_empresa.nome_fantasia?" ("+selected.consulta_empresa.nome_fantasia+")":""}</span>
-                  <small>CNPJ: {selected.consulta_empresa.cnpj}</small>
-                  {selected.consulta_empresa.atividade&&<small>Atividade pública (CNAE): {selected.consulta_empresa.atividade}</small>}
-                  {["confirmado","identificado_cnpj"].includes(selected.consulta_empresa.status||"")&&<small>Fonte: BrasilAPI. Categoria sugerida pela atividade econômica, editável antes da aprovação.</small>}
-                </>:<small>Não foi possível confirmar o recebedor por CNPJ; nenhuma informação externa foi utilizada na classificação.</small>}
-                <a href={"https://www.google.com/search?q="+encodeURIComponent(selected.contraparte)}
-                  target="_blank" rel="noopener noreferrer" className="flat-button">
-                  Pesquisar recebedor na internet <ExternalLink size={13}/>
-                </a>
-              </div>}
+
             </section>}
             {selected.avisos?.length>0&&<details className="review-notices">
               <summary>{selected.avisos.length} ponto(s) para conferir <span>Ver detalhes</span></summary>

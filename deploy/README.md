@@ -129,18 +129,8 @@ pode sugerir novo titular; **não cria** o registro nem altera a titularidade do
 documento. A criação depende da confirmação de um administrador em /admin, e a
 atribuição ao documento continua sendo uma ação separada na conferência.
 
-Quando há CNPJ válido no bloco do recebedor/contraparte, o worker faz consulta
-pontual à BrasilAPI (https://brasilapi.com.br/api/cnpj/v1/{cnpj}); a consulta
-envia somente o CNPJ identificado, nunca o PDF ou o texto do OCR. Retorna razão
-social, nome fantasia e descrição CNAE, mostrados com fonte na conferência,
-e oferece esse contexto à IA local. O CNAE **não** comprova o produto adquirido,
-então categorias continuam sugestões para aprovação humana.
-
-Sem CNPJ confiável, o sistema não inventa pesquisa externa. A conferência
-oferece link "Pesquisar recebedor na internet" para busca manual pelo nome.
-A consulta automática é opcional ao funcionamento: se indisponível, o OCR e a
-IA local continuam operando. A IA permanece um serviço compartilhado na VPS,
-carregado apenas durante uma solicitação.
+A consulta pública de CNPJ foi desativada no processamento atual; a classificação usa
+OCR local, IA local e aprovações anteriores do mesmo titular.
 
 ## Categorias sugeridas pela IA
 
@@ -188,3 +178,21 @@ O backfill examina os OCRs existentes, preenche somente operações sem data
 e com evidência válida de pagamento e informa quantas foram corrigidas.
 Sem evidência, mantém NULL para revisão manual. O comando pode ser repetido
 sem apagar dados anteriores.
+
+## OCR, IA revisora e aprendizado após aprovação (migração 010)
+
+O OCR local lê primeiro, a IA Ollama complementa campos faltantes sem substituir
+valores e recebedores confiáveis; não há consulta externa de CNPJ. O histórico
+é segregado por titular e criado exclusivamente após aprovação humana. Nenhum
+lançamento é aprovado automaticamente.
+
+Após `git pull --ff-only` na VPS, execute:
+
+```bash
+docker compose exec -T database sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1' < db/migrations/008_category_suggestions.sql
+docker compose exec -T database sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1' < db/migrations/009_payment_date.sql
+docker compose exec -T database sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1' < db/migrations/010_classification_learning.sql
+docker compose up -d --build app worker
+```
+
+O Dockerfile executa os testes do worker e compila o Next.js no build.

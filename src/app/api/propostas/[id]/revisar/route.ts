@@ -1,5 +1,6 @@
 import { currentUser, canAccessTitular } from "@/lib/auth";
 import { getDatabase } from "@/lib/database";
+import { rememberApprovedClassification } from "@/lib/classification-learning";
 import { safeId, competence } from "@/lib/document-data";
 import { backTo, forbidden, sameOriginPost } from "@/lib/request-security";
 import { confirmedCategoryId, suggestedCategory } from "@/lib/category-suggestions";
@@ -114,6 +115,7 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
         "INSERT INTO historico_operacoes(operacao_id,usuario_id,acao,dados) VALUES($1,$2,$3,$4)",
         [targetId,user.id,"aprovação",JSON.stringify({proposta:id,arquivo:old.arquivo_id})],
       );
+      await rememberApprovedClassification(connection,id);
     }
     await connection.query("COMMIT");
     return backTo(action==="aprovar"?"/conferencia?aprovados=1"+suffix:

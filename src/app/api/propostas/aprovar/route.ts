@@ -1,5 +1,6 @@
 import { currentUser, canAccessTitular } from "@/lib/auth";
 import { getDatabase } from "@/lib/database";
+import { rememberApprovedClassification } from "@/lib/classification-learning";
 import { safeId } from "@/lib/document-data";
 import { backTo, forbidden, sameOriginPost } from "@/lib/request-security";
 import { confirmedCategoryId, suggestedCategory } from "@/lib/category-suggestions";
@@ -70,6 +71,7 @@ export async function POST(request:Request){
         "INSERT INTO historico_operacoes(operacao_id,usuario_id,acao,dados) VALUES($1,$2,$3,$4)",
         [operationId,user.id,"aprovação",JSON.stringify({proposta:p.id,arquivo:p.arquivo_id})],
       );
+      await rememberApprovedClassification(cx,p.id);
     }
     await cx.query("COMMIT");
     return backTo("/conferencia?aprovados="+ids.length+batch);
