@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type DragEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { FileUp, LoaderCircle, Plus, X } from "lucide-react";
 type Book={id:string;nome:string};
@@ -17,7 +17,6 @@ export function GlobalWorkspaceActions(){
   const [bookId,setBookId]=useState("");
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
-  const input=useRef<HTMLInputElement>(null);
   const nested=useRef(0);
   const requestSeq=useRef(0);
   const submitted=useRef(0);
@@ -31,7 +30,7 @@ export function GlobalWorkspaceActions(){
         setContext(data);
       }).catch(()=>{if(alive)setContext(null);});
     return ()=>{alive=false;};
-  },[pathname==="\/login"?"login":"authenticated"]);
+  },[pathname?.startsWith("/login")]);
   const currentBook=pathname?.match(/^\/livros\/(\d+)(?:\/|$)/)?.[1];
   useEffect(()=>{
     if(!context?.importBooks.length)return;
@@ -42,7 +41,7 @@ export function GlobalWorkspaceActions(){
 
   useEffect(()=>{
     if(!context?.importBooks.length||busy||files.length>0)return;
-    const hasFiles=(e:DragEvent|globalThis.DragEvent)=>{
+    const hasFiles=(e:globalThis.DragEvent)=>{
       const dt=e.dataTransfer;
       return Boolean(dt && Array.from(dt.types||[]).includes("Files"));
     };
@@ -135,9 +134,6 @@ export function GlobalWorkspaceActions(){
       onClick={()=>router.push("/manual"+(fabBook?"?titular="+fabBook.id:""))}>
       <Plus size={24} strokeWidth={2.5}/>
     </button>}
-    {context.importBooks.length>0&&<input ref={input} type="file" multiple
-      accept=".pdf,.xml,.png,.jpg,.jpeg" style={{display:"none"}}
-      onChange={e=>{setFiles(Array.from(e.target.files||[]));e.currentTarget.value="";}}/>}
     {dragging&&<div className="global-drag-highlight" aria-hidden="true">
       <FileUp size={38}/><strong>Solte para importar</strong>
       <span>A conferência abrirá automaticamente após o envio.</span>

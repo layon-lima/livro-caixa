@@ -418,3 +418,7 @@ button { cursor: pointer; }
   .operation-popup-row>span:nth-child(2),.operation-popup-row>span:nth-child(4) {display:none;}
   .global-manual-fab {width:50px;height:50px;right:14px;bottom:14px;}
 }
+
+.trash-table tbody tr[role="button"] {cursor:default;user-select:none;}
+.trash-table tbody tr[role="button"]:hover {background:#f6f9fd;}
+.trash-table tbody tr[role="button"].selected {background:#eaf2ff;}

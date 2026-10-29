@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type MouseEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import { RotateCcw, Trash2, X } from "lucide-react";
 
 type TrashItem={id:string;titulo:string;nome:string;competencia:string};

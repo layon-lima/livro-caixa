@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type MouseEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { FileText, Folder, FolderInput, Pencil, Trash2, X, Eye, ChevronLeft } from "lucide-react";
 
@@ -41,9 +41,8 @@ export function OperationRows({operations,documents,books,canEdit,canDelete,book
     document.addEventListener("pointerdown",onClick);
     return ()=>{document.removeEventListener("keydown",onKey);document.removeEventListener("pointerdown",onClick);};
   },[menu]);
-  function show(id:string,e:MouseEvent|globalThis.MouseEvent){
-    e.preventDefault();
-    const position=place(e.clientX,e.clientY);
+  function show(id:string,x:number,y:number){
+    const position=place(x,y);
     setSelected(id);setDestination(bookId);
     setMenu({id,...position,view:"actions"});
   }
@@ -54,13 +53,13 @@ export function OperationRows({operations,documents,books,canEdit,canDelete,book
       role="button" tabIndex={0} aria-label={op.titulo+". Dois cliques para ações"}
       title="Clique para selecionar; dois cliques para ações"
       onClick={()=>{setSelected(op.id);setMenu(null);}}
-      onDoubleClick={e=>show(op.id,e)}
-      onContextMenu={e=>show(op.id,e)}
+      onDoubleClick={e=>show(op.id,e.clientX,e.clientY)}
+      onContextMenu={e=>{e.preventDefault();show(op.id,e.clientX,e.clientY);}}
       onKeyDown={e=>{
         if(e.key==="Enter"||e.key===" "){
           e.preventDefault();
           const b=e.currentTarget.getBoundingClientRect();
-          show(op.id,{preventDefault:()=>{},clientX:b.left+75,clientY:b.top+25} as MouseEvent);
+          show(op.id,b.left+75,b.top+25);
         }
       }}>
       <span className="operation-name"><Folder size={15} className="folder-icon"/><span>{op.titulo}</span></span>
