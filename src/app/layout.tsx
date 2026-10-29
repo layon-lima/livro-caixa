@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { GlobalWorkspaceActions } from "@/components/global-workspace-actions";
 
 export const metadata: Metadata = {
   title: "Livro Caixa Inteligente",
@@ -12,7 +13,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="pt-BR">
-      <body>{children}</body>
+      <body>{children}<GlobalWorkspaceActions/></body>
     </html>
   );
 }
