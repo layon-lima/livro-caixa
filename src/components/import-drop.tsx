@@ -58,9 +58,12 @@ export function ImportDrop({titularId,canApprove}:{titularId:string;canApprove:b
       router.refresh();
       const ids=[...new Set(all.filter(x=>(x.status==="importado"||x.status==="reprocessado"||x.status==="duplicado") && x.id).map(x=>x.id!))];
       const failed=all.filter(x=>x.status==="erro");
+      const approved=all.filter(x=>x.status==="ja_aprovado");
       if(!ids.length) {
         setPhase("concluido");
-        setError(failed.length?failed.map(x=>x.name+": "+(x.error||"Falha no envio")).join("; "):
+        setError(approved.length?
+          "Este documento já foi aprovado e não será reprocessado. Consulte o lançamento no seu livro.":
+          failed.length?failed.map(x=>x.name+": "+(x.error||"Falha no envio")).join("; "):
           "Os arquivos já estão cadastrados e não há uma conferência pendente para abrir.");
         return;
       }
@@ -126,7 +129,7 @@ export function ImportDrop({titularId,canApprove}:{titularId:string;canApprove:b
   const displayedFiles:UploadResult[]=results.length?results:files.map(f=>({name:f.name,status:"selecionado"}));
   const statusText:Record<string,string>={
     selecionado:"Preparando envio",importado:"Na fila de leitura",
-    duplicado:"Já cadastrado",reprocessado:"Nova leitura solicitada",aguardando:"Aguardando OCR",processando:"Lendo e identificando dados…",
+    duplicado:"Já cadastrado",ja_aprovado:"Já aprovado",reprocessado:"Nova leitura solicitada",aguardando:"Aguardando OCR",processando:"Lendo e identificando dados…",
     pronto:"Leitura concluída",erro:"Erro",
   };
   return <div className="uploader">
