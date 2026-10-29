@@ -14,7 +14,8 @@ export function parseOllamaOutput(raw, {text,categories,owners,maxPages=1}) {
   const entries=[];
   for(const o of list){
     if(!o||typeof o!=="object")continue;
-    const categoria=allowed.get(norm(o.categoria))||"";
+    const categoryCandidate=SHORT(o.categoria,160).replace(/\s+/g," ");
+    const categoria=allowed.get(norm(categoryCandidate))||categoryCandidate;
     const owner=validOwner.get(String(o.titular_id||""));
     // Não atribuir titular só porque a IA retornou um ID: precisa aparecer por extenso no arquivo.
     const titular_id=owner && evidence.includes(norm(owner.nome))?String(owner.id):"";
@@ -31,7 +32,8 @@ export function parseOllamaOutput(raw, {text,categories,owners,maxPages=1}) {
     const titular_sugerido=suggestedName.length>=6&&evidence.includes(norm(suggestedName))&&
       !owners.some(x=>norm(x.nome)===norm(suggestedName))?suggestedName:"";
     const cautions=(Array.isArray(o.avisos)?o.avisos:[]).slice(0,5).map(x=>SHORT(x,160));
-    if(o.categoria&&!categoria)cautions.push("Categoria sugerida pela IA não consta no cadastro.");
+    if(categoryCandidate&&!allowed.has(norm(categoryCandidate)))
+      cautions.push("Nova categoria sugerida pela IA; será cadastrada somente se aprovada.");
     if(o.titular_id&&!titular_id)cautions.push("Titular sugerido sem correspondência textual segura.");
     const conf=Number(o.confianca);
     entries.push({
@@ -80,7 +82,7 @@ export function partialOllamaFields(buffer,{categories,owners,text}){
     if(typeof value!=="string")continue;
     value=value.trim().slice(0,key==="descricao"?600:170);
     if(!value)continue;
-    if(key==="categoria"&&!categories.includes(value))continue;
+    if(key==="categoria"&&/^(OUTRAS? DESPESAS?|RECEITAS?)$/i.test(value))continue;
     if(key==="titular_id"){
       const owner=owners.find(x=>String(x.id)===value);
       if(!owner||!norm(text).includes(norm(owner.nome)))continue;
@@ -113,12 +115,17 @@ export async function analyzeWithOllama({text,filename,categories,owners,maxPage
     "Identifique tipo de documento: nota fiscal, boleto, comprovante, recibo, tributo, contrato ou outro.",
     "competencia deve ser AAAA-MM comprovado no texto (ou vazio); valor monetário principal sem R$, ou vazio; referência exata ou vazia.",
     "Tipo é receita, despesa ou outro. Não assuma despesa por ser comprovante; indique apenas se houver evidência.",
-    "Categoria deve ser exatamente uma da lista de categorias válidas; quando duvidar, deixe vazia.",
+    "Use uma categoria já cadastrada quando ela realmente corresponder ao gasto.",
+    "Se não houver categoria específica adequada, proponha uma NOVA categoria curta e objetiva no mesmo campo categoria, no formato Grupo > Subcategoria (ex.: Veículos > Pneus).",
+    "Nunca use Outras despesas como resposta genérica, nem classifique um gasto como Transferências só porque foi pago por Pix.",
+    "Para pagamentos sem itens descritos, use a atividade principal/CNAE confirmado do recebedor para sugerir o ramo de gasto mais provável; o usuário revisará.",
+    "Se o documento discriminar o que foi comprado, essa descrição prevalece sobre a atividade da empresa.",
+    "Reutilize exatamente a categoria já existente quando for equivalente à sugestão, para evitar categorias redundantes.",
     "Identifique titular_id somente se o nome completo de um titular permitido aparecer no documento no papel de pagador, proprietário, emitente, cliente ou destinatário.",
     "Se pagador, comprador ou proprietário do documento não existir entre titulares permitidos, retorne titular_novo_nome igual ao nome exato documentado; nunca aponte o recebedor apenas por ele ser recebedor.",
     "A contraparte deve ser a outra pessoa ou empresa da transação, não o titular.",
     "Em comprovante Pix: o recebedor é o Nome dentro de Dados de quem recebeu; o campo Instituição é do intermediário financeiro (Cielo, banco, fintech), nunca o recebedor.",
-    "Atividade econômica pública da empresa recebedora é apenas contexto, nunca prova de qual produto ou serviço foi pago.",
+    "Atividade pública da empresa recebedora auxilia a melhor hipótese, mas não deve substituir um item ou serviço explicitamente descrito no documento.",
     "Avisos é lista de dúvidas objetivas (máximo 5); confianca entre 0 e 1, sem exagerar.",
     "Se houver vários documentos distintos num mesmo PDF, retorne um item por documento com intervalo real de páginas.",
     "Não separe uma nota por produtos nem separe páginas de um mesmo documento.",
