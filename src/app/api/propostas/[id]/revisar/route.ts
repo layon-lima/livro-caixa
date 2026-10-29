@@ -96,6 +96,12 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
         );
         targetId=Number(created.rows[0].id);
       }
+      // Ao vincular comprovante a uma operação antiga sem data, preencher a
+      // efetivação comprovada; jamais sobrescrever uma data existente.
+      if(paymentDate)await connection.query(
+        "UPDATE operacoes SET data_pagamento=COALESCE(data_pagamento,$2) WHERE id=$1",
+        [targetId,paymentDate]
+      );
       await connection.query(
         "INSERT INTO operacao_arquivos(operacao_id,proposta_id,arquivo_id) VALUES($1,$2,$3)",
         [targetId,id,old.arquivo_id],

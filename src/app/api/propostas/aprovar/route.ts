@@ -60,6 +60,10 @@ export async function POST(request:Request){
         );
         operationId=Number(created.rows[0].id);
       }
+      if(p.data_pagamento)await cx.query(
+        "UPDATE operacoes SET data_pagamento=COALESCE(data_pagamento,$2) WHERE id=$1",
+        [operationId,p.data_pagamento]
+      );
       await cx.query("INSERT INTO operacao_arquivos(operacao_id,proposta_id,arquivo_id) VALUES($1,$2,$3)",[operationId,p.id,p.arquivo_id]);
       await cx.query("UPDATE propostas SET aprovado_por=$2,aprovado_em=now(),operacao_id=$3 WHERE id=$1",[p.id,user.id,operationId]);
       await cx.query(
