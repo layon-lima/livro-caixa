@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
-import { FileUp, LoaderCircle, Plus, X } from "lucide-react";
+import { useEffect,useRef,useState } from "react";
+import { usePathname,useRouter } from "next/navigation";
+import { ClipboardCheck, FileUp, LoaderCircle, Plus, X } from "lucide-react";
+
 type Book={id:string;nome:string};
 type Context={importBooks:Book[];editBooks:Book[];approveBooks:Book[]};
 type UploadResult={name:string;status:string;id?:string;error?:string;titular_nome?:string};
+type Pending={count:number;href:string};
 const accepted=new Set(["pdf","xml","png","jpg","jpeg"]);
 
 export function GlobalWorkspaceActions(){
@@ -13,48 +15,105 @@ export function GlobalWorkspaceActions(){
   const router=useRouter();
   const [context,setContext]=useState<Context|null>(null);
   const [dragging,setDragging]=useState(false);
-  const [files,setFiles]=useState<File[]>([]);
-  const [bookId,setBookId]=useState("");
-  const [busy,setBusy]=useState(false);
-  const [error,setError]=useState("");
-  const [existing,setExisting]=useState<{id:string;owner:string;name:string}|null>(null);
+  const [uploading,setUploading]=useState(false);
+  const [message,setMessage]=useState("");
+  const [existing,setExisting]=useState<{id:string;name:string;owner:string}|null>(null);
+  const [pending,setPending]=useState<Pending>({count:0,href:""});
+  const busy=useRef(false);
   const nested=useRef(0);
-  const requestSeq=useRef(0);
-  const submitted=useRef(0);
-  const [dropRequest,setDropRequest]=useState(0);
-  useEffect(()=>{
-    let alive=true;
-    setContext(null);
-    fetch("/api/workspace/context",{credentials:"same-origin",cache:"no-store"})
-      .then(r=>r.ok?r.json():null).then((data:Context|null)=>{
-        if(!alive)return;
-        setContext(data);
-      }).catch(()=>{if(alive)setContext(null);});
-    return ()=>{alive=false;};
-  },[pathname?.startsWith("/login")]);
-  const currentBook=pathname?.match(/^\/livros\/(\d+)(?:\/|$)/)?.[1];
-  useEffect(()=>{
-    if(!context?.importBooks.length)return;
-    const preferred=context.importBooks.find(x=>x.id===currentBook)?.id||
-      (context.importBooks.length===1?context.importBooks[0].id:"");
-    setBookId(preferred);
-  },[context,currentBook]);
 
   useEffect(()=>{
-    if(!context?.importBooks.length||busy||files.length>0)return;
-    const hasFiles=(e:globalThis.DragEvent)=>{
-      const dt=e.dataTransfer;
-      return Boolean(dt && Array.from(dt.types||[]).includes("Files"));
+    let alive=true;
+    fetch("/api/workspace/context",{credentials:"same-origin",cache:"no-store"})
+      .then(r=>r.ok?r.json():null)
+      .then((data:Context|null)=>{if(alive)setContext(data);})
+      .catch(()=>{if(alive)setContext(null);});
+    return ()=>{alive=false;};
+  },[pathname?.startsWith("/login")]);
+
+  useEffect(()=>{
+    if(!context?.approveBooks.length)return;
+    let alive=true;
+    const refresh=async()=>{
+      try{
+        const r=await fetch("/api/importar/pendentes",{cache:"no-store"});
+        if(!r.ok)return;
+        const data=await r.json() as Pending;
+        if(alive)setPending(data);
+      }catch{}
     };
+    void refresh();
+    const interval=setInterval(()=>void refresh(),10000);
+    return ()=>{alive=false;clearInterval(interval);};
+  },[context,pathname]);
+
+  async function upload(list:File[]){
+    if(busy.current||!context?.importBooks.length)return;
+    busy.current=true;setUploading(true);setMessage("");setExisting(null);
+    const results:UploadResult[]=[];
+    try{
+      if(list.length>100)throw Error("Envie até 100 arquivos por lote.");
+      for(let i=0;i<list.length;i+=20){
+        const form=new FormData();
+        for(const file of list.slice(i,i+20)){
+          const ext=file.name.split(".").pop()?.toLowerCase();
+          if(!ext||!accepted.has(ext))throw Error("Formato não suportado: "+file.name);
+          form.append("files",file);
+        }
+        // Sem titularId: o backend usa vínculo técnico até IA/OCR identificar.
+        const response=await fetch("/api/importar",{
+          method:"POST",body:form,credentials:"same-origin"
+        });
+        const body=await response.json().catch(()=>({error:"Resposta inválida do servidor."}));
+        if(!response.ok)throw Error(body.error||"Falha ao importar.");
+        results.push(...(body.results||[]));
+      }
+      const ids=[...new Set(results.filter(x=>x.id&&
+        ["importado","reprocessado","duplicado","outro_titular"].includes(x.status))
+        .map(x=>x.id!))];
+      const existingFile=results.find(x=>x.status==="outro_titular"&&x.id);
+      const approved=results.find(x=>["ja_aprovado","aprovado_outro_titular"].includes(x.status));
+      const restricted=results.some(x=>x.status==="duplicado_restrito");
+      if(!ids.length){
+        throw Error(approved?
+          "Este documento já foi aprovado"+(approved.titular_nome?" em "+approved.titular_nome:"")+
+            ". Não será lançado novamente.":
+          restricted?"Este documento pertence a um livro sem sua permissão de conferência.":
+          results.filter(x=>x.error).map(x=>x.name+": "+x.error).join("; ")||
+            "Este arquivo não pode ser aberto para conferência.");
+      }
+      const first=ids[0];
+      if(existingFile)setExisting({
+        id:existingFile.id!,name:existingFile.name,owner:existingFile.titular_nome||"outro livro"
+      });
+      setMessage("");
+      // Sem popup intermediário: chega diretamente ao formulário da IA.
+      if(context.approveBooks.length){
+        router.push("/conferencia?arquivos="+encodeURIComponent(ids.join(","))+
+          "&arquivo="+encodeURIComponent(first));
+      }else{
+        setMessage("Documentos recebidos. A conferência exige permissão de aprovação.");
+        router.push("/importar");
+      }
+    }catch(e){
+      setMessage(e instanceof Error?e.message:"Erro durante a importação.");
+    }finally{
+      busy.current=false;setUploading(false);
+    }
+  }
+
+  useEffect(()=>{
+    if(!context?.importBooks.length)return;
+    const hasFiles=(e:globalThis.DragEvent)=>
+      Boolean(e.dataTransfer&&Array.from(e.dataTransfer.types||[]).includes("Files"));
     const enter=(e:globalThis.DragEvent)=>{
       if(!hasFiles(e))return;
-      e.preventDefault();
-      nested.current++;
-      setDragging(true);
+      e.preventDefault();nested.current++;setDragging(true);
     };
     const over=(e:globalThis.DragEvent)=>{
       if(!hasFiles(e))return;
-      e.preventDefault();if(e.dataTransfer)e.dataTransfer.dropEffect="copy";
+      e.preventDefault();
+      if(e.dataTransfer)e.dataTransfer.dropEffect="copy";
       setDragging(true);
     };
     const leave=(e:globalThis.DragEvent)=>{
@@ -67,13 +126,8 @@ export function GlobalWorkspaceActions(){
       e.preventDefault();e.stopPropagation();
       nested.current=0;setDragging(false);
       const list=Array.from(e.dataTransfer?.files||[]);
-      if(!list.length)return;
-      setExisting(null);
-      setFiles(list.slice(0,100));
-      requestSeq.current+=1;setDropRequest(requestSeq.current);
-      setError(list.length>100?"Envie no máximo 100 arquivos por lote.":"");
+      if(list.length)void upload(list);
     };
-    // Captura no documento: funciona no explorador, tabelas, cabeçalhos e formulários.
     document.addEventListener("dragenter",enter,true);
     document.addEventListener("dragover",over,true);
     document.addEventListener("dragleave",leave,true);
@@ -84,127 +138,33 @@ export function GlobalWorkspaceActions(){
       document.removeEventListener("dragleave",leave,true);
       document.removeEventListener("drop",drop,true);
     };
-  },[context,busy,files.length]);
-
-  const close=()=>{if(!busy){setFiles([]);setExisting(null);setError("");}};
-  async function send(){
-    if(!bookId||!files.length||busy)return;
-    setBusy(true);setError("");setExisting(null);
-    const results:UploadResult[]=[];
-    try{
-      for(let i=0;i<files.length;i+=20){
-        const form=new FormData();
-        form.append("titularId",bookId);
-        for(const file of files.slice(i,i+20)){
-          const ext=file.name.split(".").pop()?.toLowerCase();
-          if(!ext||!accepted.has(ext))throw Error("Arquivo não suportado: "+file.name);
-          form.append("files",file);
-        }
-        const response=await fetch("/api/importar",{method:"POST",body:form,credentials:"same-origin"});
-        const body=await response.json().catch(()=>({error:"Resposta inválida do servidor."}));
-        if(!response.ok)throw Error(body.error||"Falha ao importar documentos.");
-        results.push(...(body.results||[]));
-      }
-      const failures=results.filter(x=>x.status==="erro");
-      const alreadyApproved=results.filter(x=>x.status==="ja_aprovado"||x.status==="aprovado_outro_titular");
-      const otherBook=results.find(x=>x.status==="outro_titular"&&x.id);
-      const restricted=results.some(x=>x.status==="duplicado_restrito");
-      const ids=[...new Set(results.filter(x=>x.id&&
-        ["importado","reprocessado","duplicado"].includes(x.status)).map(x=>x.id!))];
-      if(otherBook){
-        setExisting({id:otherBook.id!,owner:otherBook.titular_nome||"outro livro",name:otherBook.name});
-        setError(ids.length?
-          "Parte do lote foi importada; outro arquivo já pertence a um livro diferente. Abra a conferência existente ou envie os demais arquivos separadamente.":
-          "");
-        return;
-      }
-      if(!ids.length)throw Error(
-        alreadyApproved.length?
-          alreadyApproved[0].status==="aprovado_outro_titular"?
-            "Este PDF já foi aprovado em "+(alreadyApproved[0].titular_nome||"outro livro")+". Não será lançado novamente.":
-            "Este documento já foi aprovado e está no Livro Caixa. Para preservar a operação, ele não será analisado novamente.":
-        restricted?
-          "Este PDF já está cadastrado em um livro para o qual você não tem permissão de conferência. Consulte o administrador.":
-        failures.map(x=>x.name+": "+(x.error||"Erro")).join("; ")||
-          "Este arquivo já está cadastrado e não há uma conferência pendente para abrir."
-      );
-      setFiles([]);setError("");
-      // Quem só pode importar acompanha o processamento sem acessar dados
-      // de conferência para os quais não recebeu permissão.
-      const canApprove=context?.approveBooks.some(x=>x.id===bookId);
-      // Uma navegação única deixa o Next carregar o estado atualizado.
-      // Atualizar a rota antiga no mesmo instante pode interromper a transição
-      // para a conferência ao vivo (OCR/IA).
-      router.push(canApprove?"/conferencia?arquivos="+encodeURIComponent(ids.join(","))+
-        "&arquivo="+encodeURIComponent(ids[0]):
-        "/importar?titular="+encodeURIComponent(bookId));
-    }catch(e){
-      setError(e instanceof Error?e.message:"Falha ao importar.");
-    }finally{setBusy(false);}
-  }
-
-  // Se há titular permitido, o arquivo começa a ser enviado ao soltar,
-  // sem pedir clique em Iniciar leitura. O titular é provisório e pode ser revisto.
-  useEffect(()=>{
-    if(!dropRequest||submitted.current===dropRequest||!files.length||!bookId)return;
-    submitted.current=dropRequest;
-    void send();
-  },[dropRequest,files,bookId]);
+  },[context]);
 
   if(!context)return null;
-  const visibleFab=context.editBooks.length>0&&!(pathname||"").startsWith("/manual");
+  const currentBook=pathname?.match(/^\/livros\/(\d+)(?:\/|$)/)?.[1];
   const fabBook=context.editBooks.find(x=>x.id===currentBook)||
     (context.editBooks.length===1?context.editBooks[0]:null);
+  const manual=context.editBooks.length>0&&!(pathname||"").startsWith("/manual");
   return <>
-    {visibleFab&&<button type="button" className="global-manual-fab"
+    {manual&&<button type="button" className="global-manual-fab"
       title="Novo lançamento manual" aria-label="Novo lançamento manual"
       onClick={()=>router.push("/manual"+(fabBook?"?titular="+fabBook.id:""))}>
       <Plus size={24} strokeWidth={2.5}/>
     </button>}
+    {pending.count>0&&<button type="button" className="global-review-return"
+      onClick={()=>router.push(pending.href||"/conferencia")}>
+      <ClipboardCheck size={15}/> Conferências pendentes ({pending.count})
+    </button>}
     {dragging&&<div className="global-drag-highlight" aria-hidden="true">
-      <FileUp size={38}/><strong>Solte para importar</strong>
-      <span>A conferência abrirá automaticamente após o envio.</span>
+      <FileUp size={38}/><strong>Solte para analisar</strong>
+      <span>Importação automática, sem escolher titular antes da IA.</span>
     </div>}
-    {files.length>0&&<div className="global-upload-backdrop" role="presentation">
-      <section className="global-upload-dialog" role="dialog" aria-modal="true"
-        aria-label="Importar documentos">
-        <header>
-          <strong><FileUp size={17}/> Importar {files.length} arquivo(s)</strong>
-          <button onClick={close} disabled={busy} aria-label="Fechar"><X size={17}/></button>
-        </header>
-        {existing?<p>Este PDF já existe em <strong>{existing.owner}</strong>. Não vamos duplicar o documento nem mudar seu titular automaticamente. Você pode abrir a conferência existente.</p>:
-          <p>{!bookId&&context.importBooks.length>1?
-            "Escolha o titular provisório para iniciar o envio. A IA poderá sugerir outra pessoa durante a leitura.":
-            "O envio começa automaticamente. Depois, o OCR e a IA preencherão a conferência."}</p>}
-        <label>Titular provisório
-          <select disabled={busy} value={bookId} onChange={e=>setBookId(e.target.value)}>
-            <option value="">Selecione o titular</option>
-            {context.importBooks.map(b=><option key={b.id} value={b.id}>{b.nome}</option>)}
-          </select>
-        </label>
-        <div className="global-upload-names">
-          {files.map((f,i)=><div key={i}>{f.name}</div>)}
-        </div>
-        {existing&&<p className="muted" role="status">Localizado: {existing.name} • Titular: {existing.owner}</p>}
-        {error&&<p className="form-error" role="alert">{error}</p>}
-        <footer>
-          <button className="flat-button" onClick={close} disabled={busy}>Cancelar</button>
-          {existing&&<button className="primary-btn" onClick={()=>{
-            const id=existing.id;
-            setFiles([]);setExisting(null);setError("");
-            router.push("/conferencia?arquivos="+encodeURIComponent(id)+"&arquivo="+encodeURIComponent(id));
-          }}>
-            Abrir conferência existente
-          </button>}
-          {!existing&&<button className="primary-btn" onClick={()=>void send()} disabled={!bookId||busy}>
-            {busy&&<LoaderCircle size={15} className="spin"/>}
-            {busy?"Enviando…":bookId?"Tentar novamente":"Selecione um titular"}
-          </button>}
-          {existing&&<button type="button" className="flat-button" onClick={()=>{
-            setExisting(null);setError("");
-          }}>Escolher outro titular</button>}
-        </footer>
-      </section>
+    {(uploading||message)&&<div className="global-upload-toast" role="status">
+      {uploading?<LoaderCircle size={16} className="spin"/>:<FileUp size={16}/>}
+      <span>{uploading?"Enviando documento, abrindo conferência…":message}</span>
+      {!uploading&&<button type="button" aria-label="Fechar aviso" onClick={()=>setMessage("")}>
+        <X size={15}/>
+      </button>}
     </div>}
   </>;
 }
