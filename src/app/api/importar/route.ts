@@ -23,9 +23,23 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({error:"Sessão expirada."},{status:401});
   if (!sameOriginPost(request)) return NextResponse.json({error:"Origem inválida."},{status:403});
   const form = await request.formData();
-  const titularId = safeId(form.get("titularId"));
+  // O titular da importação é APENAS um vínculo técnico temporário, nunca
+  // a classificação final. O usuário não precisa selecioná-lo antes do OCR/IA.
+  let titularId=safeId(form.get("titularId"));
+  const automatico=!titularId;
+  if(automatico){
+    const choices=await getDatabase().query<{id:string}>(
+      user.isAdmin?
+        "SELECT id::text FROM titulares ORDER BY id LIMIT 1":
+        "SELECT t.id::text FROM titulares t JOIN user_titular_permissions p "+
+        "ON p.titular_id=t.id WHERE p.user_id=$1 AND p.can_import=TRUE "+
+        "ORDER BY p.can_approve DESC,t.id LIMIT 1",
+      user.isAdmin?[]:[user.id]
+    );
+    titularId=choices.rows[0]?Number(choices.rows[0].id):null;
+  }
   if (!titularId || !await canAccessTitular(user,titularId,"import")) {
-    return NextResponse.json({error:"Sem permissão de importação para este titular."},{status:403});
+    return NextResponse.json({error:"Sem permissão de importação. Contate o administrador."},{status:403});
   }
   const entries = form.getAll("files");
   if (!entries.length || entries.length > 20) {
