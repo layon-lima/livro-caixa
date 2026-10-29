@@ -2,6 +2,7 @@ import { currentUser, canAccessTitular } from "@/lib/auth";
 import { getDatabase } from "@/lib/database";
 import { safeId, competence } from "@/lib/document-data";
 import { backTo, forbidden, sameOriginPost } from "@/lib/request-security";
+import { confirmedCategoryId, suggestedCategory } from "@/lib/category-suggestions";
 
 export const runtime="nodejs";
 
@@ -17,7 +18,11 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
   const action=String(form.get("acao")||"salvar");
 
   const titular=safeId(form.get("titularId"));
-  const categoria=form.get("categoriaId")?safeId(form.get("categoriaId")):null;
+  const categoryMode=String(form.get("categoriaId")||"");
+  const proposed=categoryMode==="__new__";
+  const suggestion=proposed?suggestedCategory(
+    form.get("categoriaNovaNome"),form.get("categoriaNovaSubcategoria")):null;
+  let categoria=!proposed&&categoryMode?safeId(categoryMode):null;
   const date=competence(form.get("competencia"));
   const titulo=String(form.get("titulo")||"").trim().slice(0,170);
   const tipo=String(form.get("tipo")||"outro");
@@ -31,6 +36,7 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
   const operationId=safeId(form.get("operacaoId"));
 
   if(!["salvar","aprovar"].includes(action)||!titular||!date||!titulo||
+    (proposed&&!suggestion)||(categoryMode&&!proposed&&!categoria)||
     !["receita","despesa","outro"].includes(tipo)||
     (valor!==null&&(!Number.isFinite(valor)||valor<0||valor>1e14))||
     !await canAccessTitular(user,titular,"approve"))return error("dados");
@@ -56,6 +62,10 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
       const cat=await connection.query("SELECT 1 FROM categorias WHERE id=$1",[categoria]);
       if(!cat.rowCount){await connection.query("ROLLBACK");return error("categoria");}
     }
+    // Salvar só armazena a proposta; a nova categoria nasce no banco APENAS
+    // quando o documento é aprovado. Reutiliza equivalentes já cadastradas.
+    if(action==="aprovar"&&suggestion)
+      categoria=await confirmedCategoryId(connection,suggestion);
     if(operationId){
       const match=await connection.query(
         "SELECT 1 FROM operacoes WHERE id=$1 AND titular_id=$2 AND excluido_em IS NULL FOR UPDATE",
@@ -67,8 +77,10 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
     await connection.query(
       "UPDATE propostas SET titular_id=$2,titulo=$3,documento_tipo=$4,contraparte=$5,competencia=$6,"+
       "competencia_estimada=FALSE,categoria_id=$7,tipo=$8,descricao=$9,valor=$10,referencia=$11,"+
-      "operacao_sugerida_id=$12,revisada_por=$13,revisada_em=now() WHERE id=$1",
-      [id,titular,titulo,documentoTipo,contraparte,date,categoria,tipo,descricao,valor,referencia,operationId,user.id],
+      "operacao_sugerida_id=$12,revisada_por=$13,revisada_em=now(),"+
+      "categoria_sugerida_nome=$14,categoria_sugerida_subcategoria=$15 WHERE id=$1",
+      [id,titular,titulo,documentoTipo,contraparte,date,categoria,tipo,descricao,valor,referencia,
+        operationId,user.id,suggestion?.nome||"",suggestion?.subcategoria||""],
     );
 
     if(action==="aprovar"){
