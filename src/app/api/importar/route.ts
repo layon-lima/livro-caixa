@@ -33,7 +33,7 @@ export async function POST(request: Request) {
   }
 
   const db = getDatabase();
-  const results: {name:string;status:string;id?:string;error?:string}[] = [];
+  const results: {name:string;status:string;id?:string;error?:string;titular_nome?:string}[] = [];
   for (const entry of entries) {
     if (!(entry instanceof File)) continue;
     const name = entry.name.slice(0,255);
@@ -88,6 +88,32 @@ export async function POST(request: Request) {
               results.push({name,status:"reprocessado",id:original.id});
               continue;
             }
+          }
+          // Mesmo PDF já cadastrado em OUTRO livro: nunca abrir uma proposta
+          // usando o titular errado nem revelar dados de livros não autorizados.
+          // Se o usuário puder conferir o livro de origem, oferecer a conferência
+          // existente sem duplicar o lançamento ou mudar a titularidade.
+          if(original.titular_envio_id!==String(titularId)){
+            const allowed=await canAccessTitular(user,Number(original.titular_envio_id),"approve");
+            if(!allowed){
+              await connection.query("COMMIT");
+              results.push({name,status:"duplicado_restrito"});
+              continue;
+            }
+            const owner=await connection.query<{nome:string;ja_aprovado:boolean}>(
+              "SELECT t.nome, EXISTS(SELECT 1 FROM propostas p WHERE p.arquivo_id=$1 "+
+              "AND p.aprovado_em IS NOT NULL) AS ja_aprovado "+
+              "FROM titulares t WHERE t.id=$2",
+              [original.id,original.titular_envio_id]
+            );
+            await connection.query("COMMIT");
+            const titular_nome=owner.rows[0]?.nome||"Outro titular";
+            if(owner.rows[0]?.ja_aprovado){
+              results.push({name,status:"aprovado_outro_titular",titular_nome});
+            }else{
+              results.push({name,status:"outro_titular",id:original.id,titular_nome});
+            }
+            continue;
           }
           // Documento já aprovado: não reprocessar nem abrir conferência vazia.
           const belongs=original.titular_envio_id===String(titularId);
