@@ -226,7 +226,7 @@ async function processFile(file){
     }
     // Pix com beneficiário + CNPJ + valor + data + identificador confiáveis não
     // precisa aguardar inferência pesada. A categoria é apenas uma sugestão.
-    const rapidPix=Boolean(protectedPixReceiver&&companyInfo&&companyCategory&&
+    const rapidPix=Boolean(protectedPixReceiver&&companyInfo&&companyCategory&&matchingOwner&&
       first.tipo==="despesa"&&first.valor&&first.competencia&&first.referencia&&
       /^E[A-Za-z0-9]{20,}$/.test(first.referencia)&&!dateInitial.estimated&&
       items.length===1);
