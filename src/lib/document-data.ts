@@ -18,7 +18,7 @@ export type Proposta = {
   pagina_inicial: number | null; pagina_final: number | null;
   metodo_leitura: "local"|"ia"|"xml"; confianca: string|null; avisos: string[];
   titular_sugerido: string;
-  consulta_empresa: {cnpj?:string;razao_social?:string;nome_fantasia?:string;atividade?:string;codigo_cnae?:string;fonte?:string};
+  consulta_empresa: {cnpj?:string;status?:string;razao_social?:string;nome_fantasia?:string;atividade?:string;codigo_cnae?:string;fonte?:string};
   revisada_em: string | null; operacao_sugerida_id: string | null; aprovado_em: string | null; duplicada_de: string | null;
 };
 export function safeId(input: unknown): number | null {

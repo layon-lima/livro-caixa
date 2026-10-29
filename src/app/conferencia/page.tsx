@@ -100,7 +100,8 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
             <a href={"/api/documentos/"+selected.arquivo_id} target="_blank" rel="noreferrer">Abrir original <ExternalLink size={13}/></a></div>
           <div className="review-analysis-status">
             <strong>{selected.metodo_leitura==="ia"?"Analisado por inteligência artificial":
-              selected.metodo_leitura==="xml"?"Dados estruturados do XML":"Leitura automática local (OCR + regras)"}</strong>
+              selected.metodo_leitura==="xml"?"Dados estruturados do XML":
+              selected.consulta_empresa?.status==="confirmado"?"Conferência rápida: OCR validado + consulta de CNPJ":"Leitura automática local (OCR + regras)"}</strong>
             {selected.confianca&&<span>Indicador aproximado de extração: {Math.round(Number(selected.confianca)*100)}%</span>}
             {selected.pagina_inicial&&<span>Páginas: {selected.pagina_inicial}{selected.pagina_final&&selected.pagina_final!==selected.pagina_inicial?"–"+selected.pagina_final:""}</span>}
           </div>
@@ -134,11 +135,15 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
               {selected.contraparte&&<div className="enrichment-line">
                 <strong>Pesquisa do recebedor / fornecedor</strong>
                 {selected.consulta_empresa?.cnpj?<>
+                  {selected.consulta_empresa.status==="confirmado"?<small>Consulta CNPJ confirmada</small>:
+                    <small>{selected.consulta_empresa.status==="indisponivel"?"BrasilAPI não respondeu à consulta":
+                      selected.consulta_empresa.status==="divergente"?"CNPJ não correspondeu ao recebedor":
+                      "Consulta CNPJ pendente"}</small>}
                   <span>{selected.consulta_empresa.razao_social||selected.contraparte}
                     {selected.consulta_empresa.nome_fantasia?" ("+selected.consulta_empresa.nome_fantasia+")":""}</span>
                   <small>CNPJ: {selected.consulta_empresa.cnpj}</small>
                   {selected.consulta_empresa.atividade&&<small>Atividade pública (CNAE): {selected.consulta_empresa.atividade}</small>}
-                  <small>Fonte: BrasilAPI. A atividade não comprova o tipo do gasto.</small>
+                  {selected.consulta_empresa.status==="confirmado"&&<small>Fonte: BrasilAPI. A atividade não comprova o tipo do gasto.</small>}
                 </>:<small>Não foi possível confirmar o recebedor por CNPJ; nenhuma informação externa foi utilizada na classificação.</small>}
                 <a href={"https://www.google.com/search?q="+encodeURIComponent(selected.contraparte)}
                   target="_blank" rel="noopener noreferrer" className="flat-button">

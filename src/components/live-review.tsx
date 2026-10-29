@@ -8,7 +8,7 @@ type LiveFields={
   titulo?:string;documento_tipo?:string;titular_id?:string;categoria?:string;
   competencia?:string;tipo?:string;valor?:string;contraparte?:string;
   referencia?:string;descricao?:string;titular_sugerido?:string;
-  consulta_empresa?:{cnpj?:string;razao_social?:string;nome_fantasia?:string;atividade?:string;fonte?:string};
+  consulta_empresa?:{cnpj?:string;status?:string;razao_social?:string;nome_fantasia?:string;atividade?:string;fonte?:string};
 };
 type FileState={
   id:string;nome_original:string;status:string;erro:string|null;
@@ -103,11 +103,15 @@ export function LiveReview({arquivoId,nome,titularPadrao,books,cats,isAdmin}:{
         {isAdmin&&<a href={"/admin?sugerir_titular="+encodeURIComponent(fields.titular_sugerido)} className="flat-button">Conferir e cadastrar</a>}
       </div>}
       {fields.consulta_empresa&&<div className="enrichment-line">
-        <strong>Dados públicos do recebedor</strong>
+        <strong>Consulta pública do recebedor</strong>
+        <small>{fields.consulta_empresa.status==="confirmado"?"Consulta confirmada":
+          fields.consulta_empresa.status==="indisponivel"?"BrasilAPI indisponível":
+          fields.consulta_empresa.status==="divergente"?"Divergência de CNPJ e recebedor":
+          "Consultando CNPJ..."}</small>
         <span>{fields.consulta_empresa.razao_social||fields.contraparte}</span>
         <small>CNPJ: {fields.consulta_empresa.cnpj}</small>
         {fields.consulta_empresa.atividade&&<small>CNAE: {fields.consulta_empresa.atividade}</small>}
-        <small>Fonte: BrasilAPI. Atividade não é comprovação do tipo de despesa.</small>
+        {fields.consulta_empresa.status==="confirmado"&&<small>Fonte: BrasilAPI. Atividade não comprova o tipo da despesa.</small>}
       </div>}
       {fields.contraparte&&<div className="enrichment-line">
         <a href={"https://www.google.com/search?q="+encodeURIComponent(fields.contraparte)}

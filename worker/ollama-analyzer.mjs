@@ -103,7 +103,7 @@ export async function analyzeWithOllama({text,filename,categories,owners,maxPage
   const base=process.env.OLLAMA_URL;
   if(!base)return null;
   const model=process.env.OLLAMA_MODEL||"qwen3-vl:2b-instruct";
-  const shortText=String(text||"").slice(0,6500);
+  const shortText=String(text||"").slice(0,maxPages<=2?4600:6500);
   if(shortText.trim().length<25)return null;
   const system=[
     "Você é extrator de dados para organização documental rural brasileira.",
@@ -117,6 +117,7 @@ export async function analyzeWithOllama({text,filename,categories,owners,maxPage
     "Identifique titular_id somente se o nome completo de um titular permitido aparecer no documento no papel de pagador, proprietário, emitente, cliente ou destinatário.",
     "Se pagador, comprador ou proprietário do documento não existir entre titulares permitidos, retorne titular_novo_nome igual ao nome exato documentado; nunca aponte o recebedor apenas por ele ser recebedor.",
     "A contraparte deve ser a outra pessoa ou empresa da transação, não o titular.",
+    "Em comprovante Pix: o recebedor é o Nome dentro de Dados de quem recebeu; o campo Instituição é do intermediário financeiro (Cielo, banco, fintech), nunca o recebedor.",
     "Atividade econômica pública da empresa recebedora é apenas contexto, nunca prova de qual produto ou serviço foi pago.",
     "Avisos é lista de dúvidas objetivas (máximo 5); confianca entre 0 e 1, sem exagerar.",
     "Se houver vários documentos distintos num mesmo PDF, retorne um item por documento com intervalo real de páginas.",
@@ -140,7 +141,8 @@ export async function analyzeWithOllama({text,filename,categories,owners,maxPage
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({model,messages:[{role:"system",content:system},{role:"user",content:prompt}],
       format:"json",stream:true,keep_alive:0,
-      options:{temperature:0,num_ctx:4096,num_predict:1100}}),
+      options:{temperature:0,num_ctx:maxPages<=2?3072:4096,
+        num_predict:maxPages<=2?700:1100,num_thread:2}}),
     signal:AbortSignal.timeout(210000)
   });
   if(!response.ok)throw Error("IA Central indisponível: HTTP "+response.status);
