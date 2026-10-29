@@ -17,7 +17,6 @@ export function GlobalWorkspaceActions(){
   const [dragging,setDragging]=useState(false);
   const [uploading,setUploading]=useState(false);
   const [message,setMessage]=useState("");
-  const [existing,setExisting]=useState<{id:string;name:string;owner:string}|null>(null);
   const [pending,setPending]=useState<Pending>({count:0,href:""});
   const busy=useRef(false);
   const nested=useRef(0);
@@ -49,7 +48,7 @@ export function GlobalWorkspaceActions(){
 
   async function upload(list:File[]){
     if(busy.current||!context?.importBooks.length)return;
-    busy.current=true;setUploading(true);setMessage("");setExisting(null);
+    busy.current=true;setUploading(true);setMessage("");
     const results:UploadResult[]=[];
     try{
       if(list.length>100)throw Error("Envie até 100 arquivos por lote.");
@@ -71,7 +70,6 @@ export function GlobalWorkspaceActions(){
       const ids=[...new Set(results.filter(x=>x.id&&
         ["importado","reprocessado","duplicado","outro_titular"].includes(x.status))
         .map(x=>x.id!))];
-      const existingFile=results.find(x=>x.status==="outro_titular"&&x.id);
       const approved=results.find(x=>["ja_aprovado","aprovado_outro_titular"].includes(x.status));
       const restricted=results.some(x=>x.status==="duplicado_restrito");
       if(!ids.length){
@@ -83,9 +81,6 @@ export function GlobalWorkspaceActions(){
             "Este arquivo não pode ser aberto para conferência.");
       }
       const first=ids[0];
-      if(existingFile)setExisting({
-        id:existingFile.id!,name:existingFile.name,owner:existingFile.titular_nome||"outro livro"
-      });
       setMessage("");
       // Sem popup intermediário: chega diretamente ao formulário da IA.
       if(context.approveBooks.length){
