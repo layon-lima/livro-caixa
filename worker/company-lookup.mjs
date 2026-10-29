@@ -12,11 +12,23 @@ export function validCnpj(v){
   const second=mod(s.slice(0,13),[6,5,4,3,2,9,8,7,6,5,4,3,2]);
   return first===Number(s[12])&&second===Number(s[13]);
 }
+// Em comprovantes bancários, "Instituição" é o processador, NÃO o recebedor.
+// Retorna apenas o nome da seção explícita de quem recebeu.
+export function confirmedPixReceiver(text){
+  const t=String(text||"").slice(0,65000);
+  if(!/comprovante\s+de\s+(?:pagamento|transfer[êe]ncia)\s+pix/i.test(t))return "";
+  const block=t.match(/Dados\s+de\s+quem\s+recebeu([\s\S]*?)(?=Dados\s+(?:do\s+pagamento|da\s+transa[cç][aã]o|de\s+quem\s+(?:pagou|fez|enviou))|Autentica[cç][aã]o|$)/i)?.[1]||"";
+  const name=block.match(/(?:^|\n)\s*Nome\s*:\s*([^\r\n]+)/i)?.[1]||"";
+  const result=tidy(name,150);
+  if(result.length<3||/^(institui[cç][aã]o|cielo|cpf|cnpj|banco)\s*:/i.test(result))return "";
+  return result;
+}
+
 export function receiverCnpj(text,party,docKind){
   const t=String(text||"").slice(0,65000);
   const sections=[];
   // Pix: extrai da seção de quem recebeu, nunca da seção de quem fez a transação.
-  const pix=t.match(/Dados de quem recebeu([\s\S]*?)(?=Dados da transa[cç][aã]o|Dados de quem fez|Dados de quem pagou|Autentica[cç][aã]o|$)/i);
+  const pix=t.match(/Dados de quem recebeu([\s\S]*?)(?=Dados (?:do pagamento|da transa[cç][aã]o)|Dados de quem fez|Dados de quem pagou|Autentica[cç][aã]o|$)/i);
   if(pix)sections.push(pix[1]);
   // Boleto e nota: tenta região da contraparte já identificada.
   const p=normalize(party);
@@ -47,7 +59,7 @@ export function candidateNewOwner(text,docKind,registeredNames){
   const t=String(text||"").slice(0,65000);
   let name="";
   if(/comprovante|pix|boleto/i.test(docKind||"")){
-    const m=t.match(/Dados de quem fez a transa[cç][aã]o([\s\S]*?)(?=Autentica[cç][aã]o|Esta transa[cç][aã]o|$)/i);
+    const m=t.match(/Dados de quem (?:fez a transa[cç][aã]o|pagou)([\s\S]*?)(?=Autentica[cç][aã]o|Esta transa[cç][aã]o|$)/i);
     name=m?.[1]?.match(/(?:^|\n)\s*Nome\s*:\s*([^\r\n]+)/i)?.[1]||"";
     if(!name)name=t.match(/(?:^|\n)\s*(?:Nome do pagador|Pagador|Quem pagou)\s*:\s*([^\r\n]+)/i)?.[1]||"";
   }else if(/nota fiscal/i.test(docKind||"")){
@@ -64,7 +76,7 @@ export async function lookupPublicCnpj(cnpj){
   if(!validCnpj(cnpj))return null;
   // Host fixo, somente CNPJ validado; nenhum nome, texto OCR ou documento é enviado.
   const url="https://brasilapi.com.br/api/cnpj/v1/"+cnpj;
-  const response=await fetch(url,{headers:{Accept:"application/json"},signal:AbortSignal.timeout(7500)});
+  const response=await fetch(url,{headers:{Accept:"application/json"},signal:AbortSignal.timeout(4000)});
   if(!response.ok)throw Error("Consulta pública indisponível (HTTP "+response.status+")");
   const data=await response.json();
   if(formatDigits(data.cnpj)!==cnpj)throw Error("CNPJ retornado não corresponde ao consultado.");
