@@ -2,6 +2,7 @@ import { currentUser, canAccessTitular } from "@/lib/auth";
 import { getDatabase } from "@/lib/database";
 import { safeId } from "@/lib/document-data";
 import { backTo, forbidden, sameOriginPost } from "@/lib/request-security";
+import { confirmedCategoryId, suggestedCategory } from "@/lib/category-suggestions";
 export const runtime="nodejs";
 
 export async function POST(request:Request){
@@ -21,10 +22,12 @@ export async function POST(request:Request){
       competencia:string;categoria_id:string|null;tipo:string;descricao:string;contraparte:string;
       valor:string|null;referencia:string;operacao_sugerida_id:string|null;revisada_em:string|null;
       aprovado_em:string|null;status:string;duplicada_de:string|null;
+      categoria_sugerida_nome:string;categoria_sugerida_subcategoria:string;
     }>(
       "SELECT p.id::text,p.arquivo_id::text,p.titular_id::text,p.titulo,p.documento_tipo,p.competencia::text,"+
       "p.categoria_id::text,p.tipo,p.descricao,p.contraparte,p.valor::text,p.referencia,p.operacao_sugerida_id::text,"+
-      "p.revisada_em::text,p.aprovado_em::text,p.duplicada_de::text,a.status "+
+      "p.revisada_em::text,p.aprovado_em::text,p.duplicada_de::text,"+
+      "p.categoria_sugerida_nome,p.categoria_sugerida_subcategoria,a.status "+
       "FROM propostas p JOIN arquivos a ON a.id=p.arquivo_id WHERE p.id=ANY($1::bigint[]) FOR UPDATE OF p",
       [ids],
     );
@@ -36,6 +39,13 @@ export async function POST(request:Request){
       }
     }
     for(const p of found.rows){
+      let categoryId=p.categoria_id?Number(p.categoria_id):null;
+      if(!categoryId&&p.categoria_sugerida_nome){
+        const suggestion=suggestedCategory(p.categoria_sugerida_nome,p.categoria_sugerida_subcategoria);
+        if(!suggestion){await cx.query("ROLLBACK");return backTo("/conferencia?erro=categoria"+batch);}
+        categoryId=await confirmedCategoryId(cx,suggestion);
+        await cx.query("UPDATE propostas SET categoria_id=$2 WHERE id=$1",[p.id,categoryId]);
+      }
       let operationId=p.operacao_sugerida_id?Number(p.operacao_sugerida_id):null;
       if(operationId){
         const match=await cx.query(
@@ -46,7 +56,7 @@ export async function POST(request:Request){
         const created=await cx.query<{id:string}>(
           "INSERT INTO operacoes(titular_id,titulo,competencia,categoria_id,tipo,descricao,contraparte,valor,referencia,criado_por)"+
           " VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id::text",
-          [p.titular_id,p.titulo,p.competencia,p.categoria_id,p.tipo,p.descricao,p.contraparte,p.valor,p.referencia,user.id],
+          [p.titular_id,p.titulo,p.competencia,categoryId,p.tipo,p.descricao,p.contraparte,p.valor,p.referencia,user.id],
         );
         operationId=Number(created.rows[0].id);
       }
