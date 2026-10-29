@@ -5,6 +5,7 @@ import { getDatabase } from "@/lib/database";
 import { physicalStorageBytes, STORAGE_LIMIT_BYTES } from "@/lib/storage-actions";
 import { ImportDrop } from "@/components/import-drop";
 import { ImportStatusRefresh } from "@/components/import-status-refresh";
+import { ImportedFileRows } from "@/components/imported-file-rows";
 import { FileUp, ArrowLeft, ClipboardCheck } from "lucide-react";
 export const dynamic="force-dynamic";
 
@@ -59,21 +60,7 @@ export default async function Importar({searchParams}:{searchParams:Promise<{tit
         :<p className="form-error">Este usuário não possui permissão de importação.</p>}
       <div className="page-title-compact"><h2>Arquivos recebidos</h2><span>Processamento automático na VPS</span></div>
       <ImportStatusRefresh active={list.rows.some(a=>a.status==="aguardando"||a.status==="processando")}/>
-      <div className="table-scroll">
-        <table className="admin-table dense-table">
-          <thead><tr><th>Arquivo</th><th>Titular</th><th>Situação</th><th>Recebido em</th></tr></thead>
-          <tbody>{list.rows.map(a=><tr key={a.id}>
-            <td>{a.nome_original}</td><td>{a.nome}</td><td>
-              {a.status==="erro"?<span title={a.erro||""}>Erro — {a.erro?.slice(0,100)}</span>:a.status}
-              {(a.status==="erro" || (a.status==="pronto" && !a.revisado)) && <form className="inline-retry" action="/api/importar/reprocessar" method="post">
-                <input type="hidden" name="arquivoId" value={a.id}/>
-                <button type="submit" className="flat-button">Reprocessar</button>
-              </form>}
-            </td>
-            <td>{new Date(a.criado_em).toLocaleString("pt-BR")}</td>
-          </tr>)}</tbody>
-        </table>
-      </div>
+      <ImportedFileRows files={list.rows}/>
       <p className="muted">Depois que o OCR terminar, a conferência do lote abre automaticamente para quem tem permissão de aprovar. Arquivos não conferidos podem ser reprocessados sem novo envio.</p>
     </main>
   </div>;
