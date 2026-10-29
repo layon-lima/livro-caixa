@@ -3,6 +3,7 @@ import { getDatabase } from "@/lib/database";
 import { safeId, competence } from "@/lib/document-data";
 import { backTo, forbidden, sameOriginPost } from "@/lib/request-security";
 import { confirmedCategoryId, suggestedCategory } from "@/lib/category-suggestions";
+import { parsePaymentDate } from "@/lib/payment-date";
 
 export const runtime="nodejs";
 
@@ -24,6 +25,7 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
     form.get("categoriaNovaNome"),form.get("categoriaNovaSubcategoria")):null;
   let categoria=!proposed&&categoryMode?safeId(categoryMode):null;
   const date=competence(form.get("competencia"));
+  const paymentDate=parsePaymentDate(form.get("dataPagamento"));
   const titulo=String(form.get("titulo")||"").trim().slice(0,170);
   const tipo=String(form.get("tipo")||"outro");
   const documentoTipo=String(form.get("documentoTipo")||"outro").trim().slice(0,70);
@@ -35,7 +37,7 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
   const valor=numberString===""?null:Number(numberString);
   const operationId=safeId(form.get("operacaoId"));
 
-  if(!["salvar","aprovar"].includes(action)||!titular||!date||!titulo||
+  if(!["salvar","aprovar"].includes(action)||!titular||!date||!titulo||paymentDate===undefined||
     (proposed&&!suggestion)||(categoryMode&&!proposed&&!categoria)||
     !["receita","despesa","outro"].includes(tipo)||
     (valor!==null&&(!Number.isFinite(valor)||valor<0||valor>1e14))||
@@ -78,9 +80,9 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
       "UPDATE propostas SET titular_id=$2,titulo=$3,documento_tipo=$4,contraparte=$5,competencia=$6,"+
       "competencia_estimada=FALSE,categoria_id=$7,tipo=$8,descricao=$9,valor=$10,referencia=$11,"+
       "operacao_sugerida_id=$12,revisada_por=$13,revisada_em=now(),"+
-      "categoria_sugerida_nome=$14,categoria_sugerida_subcategoria=$15 WHERE id=$1",
+      "categoria_sugerida_nome=$14,categoria_sugerida_subcategoria=$15,data_pagamento=$16 WHERE id=$1",
       [id,titular,titulo,documentoTipo,contraparte,date,categoria,tipo,descricao,valor,referencia,
-        operationId,user.id,suggestion?.nome||"",suggestion?.subcategoria||""],
+        operationId,user.id,suggestion?.nome||"",suggestion?.subcategoria||"",paymentDate],
     );
 
     if(action==="aprovar"){
@@ -88,9 +90,9 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
       let targetId=operationId;
       if(!targetId) {
         const created=await connection.query<{id:string}>(
-          "INSERT INTO operacoes(titular_id,titulo,competencia,categoria_id,tipo,descricao,contraparte,valor,referencia,criado_por) "+
-          "VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id::text",
-          [titular,titulo,date,categoria,tipo,descricao,contraparte,valor,referencia,user.id],
+          "INSERT INTO operacoes(titular_id,titulo,competencia,categoria_id,tipo,descricao,contraparte,valor,referencia,criado_por,data_pagamento) "+
+          "VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id::text",
+          [titular,titulo,date,categoria,tipo,descricao,contraparte,valor,referencia,user.id,paymentDate],
         );
         targetId=Number(created.rows[0].id);
       }
