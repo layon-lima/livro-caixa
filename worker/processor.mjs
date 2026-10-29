@@ -3,6 +3,7 @@ import { parseLocalDocument } from "./local-parser.mjs";
 import { analyzeWithOllama } from "./ollama-analyzer.mjs";
 import { candidateNewOwner, receiverCnpj, lookupPublicCnpj, confirmedPixReceiver, suggestCategoryFromCompany } from "./company-lookup.mjs";
 import { XMLParser } from "fast-xml-parser";
+import { bestCategory } from "./category-suggestions.mjs";
 import { mkdtemp, writeFile, rm, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
@@ -148,6 +149,9 @@ async function processFile(file){
     if(!items.length)throw Error("Não foi possível identificar documentos no arquivo.");
     // Primeira etapa: OCR detecta campos e possíveis titulares ainda não cadastrados.
     const first=items[0];
+    // Categorias genéricas do OCR não devem impedir sugestões específicas da IA/CNPJ.
+    if(["OUTRAS DESPESAS","OUTRA DESPESA"].includes(normalizeName(first.categoria)))
+      first.categoria="";
     const protectedPixReceiver=items.length===1?confirmedPixReceiver(output.text):"";
     // Dados estruturados do comprovante têm prioridade sobre interpretações do modelo.
     if(protectedPixReceiver&&normalizeName(first.contraparte)!==normalizeName(protectedPixReceiver)){
@@ -211,7 +215,7 @@ async function processFile(file){
     // Categoria por atividade pública é um palpite, já preenchido para o usuário
     // ajustar se necessário. Não exige uma confirmação separada da aprovação comum.
     const companyCategory=companyInfo?suggestCategoryFromCompany(companyInfo,cats):"";
-    if(companyCategory&&!first.categoria){
+    if(companyCategory&&(!first.categoria||normalizeName(first.categoria)==="OUTRAS DESPESAS")){
       first.categoria=companyCategory;
       await db.query("UPDATE arquivos SET progresso_dados=progresso_dados || $2::jsonb,atualizado_em=now() WHERE id=$1",
         [file.id,JSON.stringify({categoria:companyCategory})]);
@@ -251,7 +255,8 @@ async function processFile(file){
         if(fromOllama?.length){
           items=fromOllama;method="ia";
           // Se a IA não encontrou categoria, aproveita o palpite público já disponível.
-          if(items.length===1&&!items[0].categoria&&companyCategory)
+          if(items.length===1&&(!items[0].categoria||
+            ["OUTRAS DESPESAS","OUTRA DESPESA"].includes(normalizeName(items[0].categoria)))&&companyCategory)
             items[0].categoria=companyCategory;
           if(protectedPixReceiver&&items.length===1&&
              normalizeName(items[0].contraparte)!==normalizeName(protectedPixReceiver)){
@@ -299,9 +304,11 @@ async function processFile(file){
         const ownerId=Number(owner.id);
         const date=competence(item.competencia);
         if(date.estimated)notice.push("Competência estimada; confirme mês e ano.");
-        const categoryName=normalizeName(item.categoria);
-        const cat=cats.find(c=>normalizeName(c.nome+(c.subcategoria?" > "+c.subcategoria:""))===categoryName);
-        if(!cat)notice.push("Categoria não determinada; selecione uma na conferência.");
+        const foundCategory=bestCategory(item.categoria,cats);
+        const cat=foundCategory.existing;
+        let categorySuggestion=foundCategory.suggested;
+        if(!cat&&!categorySuggestion)notice.push("Categoria não identificada; confira a classificação.");
+        if(categorySuggestion)notice.push("Nova categoria sugerida; ao aprovar, será cadastrada para os próximos lançamentos.");
         const xmlIncoming=method==="xml"&&buyer&&String(buyer.id)===String(owner.id)&&!seller;
         const xmlOutgoing=method==="xml"&&seller&&String(seller.id)===String(owner.id)&&!buyer;
         if(method==="xml"&&!xmlIncoming&&!xmlOutgoing)notice.push("Confira se a nota representa compra ou venda.");
@@ -325,7 +332,8 @@ async function processFile(file){
             xmlOutgoing?"Receitas":"";
           category=cats.find(c=>normalizeName(c.nome+(c.subcategoria?" > "+c.subcategoria:""))===normalizeName(guess));
           if(category) {
-            const i=notice.indexOf("Categoria não determinada; selecione uma na conferência.");
+            categorySuggestion=null;
+            const i=notice.indexOf("Categoria não identificada; confira a classificação.");
             if(i>=0)notice.splice(i,1);
           }
         }
@@ -359,8 +367,9 @@ async function processFile(file){
         await connection.query(
           "INSERT INTO propostas (arquivo_id,titular_id,titulo,documento_tipo,contraparte,competencia,"+
           "competencia_estimada,categoria_id,tipo,descricao,valor,referencia,pagina_inicial,pagina_final,"+
-          "operacao_sugerida_id,duplicada_de,metodo_leitura,confianca,avisos,titular_sugerido,consulta_empresa) "+
-          "VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)",
+          "operacao_sugerida_id,duplicada_de,metodo_leitura,confianca,avisos,titular_sugerido,consulta_empresa,"+
+          "categoria_sugerida_nome,categoria_sugerida_subcategoria) "+
+          "VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)",
           [file.id,ownerId,title,docType,party,date.date,date.estimated,category?.id||null,
             ["receita","despesa","outro"].includes(type)?type:"outro",
             desc,value,reference,
@@ -368,7 +377,8 @@ async function processFile(file){
             Number.isInteger(end)&&end>=start?end:null,
             chosen,duplicates?.rows[0]?.id||null,method,confidence,
             [...new Set([...notice,...extraWarnings])].slice(0,12),
-            cleanSuggested,JSON.stringify(companyRecord)]
+            cleanSuggested,JSON.stringify(companyRecord),
+            categorySuggestion?.nome||"",categorySuggestion?.subcategoria||""]
         );
       }
       await connection.query(
