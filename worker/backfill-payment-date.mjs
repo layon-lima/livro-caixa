@@ -9,7 +9,7 @@ const db=new Pool({
 try{
   const rs=await db.query(
     "SELECT o.id::text AS operacao_id,p.id::text AS proposta_id,"+
-    "p.documento_tipo,a.texto_extraido "+
+    "p.documento_tipo,LEFT(a.texto_extraido,12000) AS texto_extraido "+
     "FROM operacoes o JOIN operacao_arquivos oa ON oa.operacao_id=o.id "+
     "JOIN propostas p ON p.id=oa.proposta_id "+
     "JOIN arquivos a ON a.id=oa.arquivo_id "+
