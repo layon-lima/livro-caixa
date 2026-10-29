@@ -33,11 +33,15 @@ export function paymentDateFromText(text,kind){
   // Comprovante Pix efetivado: data no início do comprovante, antes dos dados.
   if(/comprovante\s+(?:de\s+)?(?:pagamento|transfer[êe]ncia)\s+pix/i.test(t.slice(0,800)) &&
     !/agendado|agendamento|n[aã]o\s+efetivado/i.test(t.slice(0,600))){
-    const opening=t.slice(0,500);
-    const head=opening.match(new RegExp("^(?:[^\\n]*\\n){0,5}[^\\n]*?"+date,"im"));
-    if(head){
-      const valid=normalizePaymentDate(head[1]);
-      if(valid)return valid;
+    // A data livre deve estar nas primeiras quatro linhas e não pode vir
+    // identificada como vencimento, emissão ou agendamento.
+    for(const line of t.slice(0,500).split(/\\r?\\n/).slice(0,4)){
+      if(/vencimento|emiss[aã]o|agendamento|expira/i.test(line))continue;
+      const match=line.match(new RegExp(date));
+      if(match){
+        const valid=normalizePaymentDate(match[1]);
+        if(valid)return valid;
+      }
     }
   }
   return "";
