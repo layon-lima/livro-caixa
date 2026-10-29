@@ -141,3 +141,23 @@ oferece link "Pesquisar recebedor na internet" para busca manual pelo nome.
 A consulta automática é opcional ao funcionamento: se indisponível, o OCR e a
 IA local continuam operando. A IA permanece um serviço compartilhado na VPS,
 carregado apenas durante uma solicitação.
+
+## Categorias sugeridas pela IA
+
+A partir da migração `008_category_suggestions.sql`, o OCR e a IA podem
+propor categorias ainda não cadastradas (por exemplo, `Veículos > Pneus`).
+A sugestão aparece na conferência e pode ser editada. `Salvar para depois`
+armazena a proposta sem alterar a lista global; somente `Aprovar`
+cria ou reaproveita a categoria dentro da mesma transação do lançamento.
+Aprovação em lote segue a mesma regra.
+
+Instalação:
+
+    cd /opt/apps/livro-caixa
+    git pull --ff-only
+    docker compose exec -T database sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1' < db/migrations/008_category_suggestions.sql
+    docker compose up -d --build
+
+A IA usa as categorias aprovadas do PostgreSQL nos próximos documentos e
+evita a escolha automática genérica de "Outras despesas". Em Pix sem
+descrição da compra, o CNAE obtido por CNPJ é uma hipótese editável.
