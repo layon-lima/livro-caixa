@@ -93,10 +93,13 @@ export function suggestCategoryFromCompany(company,categories){
       "Combustíveis > Diesel":
     "";
   if(!candidate)return "";
+  // Se o cadastro ainda não tem esta categoria, ela continua como sugestão.
+  // Somente a aprovação poderá cadastrá-la.
   const norm=v=>normalize(v).replace(/[^A-Z0-9]/g," ").replace(/\s+/g," ").trim();
   const possible=categories.find(c=>norm(typeof c==="string"?c:
     c.nome+(c.subcategoria?" > "+c.subcategoria:""))===norm(candidate));
-  return possible?candidate:"";
+  return possible?(typeof possible==="string"?possible:
+    possible.nome+(possible.subcategoria?" > "+possible.subcategoria:"")):candidate;
 }
 
 // Cache curta para não consultar repetidamente a mesma empresa a cada comprovante.
