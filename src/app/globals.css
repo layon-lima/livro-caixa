@@ -624,16 +624,6 @@ button { cursor: pointer; }
 .conference-summary span {font-size:10px;color:#7d8da0;}
 .conference-summary strong {font-size:12px;color:#1f2e42;overflow-wrap:anywhere;}
 .conference-summary .conference-needs-review {color:#916016;background:#fff3dd;padding:2px 7px;border-radius:5px;width:fit-content;}
-.conference-checklist {padding:0;}
-.conference-checklist h2 {margin:0;padding:10px 12px;background:#f0f6ff;border-bottom:1px solid #e2ebf7;border-radius:9px 9px 0 0;}
-.conference-review-items {display:flex;gap:8px 15px;align-items:center;flex-wrap:wrap;padding:11px 13px;}
-.conference-review-items>label {display:inline-flex;align-items:center;gap:7px;font-size:11px;font-weight:600;color:#43566c;cursor:pointer;}
-.conference-review-items>label input {accent-color:#176bc9;width:15px;height:15px;}
-.conference-review-items>label.conference-reviewed {color:#29805c;}
-.conference-review-items>small {width:100%;font-size:9px;color:#8a9aac;}
-.conference-notes {margin:0 12px 11px;font-size:10px;color:#806a49;}
-.conference-notes summary {cursor:pointer;}
-.conference-notes ul {padding-left:18px;}
 .conference-edit .review-form {gap:0;}
 .conference-fields {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:start;}
 .conference-fields>label,.conference-fields .review-category-picker label {min-width:0;font-size:10px;font-weight:650;color:#61748d;display:flex;flex-direction:column;gap:5px;}

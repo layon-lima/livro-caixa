@@ -7,7 +7,6 @@ import {FileText, ExternalLink, ChevronRight, Save, CheckCircle2, ClipboardCheck
 import { LiveReview } from "@/components/live-review";
 import { ReviewCategoryPicker } from "@/components/review-category-picker";
 import { ConferenceQueue, type QueueItem } from "@/components/conference-queue";
-import { ConferenceChecklist } from "@/components/conference-checklist";
 import { suggestDocumentName } from "@/lib/document-name";
 import { BatchQueueRefresh } from "@/components/batch-queue-refresh";
 import { DiscardDocument } from "@/components/discard-document";
@@ -152,15 +151,6 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
     new Date(selected.competencia.slice(0,7)+"-01T12:00:00Z").toLocaleDateString("pt-BR",{month:"long",year:"numeric",timeZone:"UTC"}):"Não identificado";
   const categoryLabel=cats.find(c=>c.id===selected?.categoria_id)?.nome||
     selected?.categoria_sugerida_nome||"Não identificada";
-  const reviewItems=[
-    !selected?.categoria_id?"Confirmar categoria":null,
-    needsOwner?"Confirmar titular":null,
-    !selected?.contraparte?"Confirmar recebedor":null,
-    !selected?.data_pagamento?"Confirmar data da transação":null,
-    !selected?.valor?"Conferir valor":null,
-    "Revisar descrição",
-    "Revisar referência",
-  ].filter((x):x is string=>Boolean(x));
 
   return <StandaloneWorkspace title="Conferência" section="livros" focusMode>
     <div className="work-page conference-page">
@@ -235,14 +225,6 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
                 className="flat-button">Conferir cadastro</Link>}
             </div>}
             {!selected.duplicada_de&&<>
-              <section className="conference-panel conference-checklist">
-                <h2><ClipboardCheck size={17}/> O que precisa da sua conferência</h2>
-                <ConferenceChecklist key={selected.id} items={reviewItems}/>
-                {selected.avisos?.length>0&&<details className="conference-notes">
-                  <summary>{selected.avisos.length} observação(ões) da análise</summary>
-                  <ul>{selected.avisos.map((notice,i)=><li key={i}>{notice}</li>)}</ul>
-                </details>}
-              </section>
               <section className="conference-panel conference-edit">
                 <h2><ClipboardCheck size={17}/> Confirmar lançamento</h2>
                 <form id={formId} action={"/api/propostas/"+selected.id+"/revisar"}
