@@ -23,7 +23,7 @@ export function parseExpenseFilters(p:URLSearchParams):ExpenseFilters{
   const status=["todos","com-documento","sem-documento"].includes(p.get("status")||"")?
     p.get("status") as ExpenseFilters["status"]:"todos";
   const sorts:ExpenseFilters["sort"][]=["data","competencia","titulo","categoria","contraparte","valor"];
-  const sort=sorts.includes(p.get("sort") as ExpenseFilters["sort"])?p.get("sort") as ExpenseFilters["sort"]:"competencia";
+  const sort=sorts.includes(p.get("sort") as ExpenseFilters["sort"])?p.get("sort") as ExpenseFilters["sort"]:"data";
   const direction=p.get("direction")==="asc"?"asc":"desc";
   const page=Math.max(1,Math.min(100000,Number.parseInt(p.get("page")||"1",10)||1));
   const size=Number.parseInt(p.get("pageSize")||"50",10);

@@ -4,11 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { FileText, Folder, FolderInput, Pencil, Trash2, X, Eye, ChevronLeft, ChevronDown, ChevronRight } from "lucide-react";
 import { suggestDocumentName } from "@/lib/document-name";
+import { documentTypeLabel, formatTransactionDate } from "@/lib/spreadsheet-fields";
 
 export type OperationEntry={
   id:string;titular_id:string;titulo:string;categoria:string|null;subcategoria:string|null;
   categoria_id:string|null;competencia:string;tipo:string;descricao:string;
-  contraparte:string;referencia:string;valor:string|null;quantidade_documentos:string; data_registro?:string; data_pagamento?:string|null; documento?:string|null; tem_documento?:boolean;
+  contraparte:string;referencia:string;valor:string|null;quantidade_documentos:string; data_registro?:string; data_pagamento?:string|null; documento?:string|null; documento_tipo?:string|null; tem_documento?:boolean;
 };
 export type AttachedDocument={operacao_id:string;arquivo_id:string;nome_original:string;documento_tipo:string;quantidade_no_arquivo?:number;nome_exibicao?:string};
 type Book={id:string;nome:string};
@@ -100,16 +101,16 @@ export function OperationRows({operations,documents,books,canEdit,canDelete,book
                 show(op.id,b.left+80,b.top+20);
               }
             }}>
-            <span>{op.data_pagamento?op.data_pagamento.split("-").reverse().join("/"):"—"}</span>
-            <span>{op.competencia.slice(0,7)}</span>
-            <span className="expense-strong" title={op.titulo}>{op.titulo}</span>
-            <span title={[op.categoria,op.subcategoria].filter(Boolean).join(" / ")}>
-              {op.categoria||"Sem categoria"}{op.subcategoria?" / "+op.subcategoria:""}</span>
-            <span title={op.contraparte||""}>{op.contraparte||"—"}</span>
-            <span title={op.documento||""}>{op.documento||"—"}</span>
+            <span className="expense-date" title={op.data_pagamento?"Data efetiva da transação: "+formatTransactionDate(op.data_pagamento):"Data da transação não identificada"}>
+              {formatTransactionDate(op.data_pagamento)}
+            </span>
             <span className="expense-value">{op.valor!==null?money(op.valor):"—"}</span>
-            <span className={"expense-status"+(op.tem_documento?" linked":" unlinked")}>
-              {op.tem_documento?"Com documento":"Sem documento"}
+            <span className="expense-strong" title={op.contraparte||"Recebedor não identificado"}>{op.contraparte||"—"}</span>
+            <span className="expense-kind" title={documentTypeLabel(op)}>
+              {documentTypeLabel(op)}
+            </span>
+            <span className="expense-document" title={op.documento||"Sem documento"}>
+              {op.documento||"Sem documento"}
             </span>
           </div>)}
         </section>;
