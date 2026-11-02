@@ -2,6 +2,7 @@
 // O app confirma o envio imediatamente; o OCR principal permanece separado.
 import {Pool} from "pg";
 import {eachZipDocument} from "../src/lib/zip-documents.ts";
+import {reimportDecision,reopenDiscardedDocument} from "../src/lib/reimport-discarded.ts";
 import {createHash} from "node:crypto";
 import {gzipSync,gunzipSync} from "node:zlib";
 import {readFile,writeFile,mkdir,unlink,stat,statfs} from "node:fs/promises";
@@ -40,21 +41,27 @@ async function storeDocument(job,name,buffer){
     const original=existing.rows[0];
     if(original){
       if(original.descartado_em){
-        if(original.titular_envio_id===String(job.titular_envio_id)&&
-           original.armazenamento==="local"){
-          // Um reenvio explícito recupera o arquivo descartado sem restaurar
-          // propostas antigas e sem modificar históricos já aprovados.
-          await cx.query("UPDATE lote_itens SET arquivo_id=NULL,status_entrada='descartado',"+
-            "erro='Documento descartado, posteriormente reenviado' WHERE arquivo_id=$1",[original.id]);
-          await cx.query(
-            "UPDATE arquivos SET descartado_em=NULL,descartado_por=NULL,status='aguardando',"+
-            "progresso_etapa='aguardando',progresso_dados='{}'::jsonb,erro=NULL,"+
-            "texto_extraido='',atualizado_em=now() WHERE id=$1",[original.id]);
+        // O titular técnico pode ter sido identificado/alterado pelo OCR no
+        // primeiro envio. Desde que o usuário tenha acesso a ambos os livros,
+        // um descarte não é impedimento para uma nova conferência.
+        const oldAccess=await cx.query(
+          "SELECT EXISTS(SELECT 1 FROM users u WHERE u.id=$1 AND u.is_active AND "+
+          "(u.is_admin OR EXISTS(SELECT 1 FROM user_titular_permissions p "+
+          "WHERE p.user_id=u.id AND p.titular_id=$2 AND "+
+          "(p.can_import OR p.can_approve)))) AS autorizado",
+          [job.enviado_por,original.titular_envio_id]);
+        const decision=reimportDecision(original,Boolean(oldAccess.rows[0]?.autorizado));
+        if(decision==="restore"){
+          const outcome=await reopenDiscardedDocument(
+            cx,original.id,Number(job.titular_envio_id),Number(job.enviado_por));
           await cx.query("COMMIT");
-          return {status:"reprocessado",id:original.id};
+          return outcome==="reprocessado"?
+            {status:"reprocessado",id:original.id}:{status:"ja_aprovado",id:original.id};
         }
         await cx.query("COMMIT");
-        return {status:"descartado",error:"Documento anteriormente descartado."};
+        return decision==="processing"?
+          {status:"erro",error:"Descarte anterior ainda em processamento; reenvie após finalizar."}:
+          {status:"duplicado_restrito"};
       }
       // Não reutilizar dados de um titular ao qual o usuário não tem acesso.
       const allowed=await cx.query(

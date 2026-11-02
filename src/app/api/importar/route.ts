@@ -10,6 +10,7 @@ import {
 import { sameOriginPost } from "@/lib/request-security";
 import { MAX_ZIP_BYTES } from "@/lib/zip-documents";
 import { saveIncomingZip } from "@/lib/zip-inbox";
+import {reimportDecision,reopenDiscardedDocument} from "@/lib/reimport-discarded";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -82,22 +83,30 @@ export async function POST(request: Request) {
         );
         if (existing.rows[0]) {
           const original=existing.rows[0];
-          // Reenvio explícito de documento previamente descartado:
-          // usa o mesmo original, mas não mistura o novo processo com ZIP antigo.
-          if(original.descartado_em&&original.titular_envio_id===String(titularId)&&
-             original.armazenamento==="local"&&original.status!=="processando"){
-            // Preservar histórico descartado; propostas novas serão criadas em nova leitura.
-            await connection.query(
-              "UPDATE lote_itens SET arquivo_id=NULL,status_entrada='descartado',"+
-              "erro='Documento descartado e reenviado em nova importação' WHERE arquivo_id=$1",
-              [original.id]);
-            await connection.query(
-              "UPDATE arquivos SET descartado_em=NULL,descartado_por=NULL,status='aguardando',"+
-              "progresso_etapa='aguardando',progresso_dados='{}'::jsonb,"+
-              "erro=NULL,texto_extraido='',atualizado_em=now() WHERE id=$1",
-              [original.id]);
+          if(original.descartado_em){
+            // O titular técnico pode ter mudado durante a leitura anterior.
+            // Reabertura autorizada pelo titular original, não por igualdade de IDs.
+            const authorizedOld=await canAccessTitular(
+              user,Number(original.titular_envio_id),"import"
+            )||await canAccessTitular(user,Number(original.titular_envio_id),"approve");
+            const decision=reimportDecision(original,authorizedOld);
+            if(decision==="restore"){
+              const outcome=await reopenDiscardedDocument(
+                connection,original.id,titularId!,user.id);
+              await connection.query("COMMIT");
+              results.push(outcome==="reprocessado"?
+                {name,status:"reprocessado",id:original.id}:
+                {name,status:"ja_aprovado"});
+              return;
+            }
             await connection.query("COMMIT");
-            results.push({name,status:"reprocessado",id:original.id});return;
+            if(decision==="processing"){
+              results.push({name,status:"erro",error:
+                "O descarte ainda está finalizando a leitura anterior. Tente reenviar em instantes."});
+            }else{
+              results.push({name,status:"duplicado_restrito"});
+            }
+            return;
           }
           // O usuário reenviou um documento ainda não conferido.
           // Reprocessar a mesma entrada sem duplicar armazenamento, preservando

@@ -28,6 +28,7 @@ COPY --from=deps --chown=nextjs:nextjs /app/node_modules ./node_modules
 COPY --chown=nextjs:nextjs scripts ./scripts
 COPY --chown=nextjs:nextjs worker ./worker
 COPY --chown=nextjs:nextjs src/lib/zip-documents.ts ./src/lib/zip-documents.ts
+COPY --chown=nextjs:nextjs src/lib/reimport-discarded.ts ./src/lib/reimport-discarded.ts
 USER nextjs
 EXPOSE 3000
 CMD ["node","server.js"]
