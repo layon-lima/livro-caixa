@@ -1,9 +1,10 @@
 "use client";
 import { useEffect, useRef, useState, type DragEvent, type ChangeEvent } from "react";
 import { FolderUp, LoaderCircle } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-type UploadResult = {name:string;status:string;id?:string;error?:string};
+type UploadResult = {name:string;status:string;id?:string;error?:string;lote?:string};
 type WorkerStatus = {id:string;status:"aguardando"|"processando"|"pronto"|"erro";erro:string|null;propostas:number};
 
 const delay = (ms:number)=>new Promise<void>(resolve=>setTimeout(resolve,ms));
@@ -18,6 +19,7 @@ export function ImportDrop({titularId,canApprove}:{titularId:string;canApprove:b
   const [hover,setHover]=useState(false);
   const [results,setResults]=useState<UploadResult[]>([]);
   const [error,setError]=useState("");
+  const [info,setInfo]=useState("");
   const [phase,setPhase]=useState<"selecionar"|"enviando"|"lendo"|"concluido">("selecionar");
 
   useEffect(()=>{
@@ -30,7 +32,7 @@ export function ImportDrop({titularId,canApprove}:{titularId:string;canApprove:b
     const selected=Array.from(data);
     if(!selected.length)return;
     setFiles(old=>[...old,...selected].slice(0,100));
-    setResults([]);setError("");setPhase("enviando");
+    setResults([]);setError("");setInfo("");setPhase("enviando");
   }
   function drop(event:DragEvent<HTMLDivElement>) {
     event.preventDefault();setHover(false);
@@ -40,38 +42,55 @@ export function ImportDrop({titularId,canApprove}:{titularId:string;canApprove:b
   async function upload(pending:File[]) {
     if(!pending.length || !titularId || sending.current)return;
     sending.current=true;
-    setBusy(true);setPhase("enviando");setError("");setResults([]);
+    setBusy(true);setPhase("enviando");setError("");setInfo("");setResults([]);
     const all:UploadResult[]=[];
-    let zipBatch="";
+    const zipBatches:string[]=[];
+    let normalIds:string[]=[];
     try {
-      for(let i=0;i<pending.length;i+=20) {
+      // O backend exige ZIP isolado. Dividir aqui impede que arrastar um ZIP
+      // acompanhado de PDFs resulte em "ignorado" sem registrar o lote.
+      const zipFiles=pending.filter(f=>f.name.toLowerCase().endsWith(".zip"));
+      const documents=pending.filter(f=>!f.name.toLowerCase().endsWith(".zip"));
+      const requests:File[][]=[
+        ...zipFiles.map(f=>[f]),
+        ...Array.from({length:Math.ceil(documents.length/20)},(_,i)=>documents.slice(i*20,(i+1)*20))
+      ];
+      for(const group of requests){
         const form=new FormData();
         form.append("titularId",titularId);
-        for(const file of pending.slice(i,i+20))form.append("files",file);
+        for(const file of group)form.append("files",file);
         const response=await fetch("/api/importar",{method:"POST",body:form,credentials:"same-origin"});
         const content=await response.json().catch(()=>({error:
-          "O servidor não confirmou a importação. Verifique se o arquivo foi recebido antes de reenviar."}));
+          "O servidor não confirmou a importação. Confira o histórico antes de reenviar."}));
         if(!response.ok)throw Error(content.error||"Não foi possível enviar os arquivos.");
-        all.push(...(content.results||[]));
-        if(content.lote)zipBatch=String(content.lote);
+        if(content.lote){
+          const batchId=String(content.lote);
+          zipBatches.push(batchId);
+          all.push({name:group[0]?.name||"ZIP",status:"recebido",lote:batchId});
+        }else all.push(...(content.results||[]));
         if(alive.current)setResults([...all]);
       }
       if(!alive.current)return;
       setFiles([]);
       router.refresh();
-      if(zipBatch){
-        setPhase("lendo");
-        if(canApprove)router.push("/conferencia?lote="+encodeURIComponent(zipBatch));
-        else{
-          setPhase("concluido");
-          setError("ZIP recebido. Os arquivos estão sendo lidos um por vez na VPS; um usuário com permissão poderá conferir os documentos concluídos.");
-        }
-        return;
-      }
-      const ids=[...new Set(all.filter(x=>(x.status==="importado"||x.status==="reprocessado"||x.status==="duplicado") && x.id).map(x=>x.id!))];
+      normalIds=[...new Set(all.filter(x=>
+        ["importado","reprocessado","duplicado"].includes(x.status)&&x.id
+      ).map(x=>x.id!))];
       const failed=all.filter(x=>x.status==="erro");
       const approved=all.filter(x=>x.status==="ja_aprovado");
-      if(!ids.length) {
+      if(zipBatches.length){
+        setPhase("lendo");
+        if(canApprove&&zipBatches.length===1&&requests.length===1){
+          router.push("/conferencia?lote="+encodeURIComponent(zipBatches[0]));
+          return;
+        }
+        setPhase("concluido");
+        setInfo(zipBatches.length===1?
+          "ZIP recebido. Use Abrir fila para acompanhar a leitura e a conferência.":
+          zipBatches.length+" ZIPs recebidos. Abra a fila de cada lote para conferir conforme forem lidos.");
+        return;
+      }
+      if(!normalIds.length){
         setPhase("concluido");
         setError(approved.length?
           "Este documento já foi aprovado e não será reprocessado. Consulte o lançamento no seu livro.":
@@ -80,15 +99,12 @@ export function ImportDrop({titularId,canApprove}:{titularId:string;canApprove:b
         return;
       }
       setPhase("lendo");
-      // Abrir a conferência imediatamente após o upload (antes do OCR e da IA).
-      // O formulário se atualiza ao vivo enquanto o worker processa.
       if(canApprove){
-        router.push("/conferencia?arquivos="+encodeURIComponent(ids.join(",")));
+        router.push("/conferencia?arquivos="+encodeURIComponent(normalIds.join(",")));
         return;
       }
-      // Usuários sem permissão de aprovação acompanham o estado nesta página.
       for(let attempt=0;alive.current;attempt++){
-        const res=await fetch("/api/importar/status?ids="+encodeURIComponent(ids.join(",")),
+        const res=await fetch("/api/importar/status?ids="+encodeURIComponent(normalIds.join(",")),
           {cache:"no-store",credentials:"same-origin"});
         const data=await res.json().catch(()=>({error:"Resposta inválida ao consultar leitura."}));
         if(!res.ok)throw Error(data.error||"Falha ao consultar o processamento.");
@@ -101,34 +117,25 @@ export function ImportDrop({titularId,canApprove}:{titularId:string;canApprove:b
               error:current.status==="erro"?(current.erro||"Falha ao ler o documento"):undefined};
           }));
         }
-        const pending=statuses.some(st=>st.status==="aguardando"||st.status==="processando");
-        if(!pending) {
-          const ready=statuses.filter(st=>st.status==="pronto"&&st.propostas>0).map(st=>st.id);
-          if(ready.length) {
-            setPhase("concluido");
-            if(canApprove) {
-              router.push("/conferencia?arquivos="+encodeURIComponent(ready.join(",")));
-            } else {
-              setError("A leitura foi concluída. Os documentos estão aguardando conferência de um usuário autorizado.");
-            }
-            return;
-          }
+        const inProgress=statuses.some(st=>st.status==="aguardando"||st.status==="processando");
+        if(!inProgress){
           setPhase("concluido");
-          setError(statuses.some(st=>st.status==="erro")
-            ?"Houve falha na leitura. Confira o erro e use Reprocessar na lista de arquivos."
-            :"Não há propostas pendentes destes documentos. Se já foram aprovados, estão organizados no Livro Caixa.");
+          setInfo("Leitura finalizada. Os arquivos estão aguardando conferência de um usuário autorizado.");
           return;
         }
         if(attempt>=180){
           setPhase("concluido");
-          setError("A leitura ainda está em andamento. Os arquivos continuam sendo processados no servidor; consulte a lista abaixo para acompanhar.");
+          setInfo("A leitura continua na VPS. A lista de arquivos atualizará automaticamente.");
           return;
         }
         await delay(3000);
       }
-    }catch(e) {
-      if(alive.current){setFiles([]);setPhase("concluido");setError(e instanceof Error?e.message:"Erro na importação");}
-    }finally {
+    }catch(e){
+      if(alive.current){
+        setFiles([]);setPhase("concluido");
+        setError(e instanceof Error?e.message:"Erro na importação");
+      }
+    }finally{
       sending.current=false;
       if(alive.current)setBusy(false);
     }
@@ -140,7 +147,7 @@ export function ImportDrop({titularId,canApprove}:{titularId:string;canApprove:b
 
   const displayedFiles:UploadResult[]=results.length?results:files.map(f=>({name:f.name,status:"selecionado"}));
   const statusText:Record<string,string>={
-    selecionado:"Preparando envio",importado:"Na fila de leitura",
+    selecionado:"Preparando envio",recebido:"ZIP recebido na VPS",importado:"Na fila de leitura",
     duplicado:"Já cadastrado",ja_aprovado:"Já aprovado",reprocessado:"Nova leitura solicitada",aguardando:"Aguardando OCR",processando:"Lendo e identificando dados…",
     pronto:"Leitura concluída",erro:"Erro",
   };
@@ -171,10 +178,11 @@ export function ImportDrop({titularId,canApprove}:{titularId:string;canApprove:b
       {!busy&&!files.length&&<span className="muted">Solte o arquivo: envio e leitura automáticos.</span>}
     </div>
     {error&&<p className="form-error" role="alert">{error}</p>}
+    {info&&<p className="form-success" role="status">{info}</p>}
     {(files.length>0||results.length>0)&&<div className="upload-files" aria-live="polite">
       {displayedFiles.map((file,i)=>
         <div className="upload-file-row" key={file.name+i}>
-          <span>{file.name}</span>
+          <span>{file.name} {file.lote&&canApprove&&<Link href={"/conferencia?lote="+encodeURIComponent(file.lote)} className="flat-button">Abrir fila</Link>}</span>
           <span className={"file-state state-"+file.status}>
             {statusText[file.status]||file.status}{file.error?" — "+file.error:""}
           </span>

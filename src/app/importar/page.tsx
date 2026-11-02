@@ -61,10 +61,14 @@ export default async function Importar({searchParams}:{searchParams:Promise<{tit
       })
     };
   });
-  const previous=await getDatabase().query<{id:string;nome_arquivo:string;criado_em:string}>(
-    "SELECT id::text,nome_arquivo,criado_em::text FROM lotes_importacao "+
-    (user.isAdmin?"":"WHERE enviado_por=$1 ")+
-    "ORDER BY criado_em DESC LIMIT 3",user.isAdmin?[]:[user.id]);
+  const previous=await getDatabase().query<{
+    id:string;nome_arquivo:string;criado_em:string;atualizado_em:string;
+    status:string;erro:string;quantidade:number;
+  }>(
+    "SELECT l.id::text,l.nome_arquivo,l.criado_em::text,l.atualizado_em::text,l.status,l.erro,"+
+    "(SELECT count(*)::int FROM lote_itens i WHERE i.lote_id=l.id) AS quantidade FROM lotes_importacao l "+
+    (user.isAdmin?"":"WHERE l.enviado_por=$1 ")+
+    "ORDER BY l.criado_em DESC LIMIT 8",user.isAdmin?[]:[user.id]);
   const percent=Math.min(100,(usedBytes/STORAGE_LIMIT_BYTES)*100);
   const gb=(bytes:number)=>(bytes/1_000_000_000).toLocaleString("pt-BR",{maximumFractionDigits:2});
   return <StandaloneWorkspace title="Importação" section="livros"><div className="work-page">
@@ -99,12 +103,21 @@ export default async function Importar({searchParams}:{searchParams:Promise<{tit
         :<p className="form-error">Este usuário não possui permissão de importação.</p>}
       {previous.rows.length>0&&<div className="batch-previous">
         <strong>Retomar conferência dos ZIPs</strong>
-        {previous.rows.map(l=><Link key={l.id} href={"/conferencia?lote="+l.id}>
-          {l.nome_arquivo}
-        </Link>)}
+        {previous.rows.map(l=><div key={l.id} className="zip-history-row">
+          <Link href={"/conferencia?lote="+l.id}>{l.nome_arquivo}</Link>
+          <span className={"zip-history-status zip-history-"+l.status}>
+            {l.status==="recebendo"?"Aguardando extração":
+             l.status==="extraindo"?"Extraindo documentos":
+             l.status==="pronto"?"Extração concluída":"Erro no ZIP"}
+          </span>
+          <small>{l.quantidade} arquivo(s) registrado(s)</small>
+          {l.status==="erro"&&<small className="zip-history-error">{l.erro||"Falha ao extrair o ZIP"}</small>}
+          {l.status==="recebendo"&&Date.now()-new Date(l.atualizado_em).getTime()>120000&&
+            <small className="zip-history-error">Sem atividade de extração. Verifique o zip-worker na VPS.</small>}
+        </div>)}
       </div>}
       <div className="page-title-compact"><h2>Arquivos recebidos</h2><span>Processamento automático na VPS</span></div>
-      <ImportStatusRefresh active={list.rows.some(a=>a.status==="aguardando"||a.status==="processando")}/>
+      <ImportStatusRefresh active={list.rows.some(a=>a.status==="aguardando"||a.status==="processando")||previous.rows.some(l=>l.status==="recebendo"||l.status==="extraindo")}/>
       <ImportedFileRows files={namedFiles}/>
       <p className="muted">Depois que o OCR terminar, a conferência do lote abre automaticamente para quem tem permissão de aprovar. Arquivos não conferidos podem ser reprocessados sem novo envio.</p>
     </main>

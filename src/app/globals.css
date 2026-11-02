@@ -919,3 +919,11 @@ button { cursor: pointer; }
 .nav-arrows button:disabled:hover {background:transparent;color:#9aa6b5;}
 
 .conference-ai-note {margin:0;padding:8px 11px;border:1px solid #e5eaf1;border-radius:7px;background:#f9fbfd;color:#58728c;font-size:11px;line-height:1.5;}
+
+.zip-history-row {display:flex;flex-wrap:wrap;align-items:center;gap:7px 11px;padding:7px 0;border-bottom:1px solid #edf1f5;font-size:11px;}
+.zip-history-row>a {font-weight:650;overflow-wrap:anywhere;}
+.zip-history-row small {color:#76889b;}
+.zip-history-status {font-size:10px;background:#eef3fa;color:#567087;padding:3px 7px;border-radius:5px;}
+.zip-history-pronto {background:#e8f5ec;color:#328057;}
+.zip-history-erro {background:#fff0eb;color:#b04d38;}
+.zip-history-error {color:#ad493b!important;font-weight:600;}

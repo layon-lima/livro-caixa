@@ -194,27 +194,36 @@ export async function POST(request: Request) {
     const signature=Buffer.from(await archive.slice(0,4).arrayBuffer());
     if(!signature.equals(Buffer.from([0x50,0x4b,0x03,0x04])))
       return NextResponse.json({error:"O arquivo não contém um ZIP válido."},{status:400});
-    const lot=await db.query<{id:string}>(
-      "INSERT INTO lotes_importacao(enviado_por,nome_arquivo,status,titular_envio_id) "+
-      "VALUES($1,$2,'recebendo',$3) RETURNING id::text",
-      [user.id,archive.name.slice(0,255),titularId]
-    );
-    const lote=lot.rows[0].id;
+    let lote="";
     try{
-      await saveIncomingZip(lote,Buffer.from(await archive.arrayBuffer()));
-      await db.query("UPDATE lotes_importacao SET zip_pronto=TRUE,atualizado_em=now() WHERE id=$1",[lote]);
-    }catch(error){
-      console.error("Falha ao receber ZIP",lote,error);
-      await db.query("UPDATE lotes_importacao SET status='erro',erro=$2,atualizado_em=now() "+
-        "WHERE id=$1",[lote,"Falha ao guardar o ZIP recebido."]);
-      return NextResponse.json(
-        {error:"Não foi possível guardar o ZIP na VPS. Confira o espaço livre e tente novamente."},
-        {status:507,headers:{"Cache-Control":"no-store"}}
+      // A tabela e as colunas precisam existir antes do reconhecimento do envio.
+      const lot=await db.query<{id:string}>(
+        "INSERT INTO lotes_importacao(enviado_por,nome_arquivo,status,titular_envio_id) "+
+        "VALUES($1,$2,'recebendo',$3) RETURNING id::text",
+        [user.id,archive.name.slice(0,255),titularId]
       );
+      lote=lot.rows[0].id;
+      await saveIncomingZip(lote,Buffer.from(await archive.arrayBuffer()));
+      await db.query(
+        "UPDATE lotes_importacao SET zip_pronto=TRUE,atualizado_em=now() WHERE id=$1",
+        [lote]
+      );
+      // Não ocultar o ZIP do retorno: a interface precisa mostrar o envio.
+      return NextResponse.json({lote,results:[{name:archive.name,status:"recebido"}],recebido:true},
+        {headers:{"Cache-Control":"private, no-store"}});
+    }catch(error){
+      const code=(error as {code?:string})?.code;
+      console.error("Falha na recepção de ZIP",lote||archive.name,error);
+      if(lote)await db.query(
+        "UPDATE lotes_importacao SET status='erro',erro=$2,atualizado_em=now() WHERE id=$1",
+        [lote,"Não foi possível receber o arquivo ZIP. Verifique armazenamento e serviço."]
+      ).catch(e=>console.error("Erro ao registrar falha do ZIP",lote,e));
+      const notMigrated=code==="42703"||code==="42P01"||code==="23514";
+      return NextResponse.json({error:notMigrated?
+          "Importação ZIP indisponível: a migração 015 ainda não está pronta no banco.": 
+          "Falha ao receber ZIP na VPS. Verifique espaço livre e logs do aplicativo."},
+        {status:notMigrated?503:500,headers:{"Cache-Control":"no-store"}});
     }
-    // Ao reabrir a conferência, o lote é retomado pela base PostgreSQL.
-    return NextResponse.json({lote,results:[],recebido:true},
-      {headers:{"Cache-Control":"private, no-store"}});
   }
   if(entries.some(e=>e instanceof File&&e.name.toLowerCase().endsWith(".zip")))
     return NextResponse.json({error:"Envie um ZIP por vez, sem misturá-lo com outros arquivos."},{status:400});
