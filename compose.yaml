@@ -64,6 +64,26 @@ services:
       - private
       - ia_central
 
+  zip-worker:
+    image: livro-caixa-app:latest
+    command: ["node", "worker/zip-ingester.mjs"]
+    restart: unless-stopped
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PGHOST: database
+      PGPORT: "5432"
+      PGDATABASE: ${POSTGRES_DB:?Informe POSTGRES_DB no .env}
+      PGUSER: ${POSTGRES_USER:?Informe POSTGRES_USER no .env}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Informe POSTGRES_PASSWORD no .env}
+    volumes:
+      - documents_data:/data/livro-caixa-arquivos
+    networks:
+      - private
+
+
 networks:
   ia_central:
     external: true

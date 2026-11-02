@@ -158,9 +158,17 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
         <aside className="conference-queue-pane" aria-label="Fila de documentos">
           <ConferenceQueue items={queue} queryRoot={batchQuery} selectedId={selected?.id}
             selectedFile={activePending?.id} lote={lote} arquivos={batch?.join(",")}/>
-          <BatchQueueRefresh active={Boolean(stats&&(stats.aguardando>0||stats.processando>0))}/>
+          <BatchQueueRefresh active={Boolean((zipBatch&&(zipBatch.status==="recebendo"||zipBatch.status==="extraindo"))||(stats&&(stats.aguardando>0||stats.processando>0)))}/>
         </aside>
         <main className="conference-document" id="conteudo-conferencia">
+          {zipBatch&&(zipBatch.status==="recebendo"||zipBatch.status==="extraindo")&&
+            <p className="form-success" role="status">
+              {zipBatch.status==="recebendo"?"ZIP recebido. Preparando extração…":
+                "Lendo os documentos do ZIP um por um. Os concluídos já aparecem na fila."}
+            </p>}
+          {zipBatch?.status==="erro"&&<p className="form-error" role="alert">
+            O ZIP não foi concluído: {zipBatch.erro||"falha na extração"}. Os documentos já recebidos foram preservados.
+          </p>}
           {query.erro&&<div className="form-error" role="alert">
             {query.erro==="duplicado"?
               "Lançamento bloqueado: esta transação já existe no Livro Caixa.":
@@ -180,8 +188,8 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
               arquivos={batch?.join(",")} lote={lote}/></div>
           </div>:!selected?<div className="conference-empty">
             <ClipboardCheck size={30}/>
-            <h2>{lote?"Nenhum documento aguardando conferência":"Sua fila está vazia"}</h2>
-            <p>{lote?"O processamento e a aprovação dos documentos deste ZIP estão atualizados.":"Importe documentos para iniciar a conferência."}</p>
+            <h2>{zipBatch&&(zipBatch.status==="recebendo"||zipBatch.status==="extraindo")?"Recebendo documentos…":lote?"Nenhum documento aguardando conferência":"Sua fila está vazia"}</h2>
+            <p>{zipBatch&&(zipBatch.status==="recebendo"||zipBatch.status==="extraindo")?"O ZIP está sendo extraído na VPS. Os documentos aparecerão automaticamente aqui.":lote?"O processamento e a aprovação dos documentos deste ZIP estão atualizados.":"Importe documentos para iniciar a conferência."}</p>
             <Link className="flat-button" href="/importar">Importar documentos</Link>
           </div>:<>
             <header className="conference-doc-header">

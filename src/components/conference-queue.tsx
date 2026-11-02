@@ -32,12 +32,12 @@ export function ConferenceQueue({items,queryRoot,selectedId,selectedFile,lote,ar
 }){
   const [search,setSearch]=useState("");
   const [filter,setFilter]=useState<"todos"|"pendentes"|"conferidos"|"erros">(
-    items.some(x=>["pendente","revisado","duplicado"].includes(x.status))?"pendentes":"todos");
+    items.some(x=>["pendente","revisado","duplicado","aguardando","processando"].includes(x.status))?"pendentes":"todos");
   const [page,setPage]=useState(0);
   const [marked,setMarked]=useState<string[]>([]);
   const counts={
     todos:items.length,
-    pendentes:items.filter(x=>["pendente","revisado","duplicado"].includes(x.status)).length,
+    pendentes:items.filter(x=>["pendente","revisado","duplicado","aguardando","processando"].includes(x.status)).length,
     conferidos:items.filter(x=>x.status==="aprovado").length,
     erros:items.filter(x=>x.status==="erro").length
   };
@@ -45,7 +45,7 @@ export function ConferenceQueue({items,queryRoot,selectedId,selectedFile,lote,ar
     const term=fold(search.trim());
     return items.filter(x=>{
       const group=filter==="todos"||
-        (filter==="pendentes"&&["pendente","revisado","duplicado"].includes(x.status))||
+        (filter==="pendentes"&&["pendente","revisado","duplicado","aguardando","processando"].includes(x.status))||
         (filter==="conferidos"&&x.status==="aprovado")||
         (filter==="erros"&&x.status==="erro");
       return group&&(!term||fold(x.titulo+" "+x.nome_titular+" "+(x.referencia||"")).includes(term));

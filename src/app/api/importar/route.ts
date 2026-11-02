@@ -8,7 +8,8 @@ import {
   localKey,
 } from "@/lib/storage-actions";
 import { sameOriginPost } from "@/lib/request-security";
-import { eachZipDocument, MAX_ZIP_BYTES } from "@/lib/zip-documents";
+import { MAX_ZIP_BYTES } from "@/lib/zip-documents";
+import { saveIncomingZip } from "@/lib/zip-inbox";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -185,43 +186,35 @@ export async function POST(request: Request) {
   const zipped=entries.length===1&&entries[0] instanceof File&&
     entries[0].name.toLowerCase().endsWith(".zip");
   if(zipped) {
+    // O upload confirma o recebimento do ZIP; um worker próprio o descompacta
+    // depois, sem manter a conexão HTTP aberta por centenas de arquivos.
     const archive=entries[0] as File;
     if(archive.size===0||archive.size>MAX_ZIP_BYTES)
       return NextResponse.json({error:"ZIP inválido ou maior que 80 MB."},{status:413});
-    const sign=Buffer.from(await archive.slice(0,4).arrayBuffer());
-    if(!sign.equals(Buffer.from([0x50,0x4b,0x03,0x04])))
+    const signature=Buffer.from(await archive.slice(0,4).arrayBuffer());
+    if(!signature.equals(Buffer.from([0x50,0x4b,0x03,0x04])))
       return NextResponse.json({error:"O arquivo não contém um ZIP válido."},{status:400});
     const lot=await db.query<{id:string}>(
-      "INSERT INTO lotes_importacao(enviado_por,nome_arquivo,status) VALUES($1,$2,'recebendo') RETURNING id::text",
-      [user.id,archive.name.slice(0,255)]
+      "INSERT INTO lotes_importacao(enviado_por,nome_arquivo,status,titular_envio_id) "+
+      "VALUES($1,$2,'recebendo',$3) RETURNING id::text",
+      [user.id,archive.name.slice(0,255),titularId]
     );
     const lote=lot.rows[0].id;
-    let ordinal=0;
-    try {
-      await eachZipDocument(Buffer.from(await archive.arrayBuffer()),async (name,buffer)=>{
-        const file=new File([new Uint8Array(buffer)],name);
-        const before=results.length;
-        await importOne(file);
-        const latest=results[before]||{name,status:"erro",error:"Não foi possível importar."};
-        await db.query(
-          "INSERT INTO lote_itens(lote_id,ordem,nome_entrada,arquivo_id,status_entrada,erro) VALUES($1,$2,$3,$4,$5,$6)",
-          [lote,++ordinal,name,latest.id||null,latest.status,latest.error||""]
-        );
-      },async (name,reason)=>{
-        const latest={name,status:"erro",error:reason};
-        results.push(latest);
-        await db.query(
-          "INSERT INTO lote_itens(lote_id,ordem,nome_entrada,status_entrada,erro) VALUES($1,$2,$3,'erro',$4)",
-          [lote,++ordinal,name,reason]
-        );
-      });
-      await db.query("UPDATE lotes_importacao SET status='pronto',atualizado_em=now() WHERE id=$1",[lote]);
-    } catch(error) {
-      const detail=error instanceof Error?error.message:"ZIP inválido";
-      await db.query("UPDATE lotes_importacao SET status='erro',erro=$2,atualizado_em=now() WHERE id=$1",[lote,detail.slice(0,500)]);
-      if(!ordinal)return NextResponse.json({error:detail},{status:400});
+    try{
+      await saveIncomingZip(lote,Buffer.from(await archive.arrayBuffer()));
+      await db.query("UPDATE lotes_importacao SET zip_pronto=TRUE,atualizado_em=now() WHERE id=$1",[lote]);
+    }catch(error){
+      console.error("Falha ao receber ZIP",lote,error);
+      await db.query("UPDATE lotes_importacao SET status='erro',erro=$2,atualizado_em=now() "+
+        "WHERE id=$1",[lote,"Falha ao guardar o ZIP recebido."]);
+      return NextResponse.json(
+        {error:"Não foi possível guardar o ZIP na VPS. Confira o espaço livre e tente novamente."},
+        {status:507,headers:{"Cache-Control":"no-store"}}
+      );
     }
-    return NextResponse.json({lote,results},{headers:{"Cache-Control":"private, no-store"}});
+    // Ao reabrir a conferência, o lote é retomado pela base PostgreSQL.
+    return NextResponse.json({lote,results:[],recebido:true},
+      {headers:{"Cache-Control":"private, no-store"}});
   }
   if(entries.some(e=>e instanceof File&&e.name.toLowerCase().endsWith(".zip")))
     return NextResponse.json({error:"Envie um ZIP por vez, sem misturá-lo com outros arquivos."},{status:400});

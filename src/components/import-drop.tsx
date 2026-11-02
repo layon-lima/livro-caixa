@@ -49,7 +49,8 @@ export function ImportDrop({titularId,canApprove}:{titularId:string;canApprove:b
         form.append("titularId",titularId);
         for(const file of pending.slice(i,i+20))form.append("files",file);
         const response=await fetch("/api/importar",{method:"POST",body:form,credentials:"same-origin"});
-        const content=await response.json().catch(()=>({error:"Resposta inválida do servidor."}));
+        const content=await response.json().catch(()=>({error:
+          "O servidor não confirmou a importação. Verifique se o arquivo foi recebido antes de reenviar."}));
         if(!response.ok)throw Error(content.error||"Não foi possível enviar os arquivos.");
         all.push(...(content.results||[]));
         if(content.lote)zipBatch=String(content.lote);

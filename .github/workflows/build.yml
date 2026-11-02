@@ -20,6 +20,8 @@ jobs:
           node-version: "24"
       - name: Instalar dependências
         run: npm install --no-audit --no-fund
+      - name: Verificar sintaxe do serviço de ZIP
+        run: node --check worker/zip-ingester.mjs
       - name: Testes do worker
         run: node --test worker/*.test.mjs
       - name: Compilar Next.js
