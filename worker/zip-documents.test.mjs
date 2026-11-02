@@ -19,8 +19,13 @@ test("ZIP: importa documentos um por vez, em ordem, e ignora formatos estranhos"
   assert.equal(skipped[0][0],"leia.txt");
 });
 test("ZIP com path traversal é recusado sem gravar arquivos",async()=>{
+  let imported=0;
+  // O leitor ZIP já rejeita o caminho inseguro antes do filtro da aplicação.
+  // Aceitar ambas as mensagens sem afrouxar a proteção nem mascarar erros.
   await assert.rejects(eachZipDocument(Buffer.from(unsafe,"base64"),
-    async()=>{},async()=>{}),/caminhos inválidos/);
+    async()=>{imported++;},async()=>{}),
+    /(?:caminhos inválidos|invalid relative path)/i);
+  assert.equal(imported,0,"Nenhum arquivo pode ser importado de um ZIP inseguro");
 });
 test("ZIP inválido é recusado",async()=>{
   await assert.rejects(eachZipDocument(Buffer.from("nao e zip"),async()=>{},async()=>{}));
