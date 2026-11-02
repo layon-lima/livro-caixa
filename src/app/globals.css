@@ -674,3 +674,64 @@ button { cursor: pointer; }
   .conference-action-bar {padding:8px;}
   .conference-action-bar .primary-btn {flex:1;}
 }
+
+
+
+/* Página inicial: pastas grandes, como a visualização de ícones do Windows.
+   A coluna duplicada de titulares foi removida do componente ExplorerShell. */
+.home-books-grid {
+  flex:1;min-height:0;overflow-y:auto;align-content:flex-start;
+  display:grid;grid-template-columns:repeat(auto-fill, minmax(198px, 1fr));
+  gap:12px 20px;padding:25px 25px 35px;
+}
+.home-book-tile {
+  width:100%;max-width:240px;min-height:206px;padding:15px 11px 11px;
+  display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
+  gap:15px;border:1px solid transparent;border-radius:9px;
+  color:#253952;text-align:center;outline-offset:2px;
+}
+.home-book-tile:hover,.home-book-tile:focus-visible {
+  background:#edf5ff;border-color:#bed9fc;
+}
+.home-book-tile:active {background:#dceeff;}
+.home-book-label {display:block;max-width:100%;font-size:12px;font-weight:600;line-height:1.45;overflow-wrap:anywhere;}
+.home-folder-figure {position:relative;display:block;flex:none;width:178px;height:122px;}
+.home-folder-back {
+  position:absolute;left:12px;top:24px;width:154px;height:92px;
+  border:1px solid #e7ab24;border-radius:9px 9px 10px 10px;
+  background:linear-gradient(155deg,#ffc83c 0%,#f2a50a 75%,#e99700 100%);
+  box-shadow:0 2px 3px #a76c1533;
+}
+.home-folder-back::before {
+  content:"";position:absolute;top:-14px;left:-1px;width:78px;height:21px;
+  border-radius:8px 12px 0 0;background:linear-gradient(135deg,#ffd45a,#f7b31a);
+  border:1px solid #e7ab24;border-bottom:0;
+}
+.home-folder-paper {
+  position:absolute;left:46px;top:28px;width:95px;height:66px;
+  border:1px solid #d0d9e3;border-radius:3px 3px 0 0;
+  background:
+    linear-gradient(#d6dfe8,#d6dfe8) 13px 18px/62px 2px no-repeat,
+    linear-gradient(#e5eaf0,#e5eaf0) 13px 29px/51px 2px no-repeat,
+    linear-gradient(#e5eaf0,#e5eaf0) 13px 40px/62px 2px no-repeat,
+    linear-gradient(#fff,#f7f9fb);
+  box-shadow:0 1px 3px #44566a20;
+  transform:rotate(-1.5deg);
+}
+.home-folder-front {
+  position:absolute;left:8px;top:60px;width:163px;height:59px;
+  border:1px solid #e5ab2a;border-radius:12px 12px 10px 10px;
+  background:linear-gradient(170deg,#ffe292 0%,#ffd266 48%,#ffc442 100%);
+  box-shadow:0 3px 0 #e9ac24,0 5px 9px #9c77162d;
+}
+.home-folder-front::before {
+  content:"";position:absolute;left:0;right:0;top:0;height:17px;
+  border-radius:11px 11px 5px 5px;
+  background:linear-gradient(180deg,#ffe9aecc,#ffe09c25);
+}
+@media(max-width:740px){
+  .home-books-grid {grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:7px;padding:18px 10px;}
+  .home-book-tile {min-height:180px;padding:12px 5px;}
+  .home-folder-figure {transform:scale(.84);transform-origin:top center;margin-bottom:-18px;}
+  .home-book-label {font-size:11px;}
+}

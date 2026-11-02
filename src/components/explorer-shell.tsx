@@ -28,16 +28,6 @@ export function ExplorerShell({ user, titulares, selected, children, pageTitle, 
         </Link>}
       </aside>
 
-      {!focusMode&&<aside className="folder-pane" aria-label="Titulares dos livros-caixa">
-        <div className="pane-heading"><span>LIVROS CAIXA</span></div>
-        {titulares.map(t => (
-          <Link key={t.id} className={"tree-link" + (selected?.id === t.id ? " tree-link-selected" : "")}
-            href={"/livros/" + t.id}>
-            <Folder size={15} className="folder-icon" /><span>{t.nome}</span>
-          </Link>
-        ))}
-        {titulares.length === 0 && <p className="tree-empty">Nenhum livro autorizado</p>}
-      </aside>}
 
       <main className="content-pane">
         <header className="content-header">
@@ -73,11 +63,18 @@ export function ExplorerShell({ user, titulares, selected, children, pageTitle, 
               <strong>Nenhum lançamento cadastrado</strong>
               <span>Os lançamentos aparecerão após a aprovação de documentos.</span>
             </div>
-          </> : <div className="titular-list">
-            {titulares.map(t => <Link className="titular-row" key={t.id} href={"/livros/" + t.id}>
-              <Folder size={16} className="folder-icon" /><span>{t.nome}</span><ChevronRight size={15} /></Link>)}
+          </> : <nav className="home-books-grid" aria-label="Abrir livro caixa">
+            {titulares.map(t => <Link className="home-book-tile" key={t.id} href={"/livros/" + t.id}
+              title={"Abrir livro caixa de "+t.nome}>
+              <span className="home-folder-figure" aria-hidden="true">
+                <span className="home-folder-back"/>
+                <span className="home-folder-paper"/>
+                <span className="home-folder-front"/>
+              </span>
+              <span className="home-book-label">{t.nome}</span>
+            </Link>)}
             {titulares.length === 0 && <p className="muted">Nenhum livro disponível para este usuário.</p>}
-          </div>}
+          </nav>}
         </section>
         <footer className="statusbar">
           <span><LayoutList size={13} /> {selected ? "Planilha de saídas" : titulares.length + " livros"}</span>
