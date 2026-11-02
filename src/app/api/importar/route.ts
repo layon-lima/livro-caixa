@@ -75,24 +75,41 @@ export async function POST(request: Request) {
         // Impede que dois envios simultâneos ultrapassem a cota ou gravem duplicados.
         await connection.query("SELECT pg_advisory_xact_lock(731266201)");
         const existing = await connection.query<{
-          id:string;titular_envio_id:string;status:string;armazenamento:string;
+          id:string;titular_envio_id:string;status:string;armazenamento:string;descartado_em:string|null;
         }>(
-          "SELECT id::text,titular_envio_id::text,status,armazenamento FROM arquivos WHERE sha256=$1 FOR UPDATE",[digest]
+          "SELECT id::text,titular_envio_id::text,status,armazenamento,descartado_em::text FROM arquivos WHERE sha256=$1 FOR UPDATE",[digest]
         );
         if (existing.rows[0]) {
           const original=existing.rows[0];
+          // Reenvio explícito de documento previamente descartado:
+          // usa o mesmo original, mas não mistura o novo processo com ZIP antigo.
+          if(original.descartado_em&&original.titular_envio_id===String(titularId)&&
+             original.armazenamento==="local"&&original.status!=="processando"){
+            // Preservar histórico descartado; propostas novas serão criadas em nova leitura.
+            await connection.query(
+              "UPDATE lote_itens SET arquivo_id=NULL,status_entrada='descartado',"+
+              "erro='Documento descartado e reenviado em nova importação' WHERE arquivo_id=$1",
+              [original.id]);
+            await connection.query(
+              "UPDATE arquivos SET descartado_em=NULL,descartado_por=NULL,status='aguardando',"+
+              "progresso_etapa='aguardando',progresso_dados='{}'::jsonb,"+
+              "erro=NULL,texto_extraido='',atualizado_em=now() WHERE id=$1",
+              [original.id]);
+            await connection.query("COMMIT");
+            results.push({name,status:"reprocessado",id:original.id});return;
+          }
           // O usuário reenviou um documento ainda não conferido.
           // Reprocessar a mesma entrada sem duplicar armazenamento, preservando
           // documentos já revisados/aprovados e sem cruzar titulares distintos.
           if (original.titular_envio_id===String(titularId) &&
               original.armazenamento==="local" &&
-              ["pronto","erro"].includes(original.status)) {
+              ["pronto","erro"].includes(original.status) && !original.descartado_em) {
             const checked=await connection.query(
               "SELECT 1 FROM propostas WHERE arquivo_id=$1 AND "+
-              "(revisada_em IS NOT NULL OR aprovado_em IS NOT NULL) LIMIT 1",[original.id]
+              "(revisada_em IS NOT NULL OR aprovado_em IS NOT NULL) AND descartado_em IS NULL LIMIT 1",[original.id]
             );
             if (!checked.rowCount) {
-              await connection.query("DELETE FROM propostas WHERE arquivo_id=$1",[original.id]);
+              await connection.query("DELETE FROM propostas WHERE arquivo_id=$1 AND descartado_em IS NULL",[original.id]);
               await connection.query(
                 "UPDATE arquivos SET status='aguardando',progresso_etapa='aguardando',progresso_dados='{}'::jsonb,"+
                 "erro=NULL,texto_extraido='',atualizado_em=now() "+

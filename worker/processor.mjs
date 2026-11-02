@@ -2,7 +2,7 @@ import { paymentDateFromText,verifiedPaymentDate } from "./payment-date.mjs";
 import { Pool } from "pg";
 import { parseLocalDocument } from "./local-parser.mjs";
 import { analyzeWithOllama } from "./ollama-analyzer.mjs";
-import { candidateNewOwner, confirmedPixReceiver } from "./company-lookup.mjs";
+import { candidateNewOwner, confirmedPixReceiver, confirmedPixPayer, knownPixPayer } from "./company-lookup.mjs";
 import { categoryFromApprovals } from "./classification-learning.mjs";
 import { mergeOcrReview } from "./ocr-ai-merge.mjs";
 import { XMLParser } from "fast-xml-parser";
@@ -156,6 +156,10 @@ async function processFile(file){
     if(["OUTRAS DESPESAS","OUTRA DESPESA"].includes(normalizeName(first.categoria)))
       first.categoria="";
     const protectedPixReceiver=items.length===1?confirmedPixReceiver(output.text):"";
+    const pixPayer=items.length===1?confirmedPixPayer(output.text):"";
+    const payerOwner=knownPixPayer(pixPayer,allowedBooks);
+    const isPixReceipt=/\bPIX\b/i.test(output.text.slice(0,5000))&&
+      /comprovante|pagamento|transfere|enviado|realizado/i.test(output.text.slice(0,5000));
     // Dados estruturados do comprovante têm prioridade sobre interpretações do modelo.
     if(protectedPixReceiver&&normalizeName(first.contraparte)!==normalizeName(protectedPixReceiver)){
       first.contraparte=protectedPixReceiver;
@@ -164,10 +168,10 @@ async function processFile(file){
     const knownNames=allNames;
     const localSuggestedOwner=candidateNewOwner(output.text,first.documento_tipo,knownNames);
     const dateInitial=competence(first.competencia);
-    const matchingOwner=recognizedOwner(output.text,allowedBooks);
+    const matchingOwner=isPixReceipt?payerOwner:recognizedOwner(output.text,allowedBooks);
     // Classificação aprendida apenas com aprovações de mesmo titular.
     // Evidência explícita do documento continua tendo prioridade.
-    if(items.length===1&&!first.categoria&&first.contraparte){
+    if(items.length===1&&!first.categoria&&first.contraparte&&(!isPixReceipt||payerOwner)){
       const fromHistory=await categoryFromApprovals(db,
         matchingOwner?.id||defaultBook.id,first.contraparte);
       if(fromHistory){
@@ -184,6 +188,7 @@ async function processFile(file){
       referencia:short(first.referencia,100),
       data_pagamento:paymentDateFromText(output.text,first.documento_tipo),
       ...(matchingOwner?{titular_id:String(matchingOwner.id)}:{}),
+      ...(pixPayer?{pagador_identificado:pixPayer}:{}),
       ...(localSuggestedOwner?{titular_sugerido:localSuggestedOwner}:{})
     };
     await db.query(
@@ -208,6 +213,7 @@ async function processFile(file){
                 paymentDateFromText(output.text,first.documento_tipo):first[key];
               if(current&&current!=="outro")delete fields[key];
             }
+            if(isPixReceipt){delete fields.titular_id;delete fields.pagador_identificado;}
             if(protectedPixReceiver){
               delete fields.contraparte;
               delete fields.titulo;
@@ -241,6 +247,14 @@ async function processFile(file){
     const connection=await db.connect();
     try{
       await connection.query("BEGIN");
+      const active=await connection.query(
+        "SELECT 1 FROM arquivos WHERE id=$1 AND descartado_em IS NULL FOR UPDATE",[file.id]);
+      if(!active.rowCount){
+        await connection.query("ROLLBACK");
+        await db.query("UPDATE arquivos SET status='erro',progresso_etapa='descartado',"+
+          "atualizado_em=now() WHERE id=$1 AND descartado_em IS NOT NULL",[file.id]);
+        return;
+      }
       for(const item of items){
         const notice=[];
         if(aiNotice)notice.push(aiNotice);
@@ -250,15 +264,24 @@ async function processFile(file){
           suggested.toLocaleUpperCase("pt-BR"):"";
         if(cleanSuggested)notice.push("Possível titular não cadastrado: "+cleanSuggested+". Confirme antes de criar.");
         const fullText=item.trecho||output.text;
+        const currentPayer=confirmedPixPayer(fullText)||(items.length===1?pixPayer:"");
+        const currentPix=/\bPIX\b/i.test(fullText.slice(0,5000))&&
+          /comprovante|pagamento|transfere|enviado|realizado/i.test(fullText.slice(0,5000));
+        const explicitPayerOwner=knownPixPayer(currentPayer,allowedBooks);
         const hinted=fromAiOwner(item.titular_id||item.titular_nome,allowedBooks);
         const seller=fromAiOwner(item.emitente_nome,allowedBooks);
         const buyer=fromAiOwner(item.destinatario_nome,allowedBooks);
         const structuredOwner=seller&&!buyer?seller:buyer&&!seller?buyer:null;
-        const byText=recognizedOwner(fullText,allowedBooks);
-        const owner=structuredOwner||hinted||byText||defaultBook;
+        const byText=currentPix?explicitPayerOwner:recognizedOwner(fullText,allowedBooks);
+        const owner=currentPix?(explicitPayerOwner||defaultBook):
+          (structuredOwner||hinted||byText||defaultBook);
         // O titular usado no armazenamento é técnico, não uma escolha do usuário.
         // Se IA/OCR não encontrarem titular confiável, a conferência exige escolha.
-        if(!structuredOwner&&!hinted&&!byText)notice.push("Titular não identificado automaticamente; selecione o titular na conferência antes de aprovar.");
+        if(currentPix&&!explicitPayerOwner)notice.push(currentPayer?
+          "Quem fez o Pix foi lido, mas não corresponde a um titular único; selecione o titular.":
+          "Não foi possível ler quem fez o Pix; selecione o titular na conferência.");
+        else if(!currentPix&&!structuredOwner&&!hinted&&!byText)
+          notice.push("Titular não identificado automaticamente; selecione o titular na conferência antes de aprovar.");
         if(hinted&&byText&&String(hinted.id)!==String(byText.id)){
           notice.push("Há divergência na identificação do titular; confira antes de aprovar.");
         }
@@ -314,7 +337,7 @@ async function processFile(file){
         if(chosen)notice.push("Possível operação relacionada encontrada: confira a vinculação sugerida.");
         const duplicates=strongerReference?await connection.query(
           "SELECT p.id::text FROM propostas p WHERE p.titular_id=$1 AND p.documento_tipo=$2 "+
-          "AND p.referencia=$3 AND p.arquivo_id<>$4 ORDER BY p.id LIMIT 1",
+          "AND p.referencia=$3 AND p.arquivo_id<>$4 AND p.descartado_em IS NULL ORDER BY p.id LIMIT 1",
           [ownerId,docType,reference,file.id]
         ):null;
         const extraWarnings=Array.isArray(item.avisos)?item.avisos.map(x=>short(x,160)).slice(0,7):[];
@@ -328,8 +351,8 @@ async function processFile(file){
           "INSERT INTO propostas (arquivo_id,titular_id,titulo,documento_tipo,contraparte,competencia,"+
           "competencia_estimada,categoria_id,tipo,descricao,valor,referencia,pagina_inicial,pagina_final,"+
           "operacao_sugerida_id,duplicada_de,metodo_leitura,confianca,avisos,titular_sugerido,consulta_empresa,"+
-          "categoria_sugerida_nome,categoria_sugerida_subcategoria,data_pagamento) "+
-          "VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)",
+          "categoria_sugerida_nome,categoria_sugerida_subcategoria,data_pagamento,pagador_identificado) "+
+          "VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)",
           [file.id,ownerId,title,docType,party,date.date,date.estimated,category?.id||null,
             ["receita","despesa","outro"].includes(type)?type:"outro",
             desc,value,reference,
@@ -338,18 +361,19 @@ async function processFile(file){
             chosen,duplicates?.rows[0]?.id||null,method,confidence,
             [...new Set([...notice,...extraWarnings])].slice(0,12),
             cleanSuggested,JSON.stringify({}),
-            categorySuggestion?.nome||"",categorySuggestion?.subcategoria||"",paidAt||null]
+            categorySuggestion?.nome||"",categorySuggestion?.subcategoria||"",paidAt||null,currentPayer]
         );
       }
       // Reatribuímos o arquivo ao titular identificado apenas quando todas
       // as propostas do PDF têm um único titular reconhecido com confiança.
       // Caso contrário permanece técnico e será resolvido na aprovação.
       const ownerRows=await connection.query(
-        "SELECT titular_id::text AS id,avisos FROM propostas WHERE arquivo_id=$1",
+        "SELECT titular_id::text AS id,avisos FROM propostas WHERE arquivo_id=$1 AND descartado_em IS NULL",
         [file.id]);
       const agreed=new Set(ownerRows.rows.map(x=>x.id));
       const uncertain=ownerRows.rows.some(x=>Array.isArray(x.avisos)&&x.avisos.some(
-        warning=>String(warning).startsWith("Titular não identificado automaticamente")
+        warning=>String(warning).startsWith("Titular não identificado automaticamente")||
+          String(warning).startsWith("Quem fez o Pix")||String(warning).startsWith("Não foi possível ler quem fez o Pix")
       ));
       if(!uncertain&&agreed.size===1&&ownerRows.rows.length===items.length){
         await connection.query("UPDATE arquivos SET titular_envio_id=$2 WHERE id=$1",
@@ -372,8 +396,8 @@ async function claim(){
   const c=await db.connect();
   try{
     await c.query("BEGIN");
-    const r=await c.query("SELECT * FROM arquivos WHERE status='aguardando' OR "+
-      "(status='processando' AND atualizado_em < now() - interval '30 minutes') "+
+    const r=await c.query("SELECT * FROM arquivos WHERE descartado_em IS NULL AND (status='aguardando' OR "+
+      "(status='processando' AND atualizado_em < now() - interval '30 minutes')) "+
       "ORDER BY id FOR UPDATE SKIP LOCKED LIMIT 1");
     if(!r.rows[0]){await c.query("COMMIT");return null;}
     await c.query("UPDATE arquivos SET status='processando',progresso_etapa='ocr',progresso_dados='{}'::jsonb,atualizado_em=now() WHERE id=$1",[r.rows[0].id]);

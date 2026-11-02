@@ -31,9 +31,9 @@ export async function GET(request: Request) {
   const rows=await getDatabase().query<Item>(
     "SELECT a.id::text,a.titular_envio_id::text AS titular_id,a.nome_original,a.status,a.erro,"+
     "a.progresso_etapa,a.progresso_dados,"+
-    "(SELECT count(*)::integer FROM propostas p WHERE p.arquivo_id=a.id AND p.aprovado_em IS NULL) AS propostas,"+
-    "(SELECT p.id::text FROM propostas p WHERE p.arquivo_id=a.id AND p.aprovado_em IS NULL ORDER BY p.id LIMIT 1) AS proposta_id "+
-    "FROM arquivos a WHERE a.id=ANY($1::bigint[])",
+    "(SELECT count(*)::integer FROM propostas p WHERE p.arquivo_id=a.id AND p.aprovado_em IS NULL AND p.descartado_em IS NULL) AS propostas,"+
+    "(SELECT p.id::text FROM propostas p WHERE p.arquivo_id=a.id AND p.aprovado_em IS NULL AND p.descartado_em IS NULL ORDER BY p.id LIMIT 1) AS proposta_id "+
+    "FROM arquivos a WHERE a.id=ANY($1::bigint[]) AND a.descartado_em IS NULL",
     [ids],
   );
   if (rows.rows.length!==ids.length) return NextResponse.json({error:"Arquivo não encontrado."},{status:404});

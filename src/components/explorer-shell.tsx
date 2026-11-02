@@ -57,21 +57,21 @@ export function ExplorerShell({ user, titulares, selected, children, pageTitle, 
           </div>
         </header>
 
-        <section className="file-list" aria-label="Livros e operações">
+        <section className="file-list" aria-label="Livros e lançamentos">
           <div className="list-titlebar">
             <div><h1>{selected ? selected.nome : pageTitle||"Livros Caixa"}</h1>
-              <p>{selected ? "Operações e documentos" : pageTitle?"Área de trabalho":"Selecione o titular para abrir seu livro"}</p></div>
+              <p>{selected ? "Lançamentos e documentos" : pageTitle?"Área de trabalho":"Selecione o titular para abrir seu livro"}</p></div>
           </div>
 
           {children ? children : selected ? <>
             <div className="file-columns" aria-hidden="true">
-              <div className="col-main">Nome da operação</div><div className="col-category">Categoria</div>
+              <div className="col-main">Descrição do lançamento</div><div className="col-category">Categoria</div>
               <div className="col-period">Competência</div><div className="col-docs">Documentos</div>
             </div>
             <div className="file-empty">
               <div className="empty-icon"><Folder size={28} strokeWidth={1.3} /></div>
-              <strong>Nenhuma operação cadastrada</strong>
-              <span>As operações aparecerão aqui depois da implementação da importação.</span>
+              <strong>Nenhum lançamento cadastrado</strong>
+              <span>Os lançamentos aparecerão após a aprovação de documentos.</span>
             </div>
           </> : <div className="titular-list">
             {titulares.map(t => <Link className="titular-row" key={t.id} href={"/livros/" + t.id}>

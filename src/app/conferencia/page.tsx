@@ -8,11 +8,12 @@ import { LiveReview } from "@/components/live-review";
 import { ReviewCategoryPicker } from "@/components/review-category-picker";
 import { suggestDocumentName } from "@/lib/document-name";
 import { BatchQueueRefresh } from "@/components/batch-queue-refresh";
+import { DiscardDocument } from "@/components/discard-document";
 import { notFound } from "next/navigation";
 export const dynamic="force-dynamic";
 type Queued=Proposta&{nome_titular:string;duplicada_de:string|null;arquivo_original_id:string|null;titular_original_id:string|null};
 
-export default async function Conferencia({searchParams}:{searchParams:Promise<{id?:string;arquivo?:string;arquivos?:string;lote?:string;revisada?:string;aprovados?:string;erro?:string}>}){
+export default async function Conferencia({searchParams}:{searchParams:Promise<{id?:string;arquivo?:string;arquivos?:string;lote?:string;revisada?:string;aprovados?:string;descartado?:string;erro?:string}>}){
   const user=await requireUser();
   const db=getDatabase();
   const [query,books,cats]=await Promise.all([searchParams,titularesPermitidos(user,"approve"),categorias()]);
@@ -22,14 +23,15 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
   const zipBatch=loteInfo?.rows[0];
   if(lote&&(!zipBatch||(!user.isAdmin&&String(user.id)!==zipBatch.enviado_por)))notFound();
   const batchStats=zipBatch?await db.query<{
-    total:number;prontos:number;aprovados:number;aguardando:number;processando:number;falhas:number;
+    total:number;prontos:number;aprovados:number;aguardando:number;processando:number;falhas:number;descartados:number;
   }>(
     "SELECT COUNT(*)::int AS total,"+
-    "COUNT(*) FILTER (WHERE a.status='pronto' AND EXISTS(SELECT 1 FROM propostas p WHERE p.arquivo_id=a.id AND p.aprovado_em IS NULL))::int AS prontos,"+
+    "COUNT(*) FILTER (WHERE a.descartado_em IS NULL AND a.status='pronto' AND EXISTS(SELECT 1 FROM propostas p WHERE p.arquivo_id=a.id AND p.aprovado_em IS NULL AND p.descartado_em IS NULL))::int AS prontos,"+
     "COUNT(*) FILTER (WHERE a.id IS NOT NULL AND EXISTS(SELECT 1 FROM propostas p WHERE p.arquivo_id=a.id AND p.aprovado_em IS NOT NULL))::int AS aprovados,"+
-    "COUNT(*) FILTER (WHERE a.status='aguardando')::int AS aguardando,"+
-    "COUNT(*) FILTER (WHERE a.status='processando')::int AS processando,"+
-    "COUNT(*) FILTER (WHERE a.status='erro' OR li.arquivo_id IS NULL)::int AS falhas "+
+    "COUNT(*) FILTER (WHERE a.status='aguardando' AND a.descartado_em IS NULL)::int AS aguardando,"+
+    "COUNT(*) FILTER (WHERE a.status='processando' AND a.descartado_em IS NULL)::int AS processando,"+
+    "COUNT(*) FILTER (WHERE (a.status='erro' AND a.descartado_em IS NULL) OR (li.arquivo_id IS NULL AND li.status_entrada<>'descartado'))::int AS falhas,"+
+    "COUNT(*) FILTER (WHERE a.descartado_em IS NOT NULL OR li.status_entrada='descartado')::int AS descartados "+
     "FROM lote_itens li LEFT JOIN arquivos a ON a.id=li.arquivo_id WHERE li.lote_id=$1",
     [lote]
   ):null;
@@ -51,13 +53,13 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
   const rows=await db.query<Queued>(
     "SELECT p.id::text,p.arquivo_id::text,p.titular_id::text,p.titulo,p.documento_tipo,p.contraparte,"+
     "p.competencia::text,p.data_pagamento::text,p.competencia_estimada,p.categoria_id::text,p.tipo,p.descricao,p.valor::text,p.referencia,"+
-    "p.pagina_inicial,p.pagina_final,p.metodo_leitura,p.confianca::text,p.avisos,p.titular_sugerido,p.consulta_empresa,p.categoria_sugerida_nome,p.categoria_sugerida_subcategoria,p.revisada_em::text,p.operacao_sugerida_id::text,p.aprovado_em::text,p.duplicada_de::text,"+
+    "p.pagador_identificado,p.pagina_inicial,p.pagina_final,p.metodo_leitura,p.confianca::text,p.avisos,p.titular_sugerido,p.consulta_empresa,p.categoria_sugerida_nome,p.categoria_sugerida_subcategoria,p.revisada_em::text,p.operacao_sugerida_id::text,p.aprovado_em::text,p.duplicada_de::text,"+
     "orig.arquivo_id::text AS arquivo_original_id,orig.titular_id::text AS titular_original_id,"+
     "a.nome_original,a.status,a.erro,''::text AS texto_extraido,t.nome AS nome_titular "+
     "FROM propostas p JOIN arquivos a ON a.id=p.arquivo_id JOIN titulares t ON t.id=p.titular_id "+
     "LEFT JOIN propostas orig ON orig.id=p.duplicada_de "+
     (user.isAdmin?"":"JOIN user_titular_permissions up ON up.titular_id=p.titular_id AND up.user_id=$1 AND up.can_approve=true ")+
-    "WHERE p.aprovado_em IS NULL "+
+    "WHERE p.aprovado_em IS NULL AND p.descartado_em IS NULL AND a.descartado_em IS NULL "+
     scope+
     (lote?"ORDER BY p.id ASC LIMIT 1000":"ORDER BY p.id DESC LIMIT 500"),
     queryArgs);
@@ -78,7 +80,7 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
     "FROM arquivos a JOIN titulares t ON t.id=a.titular_envio_id "+
     (user.isAdmin?"":"JOIN user_titular_permissions up ON up.titular_id=a.titular_envio_id "+
       "AND up.user_id=$1 AND up.can_approve=true ")+
-    "WHERE a.status IN ('aguardando','processando','erro') "+
+    "WHERE a.status IN ('aguardando','processando','erro') AND a.descartado_em IS NULL "+
     "AND NOT EXISTS (SELECT 1 FROM propostas p WHERE p.arquivo_id=a.id AND p.aprovado_em IS NULL) "+
     pendingExtra+(lote?"ORDER BY a.id ASC LIMIT 300":"ORDER BY a.id DESC LIMIT 100"),
     pendingArgs
@@ -106,9 +108,6 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
   }):"";
   const batchQuery=lote?"lote="+encodeURIComponent(lote)+"&":batch?"arquivos="+batch.join(",")+"&":"";
 
-  const available=selected?await db.query<{id:string;titulo:string}>(
-    "SELECT id::text,titulo FROM operacoes WHERE titular_id=$1 AND excluido_em IS NULL ORDER BY id DESC LIMIT 200",
-    [selected.titular_id]):null;
   return <StandaloneWorkspace title="Conferência" section="livros"><div className="work-page">
     <header className="work-bar"><Link href="/" className="work-back"><ArrowLeft size={16}/> Livros Caixa</Link>
       <strong><ClipboardCheck size={16}/> Conferência</strong><Link href="/importar">Importar documentos</Link></header>
@@ -118,7 +117,7 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
         {lote&&stats&&<div className="batch-queue-summary">
           <strong title={zipBatch?.nome_arquivo}>Lote ZIP: {zipBatch?.nome_arquivo}</strong>
           <span>{stats.prontos} disponíveis para conferir · {stats.aprovados} aprovados</span>
-          <span>{stats.processando} em leitura · {stats.aguardando} aguardando · {stats.falhas} com erro/ignorados</span>
+          <span>{stats.processando} em leitura · {stats.aguardando} aguardando · {stats.falhas} com erro/ignorados · {stats.descartados} descartados</span>
           <small>{stats.total} itens recebidos. A leitura continua enquanto você confere.</small>
           {zipBatch?.status==="erro"&&<small className="form-error">{zipBatch.erro}</small>}
           {Boolean(skipped?.rows.length)&&<details className="batch-queue-ignored">
@@ -128,8 +127,9 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
           <BatchQueueRefresh active={stats.aguardando>0||stats.processando>0}/>
         </div>}
         {query.erro&&<p className="form-error">Não foi possível concluir: {query.erro}.</p>}
-        {query.revisada&&<p className="form-success">Proposta conferida e salva.</p>}
-        {query.aprovados&&<p className="form-success">{query.aprovados} proposta(s) aprovada(s).</p>}
+        {query.descartado&&<p className="form-success">Documento retirado da fila sem criar lançamento.</p>}
+        {query.revisada&&<p className="form-success">Documento conferido e salvo.</p>}
+        {query.aprovados&&<p className="form-success">{query.aprovados} lançamento(s) criado(s).</p>}
         <form method="post" action="/api/propostas/aprovar">
           {batch&&<input type="hidden" name="arquivos" value={batch.join(",")}/>}
           {lote&&<input type="hidden" name="lote" value={lote}/>}
@@ -152,17 +152,17 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
               <span className="review-row-meta"><span>Titular em identificação</span><span>{p.status==="erro"?"Erro na leitura":p.status==="aguardando"?"Na fila":"Analisando…"}</span></span>
             </Link>
           </div>)}
-          {all.length===0&&inProgress.length===0&&<p className="empty-info">Nenhuma proposta aguardando aprovação.</p>}
+          {all.length===0&&inProgress.length===0&&<p className="empty-info">Nenhum documento aguardando conferência.</p>}
           <div className="review-footer">
             <button className="primary-btn" type="submit" disabled={!all.some(p=>p.revisada_em&&!p.duplicada_de)}>Aprovar selecionados</button>
           </div>
         </form>
       </section>
       <section className="review-detail">
-        {activePending?<LiveReview key={activePending.id}
+        {activePending?<><LiveReview key={activePending.id}
           arquivoId={activePending.id} nome={activePending.nome_original}
           books={books} cats={cats} isAdmin={user.isAdmin}
-        />:!selected?<p className="empty-info">{lote?"Lote sem documentos pendentes. Os aprovados já estão nos livros.":"Importe um arquivo para começar."}</p>:<>
+        /><DiscardDocument arquivoId={activePending.id} arquivos={batch?.join(",")} lote={lote}/></>:!selected?<p className="empty-info">{lote?"Lote sem documentos pendentes. Os aprovados já estão nos livros.":"Importe um arquivo para começar."}</p>:<>
           <div className="page-title-compact"><h2 title={"Nome no envio: "+selected.nome_original}>{selectedName}</h2>
             <a href={"/api/documentos/"+selected.arquivo_id} target="_blank" rel="noreferrer">Abrir original <ExternalLink size={13}/></a></div>
           <div className="review-analysis-status">
@@ -173,8 +173,8 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
             {selected.pagina_inicial&&<span>Páginas: {selected.pagina_inicial}{selected.pagina_final&&selected.pagina_final!==selected.pagina_inicial?"–"+selected.pagina_final:""}</span>}
           </div>
           {selected.duplicada_de && <div className="duplicate-alert">
-            <strong>Duplicidade confirmada — proposta #{selected.duplicada_de}</strong>
-            <span>Este documento não poderá ser aprovado novamente.</span>
+            <strong>Este documento já foi identificado anteriormente</strong>
+            <span>Um lançamento duplicado não será criado.</span>
             {selected.arquivo_original_id && (user.isAdmin || selected.titular_original_id===selected.titular_id) &&
               <a href={"/api/documentos/"+selected.arquivo_original_id} target="_blank" rel="noreferrer">Abrir documento original</a>}
           </div>}
@@ -183,8 +183,9 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
             {lote&&<input type="hidden" name="lote" value={lote}/>}
             <section className="review-auto-summary">
               <div><span>Documento</span><strong>{selected.documento_tipo}</strong></div>
+              {selected.pagador_identificado&&<div><span>Quem fez o Pix</span><strong>{selected.pagador_identificado}</strong></div>}
               <div><span>Titular</span><strong>{
-                selected.avisos?.some(x=>x.startsWith("Titular não identificado automaticamente"))?
+                selected.avisos?.some(x=>x.startsWith("Titular não identificado automaticamente")||x.startsWith("Quem fez o Pix")||x.startsWith("Não foi possível ler quem fez o Pix"))?
                 "Aguardando sua identificação":selected.nome_titular
               }</strong></div>
               <div><span>Categoria</span><strong>{
@@ -195,7 +196,6 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
               <div><span>Pagamento</span><strong>{selected.data_pagamento?selected.data_pagamento.split("-").reverse().join("/"):"Não informado"}</strong></div>
               <div><span>Valor</span><strong>{selected.valor?Number(selected.valor).toLocaleString("pt-BR",{style:"currency",currency:"BRL"}):"Não identificado"}</strong></div>
               <div><span>Contraparte</span><strong>{selected.contraparte||"Não identificada"}</strong></div>
-              {selected.operacao_sugerida_id&&<div><span>Vinculação</span><strong>Operação relacionada #{selected.operacao_sugerida_id}</strong></div>}
             </section>
             {selected.titular_sugerido&&<section className="review-enrichment">
               {selected.titular_sugerido&&<div className="enrichment-line">
@@ -214,16 +214,16 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
               <ul>{selected.avisos.map((notice,i)=><li key={i}>{notice}</li>)}</ul>
             </details>}
             <details className="review-edit-data" open={Boolean(selected.categoria_sugerida_nome)||
-              selected.avisos?.some(x=>x.startsWith("Titular não identificado automaticamente"))||
+              selected.avisos?.some(x=>x.startsWith("Titular não identificado automaticamente")||x.startsWith("Quem fez o Pix")||x.startsWith("Não foi possível ler quem fez o Pix"))||
               (selected.avisos?.length??0)>1}>
               <summary>Corrigir informações sugeridas</summary>
               <div className="review-fields-grid">
-                <label className="review-span-all">Título da operação
+                <label className="review-span-all">Descrição do lançamento
                   <input name="titulo" defaultValue={selected.titulo} required maxLength={170}/>
                 </label>
                 <label>Titular
                   <select name="titularId" defaultValue={
-                    selected.avisos?.some(x=>x.startsWith("Titular não identificado automaticamente"))?
+                    selected.avisos?.some(x=>x.startsWith("Titular não identificado automaticamente")||x.startsWith("Quem fez o Pix")||x.startsWith("Não foi possível ler quem fez o Pix"))?
                     "":selected.titular_id
                   } required>
                     <option value="">Selecione o titular do documento</option>
@@ -264,23 +264,15 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
                 <label className="review-span-half">Descrição
                   <textarea name="descricao" defaultValue={selected.descricao} rows={2}/>
                 </label>
-                <label className="review-span-half">Vinculação com operação existente
-                  <select name="operacaoId" defaultValue={selected.operacao_sugerida_id||""}>
-                    <option value="">Criar nova operação</option>
-                    {available?.rows.map(o=><option key={o.id} value={o.id}>
-                      {o.id===selected.operacao_sugerida_id?"Sugestão: ":""}#{o.id} — {o.titulo}
-                    </option>)}
-                  </select>
-                </label>
               </div>
-            {selected.operacao_sugerida_id&&<p className="muted">Foi encontrada uma possível operação relacionada. Confirme a escolha acima antes de salvar.</p>}
             </details>
             <div className="review-approval-actions">
-              <button type="submit" name="acao" value="aprovar" className="primary-btn">Aprovar e organizar documento</button>
+              <button type="submit" name="acao" value="aprovar" className="primary-btn">Aprovar lançamento</button>
               <button type="submit" name="acao" value="salvar" className="flat-button">Salvar para depois</button>
             </div>
             <span className="muted">Confira os dados acima antes de aprovar. Nada será organizado definitivamente sem sua confirmação.</span>
           </form>}
+          <DiscardDocument propostaId={selected.id} arquivos={batch?.join(",")} lote={lote}/>
           <details className="text-extracted"><summary>Texto extraído do documento</summary><pre>{selected.texto_extraido.slice(0,30000)}</pre></details>
         </>}
       </section>

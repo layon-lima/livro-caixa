@@ -8,7 +8,7 @@ import { suggestDocumentName } from "@/lib/document-name";
 type LiveFields={
   titulo?:string;documento_tipo?:string;titular_id?:string;categoria?:string;
   competencia?:string;data_pagamento?:string;tipo?:string;valor?:string;contraparte?:string;
-  referencia?:string;descricao?:string;titular_sugerido?:string;
+  referencia?:string;descricao?:string;titular_sugerido?:string;pagador_identificado?:string;
   consulta_empresa?:{cnpj?:string;status?:string;razao_social?:string;nome_fantasia?:string;atividade?:string;fonte?:string};
 };
 type FileState={
@@ -106,6 +106,7 @@ export function LiveReview({arquivoId,nome,books,cats,isAdmin}:{
     {error&&<p className="form-error" role="alert">{error}</p>}
     <section className="review-auto-summary">
       <div><span>Documento</span><strong>{fields.documento_tipo||"Identificando…"}</strong></div>
+      {fields.pagador_identificado&&<div><span>Quem fez o Pix</span><strong>{fields.pagador_identificado}</strong></div>}
       <div><span>Titular</span><strong>{titular?.nome||"Identificando…"}</strong></div>
       <div><span>Categoria</span><strong>{fields.categoria||"Identificando…"}</strong></div>
       <div><span>Competência</span><strong>{fields.competencia||"Identificando…"}</strong></div>
@@ -138,7 +139,7 @@ export function LiveReview({arquivoId,nome,books,cats,isAdmin}:{
     </section>}
     <div className="review-form review-live-fields">
       <div className="review-fields-grid">
-        <label className="review-span-all">Título da operação
+        <label className="review-span-all">Descrição do lançamento
           <input value={field(fields.titulo)} placeholder="Identificando…" readOnly/>
         </label>
         <label>Titular

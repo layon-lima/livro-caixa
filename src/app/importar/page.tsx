@@ -11,7 +11,7 @@ import { suggestDocumentName } from "@/lib/document-name";
 import { FileUp, ArrowLeft, ClipboardCheck } from "lucide-react";
 export const dynamic="force-dynamic";
 
-export default async function Importar({searchParams}:{searchParams:Promise<{titular?:string}>}) {
+export default async function Importar({searchParams}:{searchParams:Promise<{titular?:string;descartado?:string;erro?:string}>}) {
   const user=await requireUser();
   const books=await titularesPermitidos(user,"import");
   const query=await searchParams;
@@ -19,7 +19,7 @@ export default async function Importar({searchParams}:{searchParams:Promise<{tit
   const canApprove=selected?await canAccessTitular(user,Number(selected.id),"approve"):false;
   const [list, usedBytes]=await Promise.all([
     getDatabase().query<{
-    id:string;nome_original:string;status:string;erro:string|null;criado_em:string;nome:string;revisado:boolean;
+    id:string;nome_original:string;status:string;erro:string|null;criado_em:string;nome:string;revisado:boolean;aprovado:boolean;
     progresso_dados:Record<string,string>|null;propostas_quantidade:number;
     titulo_detectado:string|null;documento_tipo:string|null;contraparte_detectada:string|null;
     descricao_detectada:string|null;pagamento_detectado:string|null;
@@ -31,15 +31,16 @@ export default async function Importar({searchParams}:{searchParams:Promise<{tit
     "first.descricao AS descricao_detectada,first.data_pagamento::text AS pagamento_detectado,"+
     "c.nome AS categoria_detectada,c.subcategoria AS subcategoria_detectada,"+
     "first.categoria_sugerida_nome,first.categoria_sugerida_subcategoria,"+
-    "(SELECT count(*)::int FROM propostas pp WHERE pp.arquivo_id=a.id) AS propostas_quantidade,"+
-    "EXISTS(SELECT 1 FROM propostas p WHERE p.arquivo_id=a.id AND (p.revisada_em IS NOT NULL OR p.aprovado_em IS NOT NULL)) AS revisado "+
+    "EXISTS(SELECT 1 FROM propostas p WHERE p.arquivo_id=a.id AND p.aprovado_em IS NOT NULL) AS aprovado,"+
+    "(SELECT count(*)::int FROM propostas pp WHERE pp.arquivo_id=a.id AND pp.descartado_em IS NULL) AS propostas_quantidade,"+
+    "EXISTS(SELECT 1 FROM propostas p WHERE p.arquivo_id=a.id AND p.descartado_em IS NULL AND (p.revisada_em IS NOT NULL OR p.aprovado_em IS NOT NULL)) AS revisado "+
     "FROM arquivos a JOIN titulares t ON t.id=a.titular_envio_id "+
     "LEFT JOIN LATERAL (SELECT p.titulo,p.documento_tipo,p.contraparte,p.descricao,p.data_pagamento,"+
     "p.categoria_id,p.categoria_sugerida_nome,p.categoria_sugerida_subcategoria "+
-    "FROM propostas p WHERE p.arquivo_id=a.id ORDER BY p.id LIMIT 1) first ON TRUE "+
+    "FROM propostas p WHERE p.arquivo_id=a.id AND p.descartado_em IS NULL ORDER BY p.id LIMIT 1) first ON TRUE "+
     "LEFT JOIN categorias c ON c.id=first.categoria_id "+
     (user.isAdmin?"":"JOIN user_titular_permissions p ON p.titular_id=a.titular_envio_id AND p.user_id=$1 AND p.can_import=true ")+
-    "ORDER BY a.id DESC LIMIT 100",
+    "WHERE a.descartado_em IS NULL ORDER BY a.id DESC LIMIT 100",
     user.isAdmin?[]:[user.id],
   ),
     physicalStorageBytes(),
@@ -92,6 +93,8 @@ export default async function Importar({searchParams}:{searchParams:Promise<{tit
           <button type="submit" className="flat-button">Aplicar</button>
         </form>
       </details>
+      {query.descartado&&<p className="form-success">Documento retirado da fila.</p>}
+      {query.erro&&<p className="form-error">Não foi possível descartar o documento.</p>}
       {selected?<ImportDrop key={selected.id} titularId={selected.id} canApprove={canApprove}/>
         :<p className="form-error">Este usuário não possui permissão de importação.</p>}
       {previous.rows.length>0&&<div className="batch-previous">

@@ -13,13 +13,13 @@ export async function POST(request: Request){
   const connection=await db.connect();
   try{
     await connection.query("BEGIN");
-    const found=await connection.query<{titular_envio_id:string;status:string;armazenamento:string}>(
-      "SELECT titular_envio_id::text,status,armazenamento FROM arquivos WHERE id=$1 FOR UPDATE",[id]);
+    const found=await connection.query<{titular_envio_id:string;status:string;armazenamento:string;descartado_em:string|null}>(
+      "SELECT titular_envio_id::text,status,armazenamento,descartado_em::text FROM arquivos WHERE id=$1 FOR UPDATE",[id]);
     const file=found.rows[0];
     if(!file || !await canAccessTitular(user,Number(file.titular_envio_id),"import")){
       await connection.query("ROLLBACK");return forbidden();
     }
-    if(file.armazenamento!=="local" || !["pronto","erro"].includes(file.status)){
+    if(file.descartado_em || file.armazenamento!=="local" || !["pronto","erro"].includes(file.status)){
       await connection.query("ROLLBACK");return backTo("/importar?erro=reprocessamento");
     }
     // Não apagar revisões ou documentos aprovados; só refazer a leitura bruta.
@@ -28,7 +28,7 @@ export async function POST(request: Request){
     if(protectedProposals.rowCount){
       await connection.query("ROLLBACK");return backTo("/importar?erro=ja-conferido");
     }
-    await connection.query("DELETE FROM propostas WHERE arquivo_id=$1",[id]);
+    await connection.query("DELETE FROM propostas WHERE arquivo_id=$1 AND descartado_em IS NULL",[id]);
     await connection.query(
       "UPDATE arquivos SET status='aguardando',progresso_etapa='aguardando',progresso_dados='{}'::jsonb,"+
       "erro=NULL,texto_extraido='',atualizado_em=now() WHERE id=$1",[id]);

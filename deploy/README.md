@@ -277,3 +277,27 @@ git pull --ff-only
 docker compose exec -T database sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1' < db/migrations/012_flat_categories.sql
 docker compose up -d --build app worker
 ```
+
+## Correção da conferência: descarte, pagador Pix e fluxo simples (migração 013)
+
+A interface agora apresenta Documento → Conferência → Lançamento. Não solicita
+mais "vinculação com operação existente" e nunca vincula automaticamente uma
+operação apenas por sugestão. O usuário pode aprovar um lançamento, salvar para
+depois ou descartar (inclusive durante a leitura do ZIP). Descartar é lógico:
+o registro e os originais ficam preservados para auditoria; lançamentos já
+aprovados não podem ser descartados pela conferência. O reenvio explícito de
+um arquivo descartado pode colocá-lo de volta na fila após terminar o OCR.
+
+O OCR de Pix distingue "quem fez/pagou" de "quem recebeu". O nome do pagador
+aparece na conferência, e a seleção automática do titular só ocorre quando há
+correspondência única com os titulares autorizados. Caso contrário, o usuário
+escolhe o titular antes da aprovação. Arquivos antigos que ainda não foram
+conferidos podem ser reprocessados para aproveitar o novo extrator.
+
+**Aplicar primeiro a migração 013**, depois reconstruir o app e o worker:
+```bash
+cd /opt/apps/livro-caixa
+git pull --ff-only
+docker compose exec -T database sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1' < db/migrations/013_discard_pix_payer.sql
+docker compose up -d --build app worker
+```

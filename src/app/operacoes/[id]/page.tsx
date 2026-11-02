@@ -29,10 +29,10 @@ export default async function Editar({params}:{params:Promise<{id:string}>}){
   const opCategory=cats.find(c=>c.id===op.categoria_id);
   const oldCategory=op.categoria_id&&!opCategory?
     (await db.query<{nome:string}>("SELECT nome FROM categorias WHERE id=$1",[op.categoria_id])).rows[0]?.nome:"";
-  return <StandaloneWorkspace title="Editar operação" section="livros"><div className="work-page">
-    <header className="work-bar"><Link href={"/livros/"+op.titular_id}><ArrowLeft size={16}/> Voltar ao livro</Link><strong><Pencil size={16}/> Operação #{id}</strong></header>
+  return <StandaloneWorkspace title="Editar lançamento" section="livros"><div className="work-page">
+    <header className="work-bar"><Link href={"/livros/"+op.titular_id}><ArrowLeft size={16}/> Voltar ao livro</Link><strong><Pencil size={16}/> Lançamento #{id}</strong></header>
     <main className="work-main narrow-work">
-      <h1 className="work-heading">Editar operação</h1>
+      <h1 className="work-heading">Editar lançamento</h1>
       <form action={"/api/operacoes/"+id} method="post" className="review-form">
         <div className="form-inline-two">
           <label>Titular

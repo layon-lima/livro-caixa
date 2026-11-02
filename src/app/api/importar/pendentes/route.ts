@@ -15,13 +15,13 @@ export async function GET(){
   const query=
     "SELECT * FROM ("+
     "SELECT a.id::text AS arquivo_id,NULL::text AS proposta_id,a.nome_original,a.status "+
-    "FROM arquivos a WHERE a.status IN ('aguardando','processando','erro') "+
+    "FROM arquivos a WHERE a.descartado_em IS NULL AND a.status IN ('aguardando','processando','erro') "+
     "AND NOT EXISTS (SELECT 1 FROM propostas p WHERE p.arquivo_id=a.id AND p.aprovado_em IS NULL) "+
     "AND "+access("a.titular_envio_id")+
     " UNION ALL "+
     "SELECT a.id::text AS arquivo_id,p.id::text AS proposta_id,a.nome_original,a.status "+
     "FROM propostas p JOIN arquivos a ON a.id=p.arquivo_id "+
-    "WHERE p.aprovado_em IS NULL AND "+access("p.titular_id")+
+    "WHERE p.aprovado_em IS NULL AND p.descartado_em IS NULL AND a.descartado_em IS NULL AND "+access("p.titular_id")+
     ") x ORDER BY arquivo_id::bigint DESC LIMIT 50";
   const result=await getDatabase().query<{
     arquivo_id:string;proposta_id:string|null;nome_original:string;status:string;

@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { ArrowUpRight, FileText, RefreshCw, X } from "lucide-react";
+import { DiscardDocument } from "@/components/discard-document";
 type Imported={
   id:string;nome_original:string;nome_sugerido?:string;status:string;erro:string|null;
-  criado_em:string;nome:string;revisado:boolean;
+  criado_em:string;nome:string;revisado:boolean;aprovado:boolean;
 };
 type Menu={id:string;x:number;y:number};
 export function ImportedFileRows({files}:{files:Imported[]}){
@@ -70,6 +71,7 @@ export function ImportedFileRows({files}:{files:Imported[]}){
             <input type="hidden" name="arquivoId" value={active.id}/>
             <button type="submit" className="flat-button"><RefreshCw size={15}/> Reprocessar documento</button>
           </form>}
+        {!active.aprovado&&<DiscardDocument arquivoId={active.id} origem="importar"/>}
         {active.erro&&<small>{active.erro}</small>}
       </div>
     </div>}

@@ -38,7 +38,8 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
   const valorRaw=String(form.get("valor")||"").trim().replace(/\s/g,"");
   const numberString=valorRaw.includes(",")?valorRaw.replace(/\./g,"").replace(",","."):valorRaw;
   const valor=numberString===""?null:Number(numberString);
-  const operationId=safeId(form.get("operacaoId"));
+  // Um documento aprovado cria um lançamento; o usuário não precisa escolher vínculos técnicos.
+  const operationId:number|null=null;
 
   if(!["salvar","aprovar"].includes(action)||!titular||!date||!titulo||paymentDate===undefined||
     (proposed&&!suggestion)||(categoryMode&&!proposed&&!categoria)||
@@ -56,7 +57,8 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
     }>(
       "SELECT p.id::text,p.titular_id::text,p.arquivo_id::text,p.duplicada_de::text,"+
       "p.aprovado_em::text,a.status FROM propostas p "+
-      "JOIN arquivos a ON a.id=p.arquivo_id WHERE p.id=$1 FOR UPDATE OF p",[id],
+      "JOIN arquivos a ON a.id=p.arquivo_id WHERE p.id=$1 AND p.descartado_em IS NULL "+
+      "AND a.descartado_em IS NULL FOR UPDATE OF p,a",[id],
     );
     const old=found.rows[0];
     if(!old||old.aprovado_em||old.duplicada_de||
@@ -90,7 +92,7 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
 
     if(action==="aprovar"){
       if(old.status!=="pronto"){await connection.query("ROLLBACK");return error("ainda-processando");}
-      let targetId=operationId;
+      let targetId:number|null=operationId;
       if(!targetId) {
         const created=await connection.query<{id:string}>(
           "INSERT INTO operacoes(titular_id,titulo,competencia,categoria_id,tipo,descricao,contraparte,valor,referencia,criado_por,data_pagamento) "+

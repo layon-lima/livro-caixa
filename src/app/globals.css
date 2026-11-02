@@ -551,3 +551,8 @@ button { cursor: pointer; }
 .batch-queue-ignored small {display:block;margin:4px 0;overflow-wrap:anywhere;}
 .batch-previous {display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:8px 10px;margin:5px 0 8px;border:1px solid var(--line);font-size:11px;color:#506982;}
 .batch-previous a {color:#2468a8;text-decoration:underline;}
+
+.discard-document {margin:8px 0;display:flex;align-items:center;gap:7px;font-size:11px;}
+.discard-document button {display:inline-flex;align-items:center;gap:6px;}
+.discard-confirm {display:flex;align-items:center;flex-wrap:wrap;gap:7px;}
+.discard-confirm span {font-weight:600;}

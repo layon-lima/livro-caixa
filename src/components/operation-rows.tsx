@@ -141,7 +141,7 @@ export function OperationRows({operations,documents,books,canEdit,canDelete,book
       <span>{op.data_pagamento?op.data_pagamento.split("-").reverse().join("/"):"—"}</span>
       <span className="explorer-file-value">{money(op.valor)||"—"}</span>
     </div>)}
-    {operations.length===0&&<p className="empty-info">Nenhuma operação para os filtros selecionados.</p>}
+    {operations.length===0&&<p className="empty-info">Nenhum lançamento para os filtros selecionados.</p>}
     {menu&&current&&<div ref={popup} className="entity-actions-popup" role="dialog"
       aria-label={"Ações de "+current.titulo} style={{left:menu.x,top:menu.y}}
       onClick={e=>e.stopPropagation()}>
@@ -155,7 +155,7 @@ export function OperationRows({operations,documents,books,canEdit,canDelete,book
           target="_blank" rel="noopener noreferrer" onClick={()=>setMenu(null)}>
           <FileText size={15}/> Abrir documento original
         </a>}
-        <button type="button" onClick={()=>view("info")}><Eye size={15}/> Detalhes da operação</button>
+        <button type="button" onClick={()=>view("info")}><Eye size={15}/> Detalhes do lançamento</button>
         {currentDocs.length>0&&<button type="button" onClick={()=>view("files")}>
           <FileText size={15}/> Documentos ({current.quantidade_documentos})
         </button>}
@@ -189,18 +189,18 @@ export function OperationRows({operations,documents,books,canEdit,canDelete,book
       </div>}
       {menu.view==="move"&&<form className="entity-popup-form"
         action={"/api/operacoes/"+current.id+"/mover"} method="post">
-        <p>Mover para outro livro autorizado. Se o arquivo for compartilhado com outras operações, o sistema bloqueará a mudança para proteger os documentos.</p>
+        <p>Mover para outro livro autorizado. Se o arquivo for compartilhado com outros lançamentos, o sistema bloqueará a mudança para proteger os documentos.</p>
         <label>Novo titular
           <select name="destinoId" value={destination} onChange={e=>setDestination(e.target.value)}>
             <option value={bookId}>Selecione outro titular</option>
             {books.filter(b=>b.id!==bookId).map(b=><option key={b.id} value={b.id}>{b.nome}</option>)}
           </select>
         </label>
-        <button type="submit" className="primary-btn" disabled={destination===bookId||!destination}>Mover operação</button>
+        <button type="submit" className="primary-btn" disabled={destination===bookId||!destination}>Mover lançamento</button>
       </form>}
       {menu.view==="delete"&&<form className="entity-popup-form" action={"/api/operacoes/"+current.id} method="post">
         <input type="hidden" name="acao" value="excluir"/>
-        <p>Enviar <strong>{current.titulo}</strong> para a lixeira? A operação poderá ser restaurada.</p>
+        <p>Enviar <strong>{current.titulo}</strong> para a lixeira? O lançamento poderá ser restaurado.</p>
         <div className="entity-popup-confirm">
           <button type="button" className="flat-button" onClick={()=>view("actions")}>Cancelar</button>
           <button type="submit" className="primary-btn">Confirmar exclusão</button>

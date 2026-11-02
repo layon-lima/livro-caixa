@@ -32,7 +32,8 @@ export async function POST(request:Request){
       "p.categoria_id::text,p.tipo,p.descricao,p.contraparte,p.valor::text,p.referencia,p.operacao_sugerida_id::text,"+
       "p.revisada_em::text,p.aprovado_em::text,p.duplicada_de::text,"+
       "p.categoria_sugerida_nome,p.categoria_sugerida_subcategoria,a.status "+
-      "FROM propostas p JOIN arquivos a ON a.id=p.arquivo_id WHERE p.id=ANY($1::bigint[]) FOR UPDATE OF p",
+      "FROM propostas p JOIN arquivos a ON a.id=p.arquivo_id "+
+      "WHERE p.id=ANY($1::bigint[]) AND p.descartado_em IS NULL AND a.descartado_em IS NULL FOR UPDATE OF p,a",
       [ids],
     );
     if(found.rows.length!==ids.length){await cx.query("ROLLBACK");return backTo("/conferencia?erro=invalido");}
@@ -54,20 +55,14 @@ export async function POST(request:Request){
         categoryId=await confirmedCategoryId(cx,suggestion);
         await cx.query("UPDATE propostas SET categoria_id=$2 WHERE id=$1",[p.id,categoryId]);
       }
-      let operationId=p.operacao_sugerida_id?Number(p.operacao_sugerida_id):null;
-      if(operationId){
-        const match=await cx.query(
-          "SELECT 1 FROM operacoes WHERE id=$1 AND titular_id=$2 AND excluido_em IS NULL FOR UPDATE",
-          [operationId,p.titular_id]);
-        if(!match.rowCount){await cx.query("ROLLBACK");return backTo("/conferencia?erro=vinculo");}
-      }else{
-        const created=await cx.query<{id:string}>(
-          "INSERT INTO operacoes(titular_id,titulo,competencia,categoria_id,tipo,descricao,contraparte,valor,referencia,criado_por,data_pagamento)"+
-          " VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id::text",
-          [p.titular_id,p.titulo,p.competencia,categoryId,p.tipo,p.descricao,p.contraparte,p.valor,p.referencia,user.id,p.data_pagamento],
-        );
-        operationId=Number(created.rows[0].id);
-      }
+      // Um documento aprovado corresponde a um lançamento simples.
+      // Relacionamentos sugeridos nunca são aceitos implicitamente.
+      const created=await cx.query<{id:string}>(
+        "INSERT INTO operacoes(titular_id,titulo,competencia,categoria_id,tipo,descricao,contraparte,valor,referencia,criado_por,data_pagamento)"+
+        " VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id::text",
+        [p.titular_id,p.titulo,p.competencia,categoryId,p.tipo,p.descricao,p.contraparte,p.valor,p.referencia,user.id,p.data_pagamento]
+      );
+      const operationId=Number(created.rows[0].id);
       if(p.data_pagamento)await cx.query(
         "UPDATE operacoes SET data_pagamento=COALESCE(data_pagamento,$2) WHERE id=$1",
         [operationId,p.data_pagamento]
