@@ -914,3 +914,6 @@ button { cursor: pointer; }
   .expense-table-header>span,.expense-sheet-row>span {padding:8px;}
   .expense-month-header {gap:6px;padding:8px 9px;}
 }
+
+.nav-arrows button:disabled {opacity:.32;color:#9aa6b5;cursor:default;background:transparent;}
+.nav-arrows button:disabled:hover {background:transparent;color:#9aa6b5;}
