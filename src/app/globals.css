@@ -745,3 +745,11 @@ button { cursor: pointer; }
 .content-header>.crumb {flex:1;min-width:0;}
 .content-header>.crumb strong {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 @media(max-width:520px){.nav-arrows button {width:27px;height:28px;}.content-header {gap:5px;}.content-header>.crumb {gap:4px;}}
+
+.manual-duplicate-warning {padding:10px;border:1px solid #e0b16a;background:#fff8ed;border-radius:6px;font-size:11px;}
+.manual-duplicate-warning strong {color:#915318;}
+.manual-duplicate-warning p {margin:5px 0;}
+.manual-duplicate-warning a {color:#1b61a6;text-decoration:underline;}
+
+.conference-similar-override {display:flex;align-items:center;gap:8px;margin:12px 0;padding:9px 10px;border:1px solid #e4ae62;background:#fff7ea;border-radius:6px;color:#78511b;font-size:11px;font-weight:600;}
+.conference-similar-override input {accent-color:#1673c9;width:16px;height:16px;flex-shrink:0;}

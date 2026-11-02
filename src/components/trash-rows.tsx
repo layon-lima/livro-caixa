@@ -5,7 +5,7 @@ import { RotateCcw, Trash2, X } from "lucide-react";
 
 type TrashItem={id:string;titulo:string;nome:string;competencia:string};
 type Menu={id:string;x:number;y:number;confirm:boolean};
-export function TrashRows({items}:{items:TrashItem[]}){
+export function TrashRows({items,similarId}:{items:TrashItem[];similarId?:string|null}){
   const [selected,setSelected]=useState<string|null>(null);
   const [menu,setMenu]=useState<Menu|null>(null);
   const popup=useRef<HTMLDivElement>(null);
@@ -60,6 +60,10 @@ export function TrashRows({items}:{items:TrashItem[]}){
         </button>
       </div>:<form className="entity-popup-form" action={"/api/operacoes/"+active.id} method="post">
         <input type="hidden" name="acao" value="restaurar"/>
+        {similarId===active.id&&<label className="conference-similar-override">
+          <input type="checkbox" name="confirmarSemelhante" value="1" required/>
+          Conferi que são dois pagamentos distintos. Autorizo a restauração.
+        </label>
         <p>Restaurar <strong>{active.titulo}</strong> ao livro de {active.nome}?</p>
         <div className="entity-popup-confirm">
           <button type="button" className="flat-button" onClick={()=>setMenu(m=>m?{...m,confirm:false}:null)}>

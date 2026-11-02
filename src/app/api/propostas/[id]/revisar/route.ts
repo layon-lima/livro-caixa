@@ -5,6 +5,8 @@ import { safeId, competence } from "@/lib/document-data";
 import { backTo, forbidden, sameOriginPost } from "@/lib/request-security";
 import { confirmedCategoryId, suggestedCategory } from "@/lib/category-suggestions";
 import { parsePaymentDate } from "@/lib/payment-date";
+import {checkDuplicate} from "@/lib/duplicate-guard";
+import {strongDuplicateKey} from "@/lib/duplicate-identity";
 
 export const runtime="nodejs";
 
@@ -19,7 +21,7 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
   const batchSuffix=/^[a-f\d]{8}-(?:[a-f\d]{4}-){3}[a-f\d]{12}$/i.test(lote)?
     "&lote="+encodeURIComponent(lote):"";
   const suffix=batch?"&arquivos="+batch:batchSuffix;
-  const error=(cause:string)=>backTo("/conferencia?erro="+cause+suffix);
+  const error=(cause:string)=>backTo("/conferencia?erro="+cause+"&id="+id+suffix);
   const action=String(form.get("acao")||"salvar");
 
   const titular=safeId(form.get("titularId"));
@@ -40,6 +42,8 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
   const valor=numberString===""?null:Number(numberString);
   // Um documento aprovado cria um lançamento; o usuário não precisa escolher vínculos técnicos.
   const operationId:number|null=null;
+  const confirmSimilar=String(form.get("confirmarSemelhante")||"")==="1";
+  let similarConfirmed=false;
 
   if(!["salvar","aprovar"].includes(action)||!titular||!date||!titulo||paymentDate===undefined||
     (proposed&&!suggestion)||(categoryMode&&!proposed&&!categoria)||
@@ -64,6 +68,19 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
     if(!old||old.aprovado_em||old.duplicada_de||
        !await canAccessTitular(user,Number(old.titular_id),"approve")){
       await connection.query("ROLLBACK");return error("nao-autorizado");
+    }
+    if(action==="aprovar"){
+      const duplicate=await checkDuplicate(connection,{
+        titularId:titular,documentType:documentoTipo,reference:referencia,
+        paymentDate,amount:valor,counterparty:contraparte,type:tipo
+      });
+      if(duplicate?.level==="strong"){
+        await connection.query("ROLLBACK");return error("duplicado");
+      }
+      if(duplicate?.level==="similar"&&confirmSimilar)similarConfirmed=true;
+      if(duplicate?.level==="similar"&&!confirmSimilar){
+        await connection.query("ROLLBACK");return error("semelhante");
+      }
     }
     if(categoria){
       const cat=await connection.query("SELECT 1 FROM categorias WHERE id=$1 AND ativa=TRUE",[categoria]);
@@ -95,9 +112,10 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
       let targetId:number|null=operationId;
       if(!targetId) {
         const created=await connection.query<{id:string}>(
-          "INSERT INTO operacoes(titular_id,titulo,competencia,categoria_id,tipo,descricao,contraparte,valor,referencia,criado_por,data_pagamento) "+
-          "VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id::text",
-          [titular,titulo,date,categoria,tipo,descricao,contraparte,valor,referencia,user.id,paymentDate],
+          "INSERT INTO operacoes(titular_id,titulo,competencia,categoria_id,tipo,descricao,contraparte,valor,referencia,criado_por,data_pagamento,chave_duplicidade) "+
+          "VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id::text",
+          [titular,titulo,date,categoria,tipo,descricao,contraparte,valor,referencia,user.id,paymentDate,
+            strongDuplicateKey(documentoTipo,referencia)],
         );
         targetId=Number(created.rows[0].id);
       }
@@ -117,7 +135,8 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
       );
       await connection.query(
         "INSERT INTO historico_operacoes(operacao_id,usuario_id,acao,dados) VALUES($1,$2,$3,$4)",
-        [targetId,user.id,"aprovação",JSON.stringify({proposta:id,arquivo:old.arquivo_id})],
+        [targetId,user.id,"aprovação",JSON.stringify({proposta:id,arquivo:old.arquivo_id,
+          confirmacao_semelhante:similarConfirmed})],
       );
       await rememberApprovedClassification(connection,id);
     }
@@ -127,6 +146,6 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
   }catch(e){
     await connection.query("ROLLBACK").catch(()=>{});
     console.error("Falha na revisão/aprovação da proposta",id,e);
-    return error("processamento");
+    return error((e as {code?:string})?.code==="23505"?"duplicado":"processamento");
   }finally{connection.release();}
 }

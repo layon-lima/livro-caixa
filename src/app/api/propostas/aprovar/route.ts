@@ -4,6 +4,8 @@ import { rememberApprovedClassification } from "@/lib/classification-learning";
 import { safeId } from "@/lib/document-data";
 import { backTo, forbidden, sameOriginPost } from "@/lib/request-security";
 import { confirmedCategoryId, suggestedCategory } from "@/lib/category-suggestions";
+import {checkDuplicate} from "@/lib/duplicate-guard";
+import {strongDuplicateKey} from "@/lib/duplicate-identity";
 export const runtime="nodejs";
 
 export async function POST(request:Request){
@@ -44,6 +46,16 @@ export async function POST(request:Request){
       }
     }
     for(const p of found.rows){
+      const duplicate=await checkDuplicate(cx,{
+        titularId:Number(p.titular_id),documentType:p.documento_tipo,
+        reference:p.referencia,paymentDate:p.data_pagamento,amount:p.valor,
+        counterparty:p.contraparte,type:p.tipo
+      });
+      if(duplicate){
+        await cx.query("ROLLBACK");
+        return backTo("/conferencia?erro="+
+          (duplicate.level==="strong"?"duplicado":"semelhante-lote")+"&id="+p.id+batch);
+      }
       let categoryId=p.categoria_id?Number(p.categoria_id):null;
       if(categoryId){
         const match=await cx.query("SELECT 1 FROM categorias WHERE id=$1 AND ativa=TRUE",[categoryId]);
@@ -58,9 +70,10 @@ export async function POST(request:Request){
       // Um documento aprovado corresponde a um lançamento simples.
       // Relacionamentos sugeridos nunca são aceitos implicitamente.
       const created=await cx.query<{id:string}>(
-        "INSERT INTO operacoes(titular_id,titulo,competencia,categoria_id,tipo,descricao,contraparte,valor,referencia,criado_por,data_pagamento)"+
-        " VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id::text",
-        [p.titular_id,p.titulo,p.competencia,categoryId,p.tipo,p.descricao,p.contraparte,p.valor,p.referencia,user.id,p.data_pagamento]
+        "INSERT INTO operacoes(titular_id,titulo,competencia,categoria_id,tipo,descricao,contraparte,valor,referencia,criado_por,data_pagamento,chave_duplicidade)"+
+        " VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id::text",
+        [p.titular_id,p.titulo,p.competencia,categoryId,p.tipo,p.descricao,p.contraparte,p.valor,p.referencia,user.id,p.data_pagamento,
+          strongDuplicateKey(p.documento_tipo,p.referencia)]
       );
       const operationId=Number(created.rows[0].id);
       if(p.data_pagamento)await cx.query(
@@ -79,6 +92,6 @@ export async function POST(request:Request){
     return backTo("/conferencia?aprovados="+ids.length+batch);
   }catch(e){
     await cx.query("ROLLBACK");console.error("Erro ao aprovar",e);
-    return backTo("/conferencia?erro=processamento"+batch);
+    return backTo("/conferencia?erro="+((e as {code?:string})?.code==="23505"?"duplicado":"processamento")+batch);
   }finally{cx.release();}
 }

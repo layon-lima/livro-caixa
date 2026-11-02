@@ -161,7 +161,15 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
           <BatchQueueRefresh active={Boolean(stats&&(stats.aguardando>0||stats.processando>0))}/>
         </aside>
         <main className="conference-document" id="conteudo-conferencia">
-          {query.erro&&<p className="form-error" role="alert">Não foi possível concluir: {query.erro}.</p>}
+          {query.erro&&<div className="form-error" role="alert">
+            {query.erro==="duplicado"?
+              "Lançamento bloqueado: esta transação já existe no Livro Caixa.":
+              query.erro==="semelhante"?
+              "Possível duplicidade: já existe um lançamento do mesmo titular, com o mesmo recebedor, valor e data. Confira o documento antes de prosseguir.":
+              query.erro==="semelhante-lote"?
+              "A aprovação em lote foi interrompida por um possível lançamento repetido. Confira os documentos individualmente; nada deste grupo foi aprovado.":
+              "Não foi possível concluir: "+query.erro+"."}
+          </div>}
           {query.descartado&&<p className="form-success" role="status">Documento descartado e retirado da fila.</p>}
           {query.revisada&&<p className="form-success" role="status">Conferência salva para depois.</p>}
           {query.aprovados&&<p className="form-success" role="status">{query.aprovados} lançamento(s) aprovado(s).</p>}
@@ -270,6 +278,10 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
                       <input name="referencia" defaultValue={selected.referencia}/>
                     </label>
                   </div>
+                  {query.erro==="semelhante"&&query.id===selected.id&&<label className="conference-similar-override">
+                    <input type="checkbox" name="confirmarSemelhante" value="1"/>
+                    Verifiquei o lançamento existente. Este é outro pagamento e autorizo registrar separadamente.
+                  </label>}
                   <details className="conference-extra">
                     <summary>Observações adicionais</summary>
                     <label>Detalhes do documento

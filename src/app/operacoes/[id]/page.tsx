@@ -7,7 +7,9 @@ import { categorias, titularesPermitidos, safeId, type Operacao } from "@/lib/do
 import { ArrowLeft, FileText, Pencil } from "lucide-react";
 import { suggestDocumentName } from "@/lib/document-name";
 export const dynamic="force-dynamic";
-export default async function Editar({params}:{params:Promise<{id:string}>}){
+export default async function Editar({params,searchParams}:{
+  params:Promise<{id:string}>;searchParams:Promise<{erro?:string}>;
+}){
   const user=await requireUser();
   const id=safeId((await params).id);if(!id)notFound();
   const db=getDatabase();
@@ -33,7 +35,17 @@ export default async function Editar({params}:{params:Promise<{id:string}>}){
     <header className="work-bar"><Link href={"/livros/"+op.titular_id}><ArrowLeft size={16}/> Voltar ao livro</Link><strong><Pencil size={16}/> Lançamento #{id}</strong></header>
     <main className="work-main narrow-work">
       <h1 className="work-heading">Editar lançamento</h1>
+      {(await searchParams).erro==="duplicado"&&<p className="form-error" role="alert">
+        Alteração bloqueada: o identificador desta transação já existe em outro lançamento.
+      </p>}
+      {(await searchParams).erro==="semelhante"&&<p className="form-error" role="alert">
+        Há outro lançamento com o mesmo titular, recebedor, valor e data. Se realmente forem pagamentos diferentes, confirme abaixo.
+      </p>
       <form action={"/api/operacoes/"+id} method="post" className="review-form">
+        {(await searchParams).erro==="semelhante"&&<label className="conference-similar-override">
+          <input type="checkbox" name="confirmarSemelhante" value="1" required/>
+          Conferi o outro lançamento e confirmo que este é um pagamento diferente.
+        </label>
         <div className="form-inline-two">
           <label>Titular
           <select value={op.titular_id} disabled>

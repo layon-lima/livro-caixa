@@ -6,7 +6,7 @@ import { Trash2, ArrowLeft } from "lucide-react";
 import { TrashRows } from "@/components/trash-rows";
 export const dynamic = "force-dynamic";
 
-export default async function Lixeira() {
+export default async function Lixeira({searchParams}:{searchParams:Promise<{erro?:string;id?:string}>}) {
   const user=await requireUser();
   const db=getDatabase();
   const rows=await db.query<{id:string;titulo:string;nome:string;competencia:string}>(
@@ -17,9 +17,16 @@ export default async function Lixeira() {
   return <StandaloneWorkspace title="Lixeira" section="lixeira"><div className="work-page">
     <header className="work-bar"><Link href="/"><ArrowLeft size={16}/> Livros Caixa</Link><strong><Trash2 size={16}/> Lixeira</strong></header>
     <main className="work-main">
-      <h1 className="work-heading">Operações excluídas</h1>
+      <h1 className="work-heading">Lançamentos excluídos</h1>
+      {(await searchParams).erro&&<p className="form-error" role="alert">
+        {(await searchParams).erro==="duplicado"?
+          "Restauração bloqueada: o identificador da transação já consta em outro lançamento.":
+          (await searchParams).erro==="semelhante"?
+          "Existe um lançamento com mesmo titular, recebedor, valor e data. Confira e restaure somente se for outro pagamento.":
+          "Não foi possível concluir esta operação."}
+      </p>
       <p className="muted">Selecione uma operação e dê dois cliques para abrir as ações.</p>
-      <TrashRows items={rows.rows}/>
+      <TrashRows items={rows.rows} similarId={(await searchParams).erro==="semelhante"?(await searchParams).id:null}/>
     </main>
   </div></StandaloneWorkspace>;
 }

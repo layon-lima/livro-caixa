@@ -1,4 +1,5 @@
 import { paymentDateFromText,verifiedPaymentDate } from "./payment-date.mjs";
+import {extractPixEndToEndId} from "./pix-identifier.mjs";
 import { Pool } from "pg";
 import { parseLocalDocument } from "./local-parser.mjs";
 import { analyzeWithOllama } from "./ollama-analyzer.mjs";
@@ -302,7 +303,9 @@ async function processFile(file){
         const value=amount(item.valor);
         if(!party)notice.push("Fornecedor ou contraparte não identificado.");
         if(value===null)notice.push("Valor principal não identificado.");
-        const reference=short(item.referencia,100);
+        const reference=currentPix?
+          (extractPixEndToEndId(fullText)||short(item.referencia,100)):
+          short(item.referencia,100);
         const docType=short(item.documento_tipo,50).toLowerCase()||"outro";
         const type=xmlIncoming?"despesa":xmlOutgoing?"receita":item.tipo;
         if(method==="xml"&&xmlOutgoing)notice.push("Nota de saída identificada: confirme se deve entrar como receita.");

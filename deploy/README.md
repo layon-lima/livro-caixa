@@ -322,3 +322,38 @@ cd /opt/apps/livro-caixa
 git pull --ff-only
 docker compose up -d --build app
 ```
+
+## Bloqueio de duplicidades — migração 014
+
+O sistema protege importação, aprovação individual e em lote, lançamentos
+manuais, edição e restauração de lançamentos. A importação já dispõe de SHA-256
+único para impedir o mesmo arquivo físico; a migração 014 acrescenta uma chave
+única em `operacoes.chave_duplicidade` para **identificadores confiáveis**
+(EndToEndId Pix, chave NF-e e código de boleto completo). O índice é parcial
+(apenas lançamentos ativos) e não reclassifica, edita nem exclui operações antigas.
+
+O servidor verifica **dentro da mesma transação que grava**:
+1. Identificador forte (verifica lançamentos antigos pela referência e novos
+   pela chave; nunca aceita registro duplicado);
+2. Possível semelhança: mesmo titular, data efetiva, valor, tipo e recebedor.
+   Exige confirmação humana explícita em vez de bloquear pagamentos reais.
+3. Dois Pix com EndToEndId diferentes não são bloqueados por semelhança simples.
+4. Transações concorrentes são serializadas com advisory locks e a restrição
+   UNIQUE garante o bloqueio até em condições de corrida.
+5. Na aprovação em lote, um item conflitante desfaz todo o lote de aprovação,
+   sem gerar lançamentos parciais; o usuário confere o item individualmente.
+
+No processo de leitura OCR, o EndToEndId Pix é extraído do comprovante somente
+se houver um identificador único no trecho do documento. Campos desconhecidos
+não são inventados. Uma confirmação de lançamento semelhante fica registrada
+no histórico de aprovação. A verificação não garante eliminar ambiguidades
+quando não existe identificador ou os dados do documento estão incompletos.
+
+Antes do build, executar a migração no banco de dados:
+
+```bash
+cd /opt/apps/livro-caixa
+git pull --ff-only
+docker compose exec -T database sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1' < db/migrations/014_duplicate_guard.sql
+docker compose up -d --build app worker
+```
