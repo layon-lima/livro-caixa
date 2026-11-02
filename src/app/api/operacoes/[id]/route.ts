@@ -41,6 +41,12 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
   if(!titular||titular!==oldTitular||!title||!date||dataPagamento===undefined||!["despesa","outro"].includes(tipo)||
      (money!==null&&(!Number.isFinite(money)||money<0))||
      !await canAccessTitular(user,titular,"edit"))return forbidden();
+  if(cat){
+    const match=await db.query(
+      "SELECT 1 FROM categorias WHERE id=$1 AND (ativa=TRUE OR id=(SELECT categoria_id FROM operacoes WHERE id=$2))",
+      [cat,id]);
+    if(!match.rowCount)return forbidden();
+  }
   const conn=await db.connect();
   try{
     await conn.query("BEGIN");

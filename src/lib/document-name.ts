@@ -37,13 +37,18 @@ function label(data:DocumentNameData):string{
 function purpose(data:DocumentNameData):string{
   const category=compact([data.category,data.subcategory].join(" "));
   const context=compact([data.counterparty,data.description,data.title].join(" "));
-  if(/COMBUSTIVE|DIESEL|GASOLINA|ETANOL/.test(category)){
+  if(/COMPRAS FAZENDA/.test(category)){
+    if(/FERTILIZANT|ADUBO|UREIA|NPK/.test(context))return "FERTILIZANTES";
+    if(/SEMENT/.test(context))return "SEMENTES";
+    if(/DEFENSIV|FUNGICIDA|HERBICIDA|INSETICIDA/.test(context))return "DEFENSIVOS";
+  }
+  if(/ABASTECIMENTO|COMBUSTIVE|DIESEL|GASOLINA|ETANOL/.test(category)){
     if(/\bPOSTO\b|ABASTECIMENTO/.test(context))return "ABASTECIMENTO";
     if(/DIESEL/.test(category))return "DIESEL";
     if(/GASOLINA/.test(category))return "GASOLINA";
     return "COMBUSTIVEIS";
   }
-  if(/MANUTENCAO/.test(category)&&/\bPECAS?\b/.test(category))return "PECAS";
+  if(/MANUTENCAO/.test(category)&&(/\bPECAS?\b/.test(category)||/\bPECAS?\b/.test(context)))return "PECAS";
   if(/MANUTENCAO/.test(category)&&/SERVIC/.test(category))return "MANUTENCAO";
   if(/FERTILIZANT|ADUBO/.test(category))return "FERTILIZANTES";
   if(/SEMENTE/.test(category))return "SEMENTES";

@@ -6,22 +6,20 @@ test("Pix de posto vira arquivo de abastecimento sem alterar a extensão",()=>{
   assert.equal(suggestDocumentName({
     originalName:"Comprovante.pdf",documentType:"comprovante",
     title:"Comprovante Pix — AUTO POSTO BARBOSAO",
-    counterparty:"AUTO POSTO BARBOSAO",category:"Combustíveis",
-    subcategory:"Outros",paymentDate:"2026-10-28"
+    counterparty:"AUTO POSTO BARBOSAO",category:"Abastecimento",paymentDate:"2026-10-28"
   }),"PIX ABASTECIMENTO AUTO POSTO BARBOSAO 28-10-2026.pdf");
 });
 test("Comprovante da Toyo Palmas utiliza peças, não nome de banco",()=>{
   assert.equal(suggestDocumentName({
     originalName:"comprovante.PDF",documentType:"comprovante",
     title:"Comprovante Pix — TOYO PALMAS",counterparty:"TOYO PALMAS",
-    category:"Manutenção",subcategory:"Peças"
+    category:"Manutenção Fazenda",description:"Peças automotivas"
   }),"PIX PECAS TOYO PALMAS.pdf");
 });
 test("Boleto de fertilizante fica identificado mesmo sem IA",()=>{
   assert.equal(suggestDocumentName({
     originalName:"scan.pdf",documentType:"boleto",
-    counterparty:"AGREX DO BRASIL LTDA",category:"Insumos Agrícolas",
-    subcategory:"Fertilizantes"
+    counterparty:"AGREX DO BRASIL LTDA",category:"Compras Fazenda",description:"Fertilizante NPK"
   }),"BOLETO FERTILIZANTES AGREX DO BRASIL LTDA.pdf");
 });
 test("Sem identificação segura, preservar nome original",()=>{
@@ -35,6 +33,5 @@ test("Não inventar abastecimento só porque é pagamento num posto",()=>{
 });
 test("Extensão do original permanece e caracteres inválidos são removidos",()=>{
   assert.equal(suggestDocumentName({originalName:"sem-nome.xml",documentType:"nota fiscal",
-    counterparty:"Distribuidora / Norte: 01",category:"Insumos Agrícolas",
-    subcategory:"Sementes"}),"NOTA FISCAL SEMENTES DISTRIBUIDORA NORTE 01.xml");
+    counterparty:"Distribuidora / Norte: 01",category:"Compras Fazenda",description:"Compra de sementes"}),"NOTA FISCAL SEMENTES DISTRIBUIDORA NORTE 01.xml");
 });

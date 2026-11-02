@@ -81,7 +81,7 @@ function namesForReport(rows:ExpenseRow[]):ExpenseRow[]{
   return rows.map(row=>({...row,documento:row.documento&&Number(row.quantidade_no_arquivo)<=1?suggestDocumentName({
     originalName:row.documento,documentType:row.documento_tipo,
     title:row.titulo,counterparty:row.contraparte,
-    category:row.categoria,subcategory:row.subcategoria,
+    category:row.categoria,
     description:row.descricao,paymentDate:row.data_pagamento
   }):row.documento}));
 }

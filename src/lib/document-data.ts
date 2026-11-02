@@ -41,7 +41,17 @@ export async function titularesPermitidos(user: AuthUser, action: "view" | "impo
   return r.rows;
 }
 export async function categorias(): Promise<Categoria[]> {
-  const r = await getDatabase().query<Categoria>("SELECT id::text AS id,nome,subcategoria FROM categorias ORDER BY nome,subcategoria");
+  const r = await getDatabase().query<Categoria>(
+    "SELECT id::text AS id,nome,subcategoria FROM categorias WHERE ativa=TRUE "+
+    "ORDER BY CASE nome "+
+    "WHEN 'Compras Pessoais' THEN 1 "+
+    "WHEN 'Compras Fazenda' THEN 2 "+
+    "WHEN 'Abastecimento' THEN 3 "+
+    "WHEN 'Manutenção Fazenda' THEN 4 "+
+    "WHEN 'Pagamento de Serviços' THEN 5 "+
+    "WHEN 'Pagamento de Dívidas Fazenda' THEN 6 "+
+    "WHEN 'Pagamento de Dívidas Pessoais' THEN 7 "+
+    "ELSE 100 END,nome");
   return r.rows;
 }
 export function basePath(returnTo: string | null | undefined, fallback: string): string {

@@ -27,6 +27,8 @@ export default async function Editar({params}:{params:Promise<{id:string}>}){
   ]);
   const editable=await canAccessTitular(user,Number(op.titular_id),"edit");
   const opCategory=cats.find(c=>c.id===op.categoria_id);
+  const oldCategory=op.categoria_id&&!opCategory?
+    (await db.query<{nome:string}>("SELECT nome FROM categorias WHERE id=$1",[op.categoria_id])).rows[0]?.nome:"";
   return <StandaloneWorkspace title="Editar operação" section="livros"><div className="work-page">
     <header className="work-bar"><Link href={"/livros/"+op.titular_id}><ArrowLeft size={16}/> Voltar ao livro</Link><strong><Pencil size={16}/> Operação #{id}</strong></header>
     <main className="work-main narrow-work">
@@ -46,7 +48,8 @@ export default async function Editar({params}:{params:Promise<{id:string}>}){
         <div className="form-inline-two">
           <label>Categoria<select name="categoriaId" defaultValue={op.categoria_id||""} disabled={!editable}>
             <option value="">Sem categoria</option>
-            {cats.map(c=><option value={c.id} key={c.id}>{c.nome}{c.subcategoria?" → "+c.subcategoria:""}</option>)}
+            {oldCategory&&<option value={op.categoria_id!}>Anterior: {oldCategory} (reclassifique)</option>}
+            {cats.map(c=><option value={c.id} key={c.id}>{c.nome}</option>)}
           </select></label>
           <label>Tipo<select name="tipo" defaultValue={op.tipo==="receita"?"outro":op.tipo} disabled={!editable}>
             <option value="despesa">Despesa</option><option value="outro">Outro</option>

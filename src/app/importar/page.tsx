@@ -55,7 +55,6 @@ export default async function Importar({searchParams}:{searchParams:Promise<{tit
         title:file.titulo_detectado||preview.titulo,
         counterparty:file.contraparte_detectada||preview.contraparte,
         category:file.categoria_detectada||file.categoria_sugerida_nome||preview.categoria,
-        subcategory:file.subcategoria_detectada||file.categoria_sugerida_subcategoria,
         description:file.descricao_detectada||preview.descricao,
         paymentDate:file.pagamento_detectado||preview.data_pagamento
       })

@@ -117,14 +117,10 @@ function monetary(t) {
 function categoryOf(t) {
   const s=normalizeLocal(t);
   const rules=[
-    [/DIESEL|GASOLINA|ETANOL|COMBUSTIVEL|OLEO DIESEL/,"Combustíveis > Diesel"],
-    [/SEMENTE|TRATAMENTO DE SEMENTES|SEMENTES DE SOJA|SEMENTES DE MILHO/,"Insumos Agrícolas > Sementes"],
-    [/FERTILIZANTE|ADUBO|UREIA|NPK|CLORETO DE POTASSIO|MAP\b/,"Insumos Agrícolas > Fertilizantes"],
-    [/HERBICIDA|FUNGICIDA|INSETICIDA|DEFENSIVO|GLIFOSATO/,"Insumos Agrícolas > Defensivos"],
-    [/PECAS DE REPOSICAO|PECA AGRICOLA|ROLAMENTO|FILTRO DE OLEO|CORREIA|MANGUEIRA HIDRAULICA/,"Manutenção > Peças"],
-    [/SALARIO|FOLHA DE PAGAMENTO|PROVENTOS/,"Pessoal > Salários"],
-    [/FGTS|INSS|GPS PREVIDENCIA/,"Pessoal > Encargos"],
-  ];
+    [/DIESEL|GASOLINA|ETANOL|COMBUSTIVEL|OLEO DIESEL/,"Abastecimento"],
+    [/SEMENTE|FERTILIZANTE|ADUBO|UREIA|NPK|CLORETO DE POTASSIO|HERBICIDA|FUNGICIDA|INSETICIDA|DEFENSIVO|GLIFOSATO/,"Compras Fazenda"],
+    [/PECA AGRICOLA|ROLAMENTO DE TRATOR|MANUTENCAO DE IMPLEMENTO AGRICOLA/,"Manutenção Fazenda"],
+    ];
   const matches=rules.filter(([regex])=>regex.test(s));
   return matches.length===1?matches[0][1]:"";
 }

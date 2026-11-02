@@ -115,7 +115,7 @@ export function ExpenseSpreadsheet({bookId,cats,books,canEdit,canDelete,months,
         <select value={category} onChange={update(setCategory)} aria-label="Categoria">
           <option value="">Todas as categorias</option>
           {cats.map(c=><option key={c.id} value={c.id}>
-            {c.nome}{c.subcategoria?" / "+c.subcategoria:""}
+            {c.nome}
           </option>)}
         </select>
       </label>

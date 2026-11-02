@@ -18,7 +18,7 @@ export function parseOllamaOutput(raw, {text,categories,owners,maxPages=1}) {
     const categoryCandidate=SHORT(o.categoria,160).replace(/\s+/g," ");
     // Não classificar automaticamente como Outras despesas; o usuário decide.
     const generic=["OUTRAS DESPESAS","OUTRA DESPESA","RECEITAS"].includes(norm(categoryCandidate));
-    const categoria=generic?"":allowed.get(norm(categoryCandidate))||categoryCandidate;
+    const categoria=generic?"":allowed.get(norm(categoryCandidate))||"";
     const owner=validOwner.get(String(o.titular_id||""));
     // Não atribuir titular só porque a IA retornou um ID: precisa aparecer por extenso no arquivo.
     const titular_id=owner && evidence.includes(norm(owner.nome))?String(owner.id):"";
@@ -36,7 +36,7 @@ export function parseOllamaOutput(raw, {text,categories,owners,maxPages=1}) {
       !owners.some(x=>norm(x.nome)===norm(suggestedName))?suggestedName:"";
     const cautions=(Array.isArray(o.avisos)?o.avisos:[]).slice(0,5).map(x=>SHORT(x,160));
     if(!generic&&categoryCandidate&&!allowed.has(norm(categoryCandidate)))
-      cautions.push("Nova categoria sugerida pela IA; será cadastrada somente se aprovada.");
+      cautions.push("Categoria indicada pela IA não está no cadastro ativo; escolha uma categoria.");
     if(o.titular_id&&!titular_id)cautions.push("Titular sugerido sem correspondência textual segura.");
     const conf=Number(o.confianca);
     entries.push({
@@ -86,7 +86,11 @@ export function partialOllamaFields(buffer,{categories,owners,text}){
     if(typeof value!=="string")continue;
     value=value.trim().slice(0,key==="descricao"?600:170);
     if(!value)continue;
-    if(key==="categoria"&&/^(OUTRAS? DESPESAS?|RECEITAS?)$/i.test(value))continue;
+    if(key==="categoria"){
+      const match=categories.find(c=>norm(c)===norm(value));
+      if(!match)continue;
+      value=match;
+    }
     if(key==="titular_id"){
       const owner=owners.find(x=>String(x.id)===value);
       if(!owner||!norm(text).includes(norm(owner.nome)))continue;

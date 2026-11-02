@@ -20,6 +20,10 @@ export async function POST(request:Request){
   if(!titular||!titulo||!competencia||dataPagamento===undefined||!["despesa","outro"].includes(tipo)||
      (valor!==null&&(!Number.isFinite(valor)||valor<0))||
      !await canAccessTitular(user,titular,"edit"))return forbidden();
+  if(categoria){
+    const active=await getDatabase().query("SELECT 1 FROM categorias WHERE id=$1 AND ativa=TRUE",[categoria]);
+    if(!active.rowCount)return forbidden();
+  }
   const r=await getDatabase().query<{id:string}>(
     "INSERT INTO operacoes(titular_id,titulo,competencia,categoria_id,tipo,contraparte,descricao,valor,criado_por,manual,data_pagamento) "+
     "VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,true,$10) RETURNING id::text",

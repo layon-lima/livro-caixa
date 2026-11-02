@@ -1,25 +1,16 @@
-import { test } from "node:test";
+import {test} from "node:test";
 import assert from "node:assert/strict";
-import { bestCategory, splitSuggestion } from "./category-suggestions.mjs";
-
-const categories=[
-  {id:"10",nome:"Manutenção",subcategoria:"Peças"},
-  {id:"11",nome:"Outras despesas",subcategoria:""}
-];
-test("IA pode sugerir grupo e subcategoria ainda não cadastrados",()=>{
-  const suggestion=bestCategory("Veículos > Pneus",categories);
-  assert.equal(suggestion.existing,null);
-  assert.deepEqual(suggestion.suggested,{nome:"Veículos",subcategoria:"Pneus"});
+import {bestCategory,splitSuggestion} from "./category-suggestions.mjs";
+const cats=[{id:"10",nome:"Compras Fazenda"},{id:"11",nome:"Abastecimento"}];
+test("Categoria já cadastrada reaproveita id",()=>{
+  assert.equal(bestCategory("compras fazenda",cats).existing.id,"10");
 });
-test("Categorias equivalentes reaproveitam id cadastrado",()=>{
-  const result=bestCategory("MANUTENCAO > PECAS",categories);
-  assert.equal(result.existing.id,"10");
-  assert.equal(result.suggested,null);
+test("Categoria nova da IA não é cadastrada automaticamente",()=>{
+  assert.deepEqual(bestCategory("Pneus",cats),{existing:null,suggested:null});
 });
-test("Outras despesas não vira sugestão automática",()=>{
-  assert.deepEqual(bestCategory("Outras despesas",categories),{existing:null,suggested:null});
-});
-test("Categorias de nome simples são aceitas; dados malformados são rejeitados",()=>{
-  assert.deepEqual(splitSuggestion("Pneus"),{nome:"Pneus",subcategoria:""});
-  assert.equal(splitSuggestion("Teste > Sub > Outra"),null);
+test("Não aceita subcategoria nem categoria antiga",()=>{
+  assert.equal(splitSuggestion("Manutenção > Peças"),null);
+  assert.equal(splitSuggestion("Compras Fazenda → Insumos"),null);
+  assert.deepEqual(bestCategory("Combustíveis > Diesel",cats),{existing:null,suggested:null});
+  assert.equal(splitSuggestion("Abastecimento").nome,"Abastecimento");
 });

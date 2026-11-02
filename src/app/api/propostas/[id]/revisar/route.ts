@@ -25,8 +25,7 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
   const titular=safeId(form.get("titularId"));
   const categoryMode=String(form.get("categoriaId")||"");
   const proposed=categoryMode==="__new__";
-  const suggestion=proposed?suggestedCategory(
-    form.get("categoriaNovaNome"),form.get("categoriaNovaSubcategoria")):null;
+  const suggestion=proposed?suggestedCategory(form.get("categoriaNovaNome")):null;
   let categoria=!proposed&&categoryMode?safeId(categoryMode):null;
   const date=competence(form.get("competencia"));
   const paymentDate=parsePaymentDate(form.get("dataPagamento"));
@@ -65,7 +64,7 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
       await connection.query("ROLLBACK");return error("nao-autorizado");
     }
     if(categoria){
-      const cat=await connection.query("SELECT 1 FROM categorias WHERE id=$1",[categoria]);
+      const cat=await connection.query("SELECT 1 FROM categorias WHERE id=$1 AND ativa=TRUE",[categoria]);
       if(!cat.rowCount){await connection.query("ROLLBACK");return error("categoria");}
     }
     // Salvar só armazena a proposta; a nova categoria nasce no banco APENAS
@@ -86,7 +85,7 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
       "operacao_sugerida_id=$12,revisada_por=$13,revisada_em=now(),"+
       "categoria_sugerida_nome=$14,categoria_sugerida_subcategoria=$15,data_pagamento=$16 WHERE id=$1",
       [id,titular,titulo,documentoTipo,contraparte,date,categoria,tipo,descricao,valor,referencia,
-        operationId,user.id,suggestion?.nome||"",suggestion?.subcategoria||"",paymentDate],
+        operationId,user.id,suggestion?.nome||"","",paymentDate],
     );
 
     if(action==="aprovar"){

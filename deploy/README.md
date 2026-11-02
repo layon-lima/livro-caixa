@@ -257,3 +257,23 @@ docker compose up -d --build app worker
 
 Se o proxy limitar uploads a menos de 80 MB, sua configuração de tamanho de
 corpo HTTP também precisará aceitar ZIPs desse tamanho.
+
+## Categorias simples, sem subcategorias (migração 012)
+
+Sete categorias padrão: Compras Pessoais, Compras Fazenda, Abastecimento,
+Manutenção Fazenda, Pagamento de Serviços, Pagamento de Dívidas Fazenda,
+Pagamento de Dívidas Pessoais. As categorias antigas são desativadas (não
+apagadas). Lançamentos aprovados mantêm seu histórico; propostas pendentes
+com classificação antiga ou sugestão automática são liberadas para nova
+conferência. O OCR e a IA usam apenas as categorias ativas, e o usuário
+continua podendo criar uma categoria manualmente. Nenhuma categoria
+extra sugerida foi cadastrada.
+
+Na VPS, após o código estar atualizado:
+
+```bash
+cd /opt/apps/livro-caixa
+git pull --ff-only
+docker compose exec -T database sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1' < db/migrations/012_flat_categories.sql
+docker compose up -d --build app worker
+```

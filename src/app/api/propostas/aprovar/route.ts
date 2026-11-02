@@ -44,8 +44,12 @@ export async function POST(request:Request){
     }
     for(const p of found.rows){
       let categoryId=p.categoria_id?Number(p.categoria_id):null;
+      if(categoryId){
+        const match=await cx.query("SELECT 1 FROM categorias WHERE id=$1 AND ativa=TRUE",[categoryId]);
+        if(!match.rowCount){await cx.query("ROLLBACK");return backTo("/conferencia?erro=categoria"+batch);}
+      }
       if(!categoryId&&p.categoria_sugerida_nome){
-        const suggestion=suggestedCategory(p.categoria_sugerida_nome,p.categoria_sugerida_subcategoria);
+        const suggestion=suggestedCategory(p.categoria_sugerida_nome);
         if(!suggestion){await cx.query("ROLLBACK");return backTo("/conferencia?erro=categoria"+batch);}
         categoryId=await confirmedCategoryId(cx,suggestion);
         await cx.query("UPDATE propostas SET categoria_id=$2 WHERE id=$1",[p.id,categoryId]);

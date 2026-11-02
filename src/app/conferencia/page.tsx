@@ -102,7 +102,6 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
     originalName:selected.nome_original,documentType:selected.documento_tipo,
     title:selected.titulo,counterparty:selected.contraparte,description:selected.descricao,
     category:selectedCat?.nome||selected.categoria_sugerida_nome,
-    subcategory:selectedCat?.subcategoria||selected.categoria_sugerida_subcategoria,
     paymentDate:selected.data_pagamento
   }):"";
   const batchQuery=lote?"lote="+encodeURIComponent(lote)+"&":batch?"arquivos="+batch.join(",")+"&":"";
@@ -190,9 +189,7 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
               }</strong></div>
               <div><span>Categoria</span><strong>{
                 cats.find(c=>c.id===selected.categoria_id)?.nome||
-                (selected.categoria_sugerida_nome?
-                  [selected.categoria_sugerida_nome,selected.categoria_sugerida_subcategoria].filter(Boolean).join(" → "):
-                  "Não identificada")
+                (selected.categoria_sugerida_nome||"Não identificada")
               }</strong></div>
               <div><span>Competência</span><strong>{selected.competencia.slice(0,7)}</strong></div>
               <div><span>Pagamento</span><strong>{selected.data_pagamento?selected.data_pagamento.split("-").reverse().join("/"):"Não informado"}</strong></div>

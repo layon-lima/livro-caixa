@@ -129,7 +129,7 @@ async function processFile(file){
     const output=await extract(bytes,file.mime,folder);
     timing.ocr_ms=Date.now()-timing.started;
     const [categories,books]=await Promise.all([
-      db.query("SELECT id::text,nome,subcategoria FROM categorias"),
+      db.query("SELECT id::text,nome,subcategoria FROM categorias WHERE ativa=TRUE"),
       db.query(
         "SELECT t.id::text,t.nome FROM titulares t "+
         "JOIN users u ON u.id=$1 AND u.is_active=TRUE "+
@@ -193,7 +193,7 @@ async function processFile(file){
     if(method==="local" && process.env.OLLAMA_URL){
       const aiStarted=Date.now();
       try{
-        const labels=cats.map(x=>x.nome+(x.subcategoria?" > "+x.subcategoria:""));
+        const labels=cats.map(x=>x.nome);
         const maxPages=Number(output.text.match(/^PÁGINA \d+ DE (\d+)/m)?.[1]||1);
         await db.query("UPDATE arquivos SET progresso_etapa='ia',atualizado_em=now() WHERE id=$1",[file.id]);
         const fromOllama=await analyzeWithOllama({
@@ -269,7 +269,7 @@ async function processFile(file){
         const cat=foundCategory.existing;
         let categorySuggestion=foundCategory.suggested;
         if(!cat&&!categorySuggestion)notice.push("Categoria não identificada; confira a classificação.");
-        if(categorySuggestion)notice.push("Nova categoria sugerida; ao aprovar, será cadastrada para os próximos lançamentos.");
+        if(categorySuggestion)notice.push("Categoria sugerida pela IA; escolha uma categoria válida.");
         const xmlIncoming=method==="xml"&&buyer&&String(buyer.id)===String(owner.id)&&!seller;
         const xmlOutgoing=method==="xml"&&seller&&String(seller.id)===String(owner.id)&&!buyer;
         if(method==="xml"&&!xmlIncoming&&!xmlOutgoing)notice.push("Confira se a nota representa compra ou venda.");
@@ -286,12 +286,10 @@ async function processFile(file){
         let category=cat;
         if(!category&&method==="xml"){
           const products=normalizeName(item.descricao);
-          const guess=/DIESEL|GASOLINA|COMBUSTIVEL/.test(products)?"Combustíveis > Diesel":
-            /SEMENTE|SOJA SEMENTE|MILHO SEMENTE/.test(products)?"Insumos Agrícolas > Sementes":
-            /FERTILIZANTE|ADUBO|UREIA|NPK/.test(products)?"Insumos Agrícolas > Fertilizantes":
-            /HERBICIDA|FUNGICIDA|INSETICIDA|DEFENSIVO/.test(products)?"Insumos Agrícolas > Defensivos":
-            xmlOutgoing?"Receitas":"";
-          category=cats.find(c=>normalizeName(c.nome+(c.subcategoria?" > "+c.subcategoria:""))===normalizeName(guess));
+          const guess=/DIESEL|GASOLINA|COMBUSTIVEL|ETANOL/.test(products)?"Abastecimento":
+            /SEMENTE|ADUBO|FERTILIZANTE|UREIA|NPK|HERBICIDA|FUNGICIDA|INSETICIDA|DEFENSIVO/.test(products)?
+              "Compras Fazenda":"";
+          category=cats.find(c=>normalizeName(c.nome)===normalizeName(guess));
           if(category) {
             categorySuggestion=null;
             const i=notice.indexOf("Categoria não identificada; confira a classificação.");

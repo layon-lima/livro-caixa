@@ -11,7 +11,7 @@ test("NF-e local extrai fornecedor, valor, categoria e data",()=>{
   assert.equal(item.contraparte,"AGROEX LTDA");
   assert.equal(item.valor,"5.250,00");
   assert.equal(item.competencia,"12/08/2026");
-  assert.equal(item.categoria,"Insumos Agrícolas > Fertilizantes");
+  assert.equal(item.categoria,"Compras Fazenda");
 });
 test("Boleto identifica beneficiário e valor sem escolher categoria fictícia",()=>{
   const [item]=parseLocalDocument(

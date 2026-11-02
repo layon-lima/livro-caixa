@@ -25,7 +25,7 @@ export default async function Manual({searchParams}:{searchParams:Promise<{titul
         <label>Título<input name="titulo" required maxLength={170} placeholder="Descrição objetiva da operação"/></label>
         <div className="form-inline-two">
           <label>Categoria<select name="categoriaId"><option value="">Sem categoria</option>
-            {cats.map(c=><option value={c.id} key={c.id}>{c.nome}{c.subcategoria?" → "+c.subcategoria:""}</option>)}
+            {cats.map(c=><option value={c.id} key={c.id}>{c.nome}</option>)}
           </select></label>
           <label>Tipo<select name="tipo"><option value="despesa">Despesa</option><option value="outro">Outro</option></select></label>
         </div>
