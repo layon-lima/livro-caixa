@@ -40,7 +40,7 @@ export default async function Editar({params,searchParams}:{
       </p>}
       {(await searchParams).erro==="semelhante"&&<p className="form-error" role="alert">
         Há outro lançamento com o mesmo titular, recebedor, valor e data. Se realmente forem pagamentos diferentes, confirme abaixo.
-      </p>
+      </p>}
       <form action={"/api/operacoes/"+id} method="post" className="review-form">
         {(await searchParams).erro==="semelhante"&&<label className="conference-similar-override">
           <input type="checkbox" name="confirmarSemelhante" value="1" required/>

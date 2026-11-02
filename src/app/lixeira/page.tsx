@@ -24,7 +24,7 @@ export default async function Lixeira({searchParams}:{searchParams:Promise<{erro
           (await searchParams).erro==="semelhante"?
           "Existe um lançamento com mesmo titular, recebedor, valor e data. Confira e restaure somente se for outro pagamento.":
           "Não foi possível concluir esta operação."}
-      </p>
+      </p>}
       <p className="muted">Selecione uma operação e dê dois cliques para abrir as ações.</p>
       <TrashRows items={rows.rows} similarId={(await searchParams).erro==="semelhante"?(await searchParams).id:null}/>
     </main>
