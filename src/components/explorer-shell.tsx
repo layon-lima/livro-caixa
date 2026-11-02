@@ -4,6 +4,7 @@ import {
   LayoutList, LogOut, Settings2, Trash2,
 } from "lucide-react";
 import type { AuthUser } from "@/lib/auth";
+import { NavigationArrows } from "@/components/navigation-arrows";
 
 export type Titular = { id: string; nome: string };
 type Props = {
@@ -31,6 +32,7 @@ export function ExplorerShell({ user, titulares, selected, children, pageTitle, 
 
       <main className="content-pane">
         <header className="content-header">
+          <NavigationArrows/>
           <div className="crumb">
             <BookOpen size={17} strokeWidth={1.8} />
             <ChevronRight size={14} className="crumb-chevron" />
