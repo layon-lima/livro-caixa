@@ -63,7 +63,7 @@ export function TrashRows({items,similarId}:{items:TrashItem[];similarId?:string
         {similarId===active.id&&<label className="conference-similar-override">
           <input type="checkbox" name="confirmarSemelhante" value="1" required/>
           Conferi que são dois pagamentos distintos. Autorizo a restauração.
-        </label>
+        </label>}
         <p>Restaurar <strong>{active.titulo}</strong> ao livro de {active.nome}?</p>
         <div className="entity-popup-confirm">
           <button type="button" className="flat-button" onClick={()=>setMenu(m=>m?{...m,confirm:false}:null)}>

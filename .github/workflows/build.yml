@@ -1,0 +1,26 @@
+name: Validar build do Livro Caixa
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Obter código
+        uses: actions/checkout@v4
+      - name: Preparar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Instalar dependências
+        run: npm install --no-audit --no-fund
+      - name: Testes do worker
+        run: node --test worker/*.test.mjs
+      - name: Compilar Next.js
+        run: npm run build

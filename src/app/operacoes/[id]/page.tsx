@@ -45,7 +45,7 @@ export default async function Editar({params,searchParams}:{
         {(await searchParams).erro==="semelhante"&&<label className="conference-similar-override">
           <input type="checkbox" name="confirmarSemelhante" value="1" required/>
           Conferi o outro lançamento e confirmo que este é um pagamento diferente.
-        </label>
+        </label>}
         <div className="form-inline-two">
           <label>Titular
           <select value={op.titular_id} disabled>
