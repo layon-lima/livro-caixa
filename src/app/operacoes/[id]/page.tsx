@@ -5,6 +5,7 @@ import { requireUser, canAccessTitular } from "@/lib/auth";
 import { getDatabase } from "@/lib/database";
 import { categorias, titularesPermitidos, safeId, type Operacao } from "@/lib/document-data";
 import { ArrowLeft, FileText, Pencil } from "lucide-react";
+import { suggestDocumentName } from "@/lib/document-name";
 export const dynamic="force-dynamic";
 export default async function Editar({params}:{params:Promise<{id:string}>}){
   const user=await requireUser();
@@ -17,11 +18,15 @@ export default async function Editar({params}:{params:Promise<{id:string}>}){
   if(!op||!await canAccessTitular(user,Number(op.titular_id),"view"))notFound();
   const [cats,books,files]=await Promise.all([
     categorias(),titularesPermitidos(user,"edit"),
-    db.query<{arquivo_id:string;nome_original:string}>(
-      "SELECT oa.arquivo_id::text,a.nome_original FROM operacao_arquivos oa JOIN arquivos a ON a.id=oa.arquivo_id "+
+    db.query<{arquivo_id:string;nome_original:string;documento_tipo:string;quantidade_no_arquivo:number}>(
+      "SELECT oa.arquivo_id::text,a.nome_original,p.documento_tipo,"+
+      "(SELECT COUNT(*)::int FROM propostas p2 WHERE p2.arquivo_id=a.id) AS quantidade_no_arquivo "+
+      "FROM operacao_arquivos oa JOIN arquivos a ON a.id=oa.arquivo_id "+
+      "JOIN propostas p ON p.id=oa.proposta_id "+
       "WHERE oa.operacao_id=$1",[id]),
   ]);
   const editable=await canAccessTitular(user,Number(op.titular_id),"edit");
+  const opCategory=cats.find(c=>c.id===op.categoria_id);
   return <StandaloneWorkspace title="Editar operação" section="livros"><div className="work-page">
     <header className="work-bar"><Link href={"/livros/"+op.titular_id}><ArrowLeft size={16}/> Voltar ao livro</Link><strong><Pencil size={16}/> Operação #{id}</strong></header>
     <main className="work-main narrow-work">
@@ -57,7 +62,13 @@ export default async function Editar({params}:{params:Promise<{id:string}>}){
       </form>
       <h2 className="work-heading">Documentos vinculados</h2>
       {files.rows.map(f=><div className="upload-file-row" key={f.arquivo_id}>
-        <a href={"/api/documentos/"+f.arquivo_id} target="_blank" rel="noreferrer"><FileText size={14}/>{f.nome_original}</a>
+        <a href={"/api/documentos/"+f.arquivo_id} target="_blank" rel="noreferrer"><FileText size={14}/>{
+          f.quantidade_no_arquivo>1?f.nome_original:suggestDocumentName({
+            originalName:f.nome_original,documentType:f.documento_tipo,
+            title:op.titulo,counterparty:op.contraparte,category:opCategory?.nome,
+            subcategory:opCategory?.subcategoria,description:op.descricao,
+            paymentDate:op.data_pagamento})
+        }</a>
       </div>)}
       {files.rows.length===0&&<p className="muted">Nenhum documento vinculado.</p>}
     </main>

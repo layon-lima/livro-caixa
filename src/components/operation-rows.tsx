@@ -3,14 +3,21 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { FileText, Folder, FolderInput, Pencil, Trash2, X, Eye, ChevronLeft, ChevronDown, ChevronRight } from "lucide-react";
+import { suggestDocumentName } from "@/lib/document-name";
 
 export type OperationEntry={
   id:string;titular_id:string;titulo:string;categoria:string|null;subcategoria:string|null;
   categoria_id:string|null;competencia:string;tipo:string;descricao:string;
   contraparte:string;referencia:string;valor:string|null;quantidade_documentos:string; data_registro?:string; data_pagamento?:string|null; documento?:string|null; tem_documento?:boolean;
 };
-export type AttachedDocument={operacao_id:string;arquivo_id:string;nome_original:string;documento_tipo:string};
+export type AttachedDocument={operacao_id:string;arquivo_id:string;nome_original:string;documento_tipo:string;quantidade_no_arquivo?:number;nome_exibicao?:string};
 type Book={id:string;nome:string};
+const displayName=(doc:AttachedDocument,op:OperationEntry)=>doc.nome_exibicao||
+  (Number(doc.quantidade_no_arquivo)>1?doc.nome_original:suggestDocumentName({
+  originalName:doc.nome_original,documentType:doc.documento_tipo,title:op.titulo,
+  counterparty:op.contraparte,category:op.categoria,subcategory:op.subcategoria,
+  description:op.descricao,paymentDate:op.data_pagamento,
+}));
 type Props={
   operations:OperationEntry[];documents:AttachedDocument[];books:Book[];
   canEdit:boolean;canDelete:boolean;bookId:string;
@@ -110,7 +117,7 @@ export function OperationRows({operations,documents,books,canEdit,canDelete,book
     })():fileEntries.map(({op,doc,key})=><div key={key}
       className={"operation-row operation-popup-row explorer-file-row"+(selected===key?" selected":"")}
       role="button" tabIndex={0}
-      aria-label={(doc?.nome_original||op.titulo)+". Dois cliques para ações"}
+      aria-label={(doc?displayName(doc,op):op.titulo)+". Dois cliques para ações"}
       title="Clique para selecionar; dois cliques para abrir as opções do arquivo"
       onClick={()=>{setSelected(key);setMenu(null);}}
       onDoubleClick={e=>{show(op.id,e.clientX,e.clientY,doc?.arquivo_id);setSelected(key);}}
@@ -125,8 +132,8 @@ export function OperationRows({operations,documents,books,canEdit,canDelete,book
       }}>
       <span className="operation-name">
         <FileText size={15} className="explorer-document-icon"/>
-        <span title={doc?.nome_original||"Lançamento sem anexo — "+op.titulo}>
-          {doc?.nome_original||"Lançamento sem anexo — "+op.titulo}
+        <span title={doc?displayName(doc,op):"Lançamento sem anexo — "+op.titulo}>
+          {doc?displayName(doc,op):"Lançamento sem anexo — "+op.titulo}
         </span>
       </span>
       <span title={op.titulo}>{op.titulo}</span>
@@ -173,7 +180,7 @@ export function OperationRows({operations,documents,books,canEdit,canDelete,book
       </div>}
       {menu.view==="files"&&<div className="entity-popup-options">
         {currentDocs.map(f=><a key={f.arquivo_id} href={"/api/documentos/"+f.arquivo_id}
-          target="_blank" rel="noopener noreferrer"><FileText size={15}/><span className="truncate">{f.nome_original}</span></a>)}
+          target="_blank" rel="noopener noreferrer"><FileText size={15}/><span className="truncate">{displayName(f,current)}</span></a>)}
         {Number(current.quantidade_documentos)>currentDocs.length&&
           <Link href={"/operacoes/"+current.id} onClick={()=>setMenu(null)}>
             <FileText size={15}/> Ver todos os documentos

@@ -57,7 +57,8 @@ export function ExpenseSpreadsheet({bookId,cats,books,canEdit,canDelete,months}:
   },[bookId,params]);
   const documents:AttachedDocument[]=(data?.rows||[]).filter(x=>x.arquivo_id)
     .map(x=>({operacao_id:x.id,arquivo_id:x.arquivo_id!,
-      nome_original:x.documento||"Documento",documento_tipo:"documento"}));
+      nome_original:x.documento||"Documento",documento_tipo:"documento",
+      nome_exibicao:x.documento||"Documento"}));
   const count=data?.summary.quantidade||0;
   const pages=Math.max(1,Math.ceil(count/pageSize));
   const update=(setter:(v:string)=>void)=>(event:ChangeEvent<HTMLSelectElement>)=>{

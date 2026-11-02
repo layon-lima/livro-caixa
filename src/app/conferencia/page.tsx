@@ -6,6 +6,7 @@ import { categorias, titularesPermitidos, type Proposta } from "@/lib/document-d
 import { ArrowLeft, ClipboardCheck, FileText, ExternalLink, LoaderCircle } from "lucide-react";
 import { LiveReview } from "@/components/live-review";
 import { ReviewCategoryPicker } from "@/components/review-category-picker";
+import { suggestDocumentName } from "@/lib/document-name";
 export const dynamic="force-dynamic";
 type Queued=Proposta&{nome_titular:string;duplicada_de:string|null;arquivo_original_id:string|null;titular_original_id:string|null};
 
@@ -59,7 +60,16 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
       (!query.id?inProgress[0]:undefined));
   const selected=requested||(!activePending?
     (query.arquivo?all.find(p=>p.arquivo_id===query.arquivo):undefined)||all[0]:undefined);
+  const selectedCat=selected?cats.find(c=>c.id===selected.categoria_id):null;
+  const selectedName=selected?suggestDocumentName({
+    originalName:selected.nome_original,documentType:selected.documento_tipo,
+    title:selected.titulo,counterparty:selected.contraparte,description:selected.descricao,
+    category:selectedCat?.nome||selected.categoria_sugerida_nome,
+    subcategory:selectedCat?.subcategoria||selected.categoria_sugerida_subcategoria,
+    paymentDate:selected.data_pagamento
+  }):"";
   const batchQuery=batch?"arquivos="+batch.join(",")+"&":"";
+
   const available=selected?await db.query<{id:string;titulo:string}>(
     "SELECT id::text,titulo FROM operacoes WHERE titular_id=$1 AND excluido_em IS NULL ORDER BY id DESC LIMIT 200",
     [selected.titular_id]):null;
@@ -104,7 +114,7 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
           arquivoId={activePending.id} nome={activePending.nome_original}
           books={books} cats={cats} isAdmin={user.isAdmin}
         />:!selected?<p className="empty-info">{batch?"Nenhuma proposta pendente neste envio.":"Importe um arquivo para começar."}</p>:<>
-          <div className="page-title-compact"><h2>{selected.nome_original}</h2>
+          <div className="page-title-compact"><h2 title={"Nome no envio: "+selected.nome_original}>{selectedName}</h2>
             <a href={"/api/documentos/"+selected.arquivo_id} target="_blank" rel="noreferrer">Abrir original <ExternalLink size={13}/></a></div>
           <div className="review-analysis-status">
             <strong>{selected.metodo_leitura==="ia"?"Analisado por inteligência artificial":

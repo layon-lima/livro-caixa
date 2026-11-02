@@ -196,3 +196,23 @@ docker compose up -d --build app worker
 ```
 
 O Dockerfile executa os testes do worker e compila o Next.js no build.
+
+## Nome inteligente de documentos no Explorador
+
+A coluna Arquivo usa o tipo identificado (Pix, boleto, nota fiscal etc.),
+a categoria do lançamento e o fornecedor para propor um nome explicativo.
+Exemplo: `PIX ABASTECIMENTO AUTO POSTO BARBOSAO 28-10-2026.pdf`.
+
+Aplica-se também a documentos anteriormente aprovados e aos exibidos na
+conferência/importação. Correções na categoria e na contraparte atualizam
+automaticamente a apresentação. Para PDFs contendo vários documentos, o
+nome de origem permanece para não confundir os arquivos. Não renomeia o
+objeto original no armazenamento, não mexe na assinatura nem no hash,
+e preserva a extensão. Após aprovação de documento único, o nome sugerido
+também é usado quando aberto/salvo pelo navegador.
+
+Atualização: apenas código, **sem migração SQL**.
+```bash
+git pull --ff-only
+docker compose up -d --build app worker
+```

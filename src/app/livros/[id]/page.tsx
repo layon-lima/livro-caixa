@@ -10,7 +10,7 @@ import { ExpenseSpreadsheet } from "@/components/expense-spreadsheet";
 import { Folder, Search } from "lucide-react";
 export const dynamic="force-dynamic";
 
-type Attached = {operacao_id:string;arquivo_id:string;nome_original:string;documento_tipo:string};
+type Attached = {operacao_id:string;arquivo_id:string;nome_original:string;documento_tipo:string;quantidade_no_arquivo:number};
 type Params = {aba?:string;mes?:string;categoria?:string;recebedor?:string;q?:string;op?:string;erro?:string};
 export default async function Livro({params,searchParams}:{
   params:Promise<{id:string}>; searchParams:Promise<Params>;
@@ -76,7 +76,8 @@ export default async function Livro({params,searchParams}:{
   ):{rows:[] as Operacao[]};
   const ops=data.rows;
   const attached=fetchOperations&&ops.length?await db.query<Attached>(
-    "SELECT oa.operacao_id::text,oa.arquivo_id::text,a.nome_original,p.documento_tipo "+
+    "SELECT oa.operacao_id::text,oa.arquivo_id::text,a.nome_original,p.documento_tipo,"+
+    "(SELECT COUNT(*)::int FROM propostas p2 WHERE p2.arquivo_id=a.id) AS quantidade_no_arquivo "+
     "FROM operacao_arquivos oa JOIN arquivos a ON a.id=oa.arquivo_id "+
     "JOIN propostas p ON p.id=oa.proposta_id "+
     "WHERE oa.operacao_id=ANY($1::bigint[]) ORDER BY oa.proposta_id",

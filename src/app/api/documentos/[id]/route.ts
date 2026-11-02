@@ -3,6 +3,7 @@ import { currentUser, canAccessTitular } from "@/lib/auth";
 import { getDatabase } from "@/lib/database";
 import { safeId } from "@/lib/document-data";
 import { readOriginal } from "@/lib/storage-actions";
+import { suggestDocumentName } from "@/lib/document-name";
 export const runtime="nodejs";
 export const dynamic="force-dynamic";
 
@@ -14,10 +15,21 @@ export async function GET(_request:Request,{params}:{params:Promise<{id:string}>
   const r=await getDatabase().query<{
     chave_armazenamento:string;armazenamento:string;nome_original:string;
     mime:string;titular_envio_id:string;acessos:string[];
+    propostas_quantidade:number;documento_tipo:string|null;titulo:string|null;
+    contraparte:string|null;descricao:string|null;data_pagamento:string|null;
+    categoria:string|null;subcategoria:string|null;
   }>(
     "SELECT a.chave_armazenamento,a.armazenamento,a.nome_original,a.mime,a.titular_envio_id::text, "+
-    "ARRAY(SELECT DISTINCT p.titular_id::text FROM propostas p WHERE p.arquivo_id=a.id) AS acessos "+
-    "FROM arquivos a WHERE a.id=$1",[fileId],
+    "ARRAY(SELECT DISTINCT p.titular_id::text FROM propostas p WHERE p.arquivo_id=a.id) AS acessos,"+
+    "(SELECT count(*)::int FROM propostas p WHERE p.arquivo_id=a.id) AS propostas_quantidade,"+
+    "d.documento_tipo,d.titulo,d.contraparte,d.descricao,d.data_pagamento::text,d.categoria,d.subcategoria "+
+    "FROM arquivos a "+
+    "LEFT JOIN LATERAL (SELECT p.documento_tipo,o.titulo,o.contraparte,o.descricao,o.data_pagamento,"+
+    "c.nome AS categoria,c.subcategoria FROM propostas p "+
+    "JOIN operacoes o ON o.id=p.operacao_id LEFT JOIN categorias c ON c.id=o.categoria_id "+
+    "WHERE p.arquivo_id=a.id AND p.aprovado_em IS NOT NULL "+
+    "ORDER BY p.id LIMIT 1) d ON TRUE "+
+    "WHERE a.id=$1",[fileId],
   );
   const file=r.rows[0];
   if (!file) return new Response("Arquivo não encontrado",{status:404});
@@ -31,7 +43,15 @@ export async function GET(_request:Request,{params}:{params:Promise<{id:string}>
   }
   try {
     const data=await readOriginal(file.chave_armazenamento,file.armazenamento);
-    const safeName=file.nome_original.replace(/[\r\n"]/g,"_");
+    // Ao abrir/salvar, usar o nome identificado. O conteúdo original é imutável.
+    // PDFs com mais de uma proposta continuam com o nome de origem.
+    const displayName=file.propostas_quantidade===1?suggestDocumentName({
+      originalName:file.nome_original,documentType:file.documento_tipo,
+      title:file.titulo,counterparty:file.contraparte,category:file.categoria,
+      subcategory:file.subcategoria,description:file.descricao,
+      paymentDate:file.data_pagamento
+    }):file.nome_original;
+    const safeName=displayName.replace(/[\\/\r\n"]/g,"_");
     const body=new Uint8Array(data.length);
     body.set(data);
     return new NextResponse(body.buffer,{

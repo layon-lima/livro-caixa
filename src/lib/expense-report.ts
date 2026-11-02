@@ -1,5 +1,6 @@
 import "server-only";
 import { getDatabase } from "@/lib/database";
+import { suggestDocumentName } from "@/lib/document-name";
 
 export type ExpenseFilters={
   mes:string;categoria:string;q:string;status:"todos"|"com-documento"|"sem-documento";
@@ -10,7 +11,7 @@ export type ExpenseRow={
   id:string;titular_id:string;titulo:string;categoria_id:string|null;
   categoria:string|null;subcategoria:string|null;tipo:string;competencia:string;
   data_registro:string;data_pagamento:string|null;contraparte:string;descricao:string;referencia:string;
-  valor:string|null;quantidade_documentos:string;documento:string|null;arquivo_id:string|null;
+  valor:string|null;quantidade_documentos:string;documento:string|null;documento_tipo:string|null;arquivo_id:string|null;quantidade_no_arquivo:number|null;
   tem_documento:boolean;
 };
 export type MonthTotal={mes:string;quantidade:number;total:string};
@@ -67,9 +68,23 @@ const select="SELECT o.id::text,o.titular_id::text,o.titulo,o.categoria_id::text
   "(SELECT count(*)::text FROM operacao_arquivos oa WHERE oa.operacao_id=o.id) AS quantidade_documentos,"+
   "(SELECT a.nome_original FROM operacao_arquivos oa JOIN arquivos a ON a.id=oa.arquivo_id "+
   "WHERE oa.operacao_id=o.id ORDER BY oa.proposta_id LIMIT 1) AS documento,"+
+  "(SELECT p.documento_tipo FROM operacao_arquivos oa JOIN propostas p ON p.id=oa.proposta_id "+
+  "WHERE oa.operacao_id=o.id ORDER BY oa.proposta_id LIMIT 1) AS documento_tipo,"+
+  "(SELECT COUNT(*)::int FROM propostas pp WHERE pp.arquivo_id=("+
+  "SELECT oa.arquivo_id FROM operacao_arquivos oa WHERE oa.operacao_id=o.id "+
+  "ORDER BY oa.proposta_id LIMIT 1)) AS quantidade_no_arquivo,"+
   "(SELECT oa.arquivo_id::text FROM operacao_arquivos oa WHERE oa.operacao_id=o.id "+
   "ORDER BY oa.proposta_id LIMIT 1) AS arquivo_id,"+
   "EXISTS (SELECT 1 FROM operacao_arquivos oa WHERE oa.operacao_id=o.id) AS tem_documento ";
+
+function namesForReport(rows:ExpenseRow[]):ExpenseRow[]{
+  return rows.map(row=>({...row,documento:row.documento&&Number(row.quantidade_no_arquivo)<=1?suggestDocumentName({
+    originalName:row.documento,documentType:row.documento_tipo,
+    title:row.titulo,counterparty:row.contraparte,
+    category:row.categoria,subcategory:row.subcategoria,
+    description:row.descricao,paymentDate:row.data_pagamento
+  }):row.documento}));
+}
 
 export async function expensePage(titularId:number,filters:ExpenseFilters){
   const db=getDatabase();
@@ -89,13 +104,14 @@ export async function expensePage(titularId:number,filters:ExpenseFilters){
       "COALESCE(SUM(o.valor),0)::text AS total "+
       from+where+" GROUP BY to_char(o.competencia,'YYYY-MM') ORDER BY mes DESC",values)
   ]);
-  return {rows:rows.rows,summary:summary.rows[0]||{total:"0",quantidade:0},
+  return {rows:namesForReport(rows.rows),summary:summary.rows[0]||{total:"0",quantidade:0},
     months:months.rows,page:filters.page,pageSize:filters.pageSize};
 }
 export async function expenseExport(titularId:number,filters:ExpenseFilters){
   const {where,args}=condition(filters);
   const values=[titularId,...args];
   const dir=filters.direction==="asc"?"ASC":"DESC";
-  return getDatabase().query<ExpenseRow>(select+from+where+
+  const result=await getDatabase().query<ExpenseRow>(select+from+where+
     " ORDER BY "+orderKeys[filters.sort]+" "+dir+" NULLS LAST,o.id DESC LIMIT 20001",values);
+  return {...result,rows:namesForReport(result.rows)};
 }

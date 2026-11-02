@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { ArrowUpRight, FileText, RefreshCw, X } from "lucide-react";
 type Imported={
-  id:string;nome_original:string;status:string;erro:string|null;
+  id:string;nome_original:string;nome_sugerido?:string;status:string;erro:string|null;
   criado_em:string;nome:string;revisado:boolean;
 };
 type Menu={id:string;x:number;y:number};
@@ -13,6 +13,7 @@ export function ImportedFileRows({files}:{files:Imported[]}){
   const [menu,setMenu]=useState<Menu|null>(null);
   const popup=useRef<HTMLDivElement>(null);
   const active=files.find(f=>f.id===menu?.id);
+  const fileLabel=(f:Imported)=>f.nome_sugerido||f.nome_original;
   useEffect(()=>{
     if(!menu)return;
     const onClick=(event:PointerEvent)=>{
@@ -33,7 +34,7 @@ export function ImportedFileRows({files}:{files:Imported[]}){
       <thead><tr><th>Arquivo</th><th>Titular</th><th>Situação</th><th>Recebido em</th></tr></thead>
       <tbody>{files.map(file=><tr key={file.id} tabIndex={0} role="button"
         className={selected===file.id?"selected":""}
-        aria-label={file.nome_original+". Dois cliques para opções"}
+        aria-label={fileLabel(file)+". Dois cliques para opções"}
         title="Selecione e dê dois cliques para as ações"
         onClick={()=>setSelected(file.id)}
         onDoubleClick={e=>open(file.id,e.clientX,e.clientY)}
@@ -44,16 +45,16 @@ export function ImportedFileRows({files}:{files:Imported[]}){
             open(file.id,rect.left+80,rect.top+18);
           }
         }}>
-        <td>{file.nome_original}</td><td>{file.nome}</td>
+        <td title={"Nome no envio: "+file.nome_original}>{fileLabel(file)}</td><td>{file.nome}</td>
         <td>{file.status==="erro"?"Erro":" "+file.status}</td>
         <td>{new Date(file.criado_em).toLocaleString("pt-BR")}</td>
       </tr>)}</tbody>
     </table>
     {!files.length&&<p className="muted">Nenhum documento recebido.</p>}
     {active&&menu&&<div ref={popup} className="entity-actions-popup" role="dialog"
-      aria-label={"Ações do arquivo "+active.nome_original} style={{left:menu.x,top:menu.y}}>
+      aria-label={"Ações do arquivo "+fileLabel(active)} style={{left:menu.x,top:menu.y}}>
       <div className="entity-popup-header">
-        <strong title={active.nome_original}>{active.nome_original}</strong>
+        <strong title={"Nome no envio: "+active.nome_original}>{fileLabel(active)}</strong>
         <button type="button" aria-label="Fechar" onClick={()=>setMenu(null)}><X size={16}/></button>
       </div>
       <div className="entity-popup-options">
