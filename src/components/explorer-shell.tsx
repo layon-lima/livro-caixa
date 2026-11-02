@@ -9,12 +9,12 @@ export type Titular = { id: string; nome: string };
 type Props = {
   user: AuthUser; titulares: Titular[]; selected?: Titular;
   children?: React.ReactNode;
-  pageTitle?:string; activeSection?:"livros"|"admin"|"lixeira";
+  pageTitle?:string; activeSection?:"livros"|"admin"|"lixeira"; focusMode?:boolean;
 };
 
-export function ExplorerShell({ user, titulares, selected, children, pageTitle, activeSection="livros" }: Props) {
+export function ExplorerShell({ user, titulares, selected, children, pageTitle, activeSection="livros", focusMode=false }: Props) {
   return (
-    <div className="workspace">
+    <div className={"workspace"+(focusMode?" workspace-focus":"")}>
       <aside className="rail" aria-label="Navegação">
         <div className="rail-mark" aria-label="Livro Caixa Inteligente">LC</div>
         <Link className={"rail-item"+(activeSection==="livros"?" rail-item-active":"")} href="/" aria-label="Livros Caixa">
@@ -28,7 +28,7 @@ export function ExplorerShell({ user, titulares, selected, children, pageTitle, 
         </Link>}
       </aside>
 
-      <aside className="folder-pane" aria-label="Titulares dos livros-caixa">
+      {!focusMode&&<aside className="folder-pane" aria-label="Titulares dos livros-caixa">
         <div className="pane-heading"><span>LIVROS CAIXA</span></div>
         {titulares.map(t => (
           <Link key={t.id} className={"tree-link" + (selected?.id === t.id ? " tree-link-selected" : "")}
@@ -37,7 +37,7 @@ export function ExplorerShell({ user, titulares, selected, children, pageTitle, 
           </Link>
         ))}
         {titulares.length === 0 && <p className="tree-empty">Nenhum livro autorizado</p>}
-      </aside>
+      </aside>}
 
       <main className="content-pane">
         <header className="content-header">

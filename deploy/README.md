@@ -301,3 +301,24 @@ git pull --ff-only
 docker compose exec -T database sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1' < db/migrations/013_discard_pix_payer.sql
 docker compose up -d --build app worker
 ```
+
+## Conferência redesenhada (interface 2026)
+
+Nova visualização da conferência inspirada no layout aprovado:
+- Barra lateral reduzida à navegação principal durante conferência;
+- Fila de documentos com busca, filtros, páginas e aprovação em lote;
+- Sem bloco superior de "Fila do ZIP" com contadores grandes;
+- Cabeçalho do documento, resumo estruturado, checklist interativo e formulário
+  sempre visível com as informações essenciais;
+- Botões Abrir original / Próximo / Salvar / Descartar e barra inferior Aprovar /
+  Salvar para depois / Descartar;
+- Documentos em leitura continuam acompanhados pela mesma fila progressiva;
+- Documentos já aprovados podem ser consultados pela aba Conferidos do ZIP;
+- Sem alteração de banco, nenhuma migração necessária.
+
+Implantar somente app e CSS (worker não é alterado por esta interface):
+```bash
+cd /opt/apps/livro-caixa
+git pull --ff-only
+docker compose up -d --build app
+```

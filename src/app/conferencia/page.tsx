@@ -3,9 +3,11 @@ import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { getDatabase } from "@/lib/database";
 import { categorias, titularesPermitidos, type Proposta } from "@/lib/document-data";
-import { ArrowLeft, ClipboardCheck, FileText, ExternalLink, LoaderCircle } from "lucide-react";
+import {FileText, ExternalLink, ChevronRight, Save, CheckCircle2, ClipboardCheck} from "lucide-react";
 import { LiveReview } from "@/components/live-review";
 import { ReviewCategoryPicker } from "@/components/review-category-picker";
+import { ConferenceQueue, type QueueItem } from "@/components/conference-queue";
+import { ConferenceChecklist } from "@/components/conference-checklist";
 import { suggestDocumentName } from "@/lib/document-name";
 import { BatchQueueRefresh } from "@/components/batch-queue-refresh";
 import { DiscardDocument } from "@/components/discard-document";
@@ -36,10 +38,6 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
     [lote]
   ):null;
   const stats=batchStats?.rows[0];
-  const skipped=zipBatch?await db.query<{nome_entrada:string;erro:string;status_entrada:string}>(
-    "SELECT nome_entrada,erro,status_entrada FROM lote_itens "+
-    "WHERE lote_id=$1 AND arquivo_id IS NULL ORDER BY ordem LIMIT 40",[lote]
-  ):null;
   const ids=query.arquivos && /^\d+(?:,\d+){0,99}$/.test(query.arquivos)
     ? [...new Set(query.arquivos.split(",").map(Number))].filter(x=>Number.isSafeInteger(x)&&x>0)
     : null;
@@ -106,176 +104,213 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
     category:selectedCat?.nome||selected.categoria_sugerida_nome,
     paymentDate:selected.data_pagamento
   }):"";
+  // Aba "Conferidos" do ZIP: lista aprovações para consulta, sem reaprová-las.
+  const completed=lote?await db.query<{
+    id:string;arquivo_id:string;operacao_id:string|null;titulo:string;nome_titular:string;
+  }>(
+    "SELECT p.id::text,p.arquivo_id::text,p.operacao_id::text,p.titulo,t.nome AS nome_titular "+
+    "FROM propostas p JOIN lote_itens li ON li.arquivo_id=p.arquivo_id "+
+    "JOIN titulares t ON t.id=p.titular_id "+
+    (user.isAdmin?"":"JOIN user_titular_permissions up ON up.titular_id=p.titular_id AND up.user_id=$2 AND up.can_view=TRUE ")+
+    "WHERE li.lote_id=$1 AND p.aprovado_em IS NOT NULL "+
+    "ORDER BY p.aprovado_em DESC LIMIT 300",
+    user.isAdmin?[lote]:[lote,user.id]
+  ):null;
+  const queue:QueueItem[]=[
+    ...all.map(p=>({
+      id:p.id,arquivo_id:p.arquivo_id,titulo:p.titulo,nome_titular:p.nome_titular,referencia:p.referencia,
+      status:(p.duplicada_de?"duplicado":p.revisada_em?"revisado":"pendente") as QueueItem["status"]
+    })),
+    ...inProgress.map(p=>({
+      id:"file-"+p.id,arquivo_id:p.id,titulo:p.nome_original,nome_titular:p.nome_titular,
+      status:p.status as QueueItem["status"]
+    })),
+    ...(completed?.rows||[]).map(p=>({
+      id:p.id,arquivo_id:p.arquivo_id,titulo:p.titulo,nome_titular:p.nome_titular,
+      operacao_id:p.operacao_id,status:"aprovado" as const
+    }))
+  ];
+  const position=selected?all.findIndex(x=>x.id===selected.id):-1;
+  const nextItem=selected?all.slice(position+1).find(x=>x.id!==selected.id):all[0];
+  const nextHref=nextItem?"/conferencia?"+(lote?"lote="+encodeURIComponent(lote)+"&":
+    batch?"arquivos="+batch.join(",")+"&":"")+"id="+nextItem.id:null;
   const batchQuery=lote?"lote="+encodeURIComponent(lote)+"&":batch?"arquivos="+batch.join(",")+"&":"";
+  const formId=selected?"conf-form-"+selected.id:"";
+  const pix=selected?/\bPIX\b/i.test(selected.titulo+" "+selected.documento_tipo):false;
+  const typeLabel=selected?(pix?"Comprovante Pix":
+    selected.documento_tipo==="nota fiscal"?"Nota fiscal":selected.documento_tipo):"";
+  const needsOwner=Boolean(selected?.avisos?.some(x=>
+    x.startsWith("Titular não identificado automaticamente")||
+    x.startsWith("Quem fez o Pix")||
+    x.startsWith("Não foi possível ler quem fez o Pix")));
+  const realOwner=selected?(needsOwner?"Aguardando identificação":selected.nome_titular):"";
+  const displayAmount=selected&&selected.valor!==null&&selected.valor!==undefined&&selected.valor!==""?
+    Number(selected.valor).toLocaleString("pt-BR",{style:"currency",currency:"BRL"}):"Não identificado";
+  const displayDate=selected?.data_pagamento?
+    selected.data_pagamento.split("-").reverse().join("/"):"Não identificado";
+  const displayMonth=selected?.competencia?
+    new Date(selected.competencia.slice(0,7)+"-01T12:00:00Z").toLocaleDateString("pt-BR",{month:"long",year:"numeric",timeZone:"UTC"}):"Não identificado";
+  const categoryLabel=cats.find(c=>c.id===selected?.categoria_id)?.nome||
+    selected?.categoria_sugerida_nome||"Não identificada";
+  const reviewItems=[
+    !selected?.categoria_id?"Confirmar categoria":null,
+    needsOwner?"Confirmar titular":null,
+    !selected?.contraparte?"Confirmar recebedor":null,
+    !selected?.data_pagamento?"Confirmar data da transação":null,
+    !selected?.valor?"Conferir valor":null,
+    "Revisar descrição",
+    "Revisar referência",
+  ].filter((x):x is string=>Boolean(x));
 
-  return <StandaloneWorkspace title="Conferência" section="livros"><div className="work-page">
-    <header className="work-bar"><Link href="/" className="work-back"><ArrowLeft size={16}/> Livros Caixa</Link>
-      <strong><ClipboardCheck size={16}/> Conferência</strong><Link href="/importar">Importar documentos</Link></header>
-    <div className="review-grid">
-      <section className="review-list">
-        <div className="page-title-compact"><h1>{lote?"Fila do ZIP":batch?"Conferência desta importação":"Documentos aguardando aprovação"}</h1><span>{all.length+inProgress.length} documento(s)</span></div>
-        {lote&&stats&&<div className="batch-queue-summary">
-          <strong title={zipBatch?.nome_arquivo}>Lote ZIP: {zipBatch?.nome_arquivo}</strong>
-          <span>{stats.prontos} disponíveis para conferir · {stats.aprovados} aprovados</span>
-          <span>{stats.processando} em leitura · {stats.aguardando} aguardando · {stats.falhas} com erro/ignorados · {stats.descartados} descartados</span>
-          <small>{stats.total} itens recebidos. A leitura continua enquanto você confere.</small>
-          {zipBatch?.status==="erro"&&<small className="form-error">{zipBatch.erro}</small>}
-          {Boolean(skipped?.rows.length)&&<details className="batch-queue-ignored">
-            <summary>Ver arquivos ignorados ({skipped?.rows.length}{stats&&stats.falhas>40?"+":""})</summary>
-            {skipped?.rows.map((x,i)=><small key={i}>{x.nome_entrada}: {x.erro||"Já cadastrado ou sem acesso à conferência."}</small>)}
-          </details>}
-          <BatchQueueRefresh active={stats.aguardando>0||stats.processando>0}/>
-        </div>}
-        {query.erro&&<p className="form-error">Não foi possível concluir: {query.erro}.</p>}
-        {query.descartado&&<p className="form-success">Documento retirado da fila sem criar lançamento.</p>}
-        {query.revisada&&<p className="form-success">Documento conferido e salvo.</p>}
-        {query.aprovados&&<p className="form-success">{query.aprovados} lançamento(s) criado(s).</p>}
-        <form method="post" action="/api/propostas/aprovar">
-          {batch&&<input type="hidden" name="arquivos" value={batch.join(",")}/>}
-          {lote&&<input type="hidden" name="lote" value={lote}/>}
-          {all.map(p=><div key={p.id} className={"review-row"+(selected?.id===p.id?" selected":"")}>
-            <label className="review-check" title={p.revisada_em?"Selecionar para aprovação":"Confira antes de aprovar"}>
-              <input type="checkbox" name="ids" value={p.id} disabled={!p.revisada_em || !!p.duplicada_de}/>
-            </label>
-            <Link href={"/conferencia?"+batchQuery+"id="+p.id} className="review-row-link">
-              <span className="review-row-title"><FileText size={14}/><span title={p.titulo}>{p.titulo}</span></span>
-              <span className="review-row-meta">
-                <span title={p.nome_titular}>{p.nome_titular}</span>
-                <span>{p.duplicada_de?"Duplicado":p.revisada_em?"Conferido":"Pronto para conferir"}</span>
-              </span>
-            </Link>
-          </div>)}
-          {inProgress.map(p=><div key={"pending-"+p.id} className={"review-row"+(activePending?.id===p.id?" selected":"")}>
-            <span className="review-check" aria-hidden="true"><LoaderCircle size={14} className={p.status==="erro"?"":"spin"}/></span>
-            <Link href={"/conferencia?"+batchQuery+"arquivo="+p.id} className="review-row-link">
-              <span className="review-row-title"><FileText size={14}/><span title={p.nome_original}>{p.nome_original}</span></span>
-              <span className="review-row-meta"><span>Titular em identificação</span><span>{p.status==="erro"?"Erro na leitura":p.status==="aguardando"?"Na fila":"Analisando…"}</span></span>
-            </Link>
-          </div>)}
-          {all.length===0&&inProgress.length===0&&<p className="empty-info">Nenhum documento aguardando conferência.</p>}
-          <div className="review-footer">
-            <button className="primary-btn" type="submit" disabled={!all.some(p=>p.revisada_em&&!p.duplicada_de)}>Aprovar selecionados</button>
-          </div>
-        </form>
-      </section>
-      <section className="review-detail">
-        {activePending?<><LiveReview key={activePending.id}
-          arquivoId={activePending.id} nome={activePending.nome_original}
-          books={books} cats={cats} isAdmin={user.isAdmin}
-        /><DiscardDocument arquivoId={activePending.id} arquivos={batch?.join(",")} lote={lote}/></>:!selected?<p className="empty-info">{lote?"Lote sem documentos pendentes. Os aprovados já estão nos livros.":"Importe um arquivo para começar."}</p>:<>
-          <div className="page-title-compact"><h2 title={"Nome no envio: "+selected.nome_original}>{selectedName}</h2>
-            <a href={"/api/documentos/"+selected.arquivo_id} target="_blank" rel="noreferrer">Abrir original <ExternalLink size={13}/></a></div>
-          <div className="review-analysis-status">
-            <strong>{selected.metodo_leitura==="ia"?"Analisado por inteligência artificial":
-              selected.metodo_leitura==="xml"?"Dados estruturados do XML":
-              "Leitura automática local (OCR + regras)"}</strong>
-            {selected.confianca&&<span>Indicador aproximado de extração: {Math.round(Number(selected.confianca)*100)}%</span>}
-            {selected.pagina_inicial&&<span>Páginas: {selected.pagina_inicial}{selected.pagina_final&&selected.pagina_final!==selected.pagina_inicial?"–"+selected.pagina_final:""}</span>}
-          </div>
-          {selected.duplicada_de && <div className="duplicate-alert">
-            <strong>Este documento já foi identificado anteriormente</strong>
-            <span>Um lançamento duplicado não será criado.</span>
-            {selected.arquivo_original_id && (user.isAdmin || selected.titular_original_id===selected.titular_id) &&
-              <a href={"/api/documentos/"+selected.arquivo_original_id} target="_blank" rel="noreferrer">Abrir documento original</a>}
-          </div>}
-          {!selected.duplicada_de && <form action={"/api/propostas/"+selected.id+"/revisar"} method="post" className="review-form">
-            {batch&&<input type="hidden" name="arquivos" value={batch.join(",")}/>}
-            {lote&&<input type="hidden" name="lote" value={lote}/>}
-            <section className="review-auto-summary">
-              <div><span>Documento</span><strong>{selected.documento_tipo}</strong></div>
-              {selected.pagador_identificado&&<div><span>Quem fez o Pix</span><strong>{selected.pagador_identificado}</strong></div>}
-              <div><span>Titular</span><strong>{
-                selected.avisos?.some(x=>x.startsWith("Titular não identificado automaticamente")||x.startsWith("Quem fez o Pix")||x.startsWith("Não foi possível ler quem fez o Pix"))?
-                "Aguardando sua identificação":selected.nome_titular
-              }</strong></div>
-              <div><span>Categoria</span><strong>{
-                cats.find(c=>c.id===selected.categoria_id)?.nome||
-                (selected.categoria_sugerida_nome||"Não identificada")
-              }</strong></div>
-              <div><span>Competência</span><strong>{selected.competencia.slice(0,7)}</strong></div>
-              <div><span>Pagamento</span><strong>{selected.data_pagamento?selected.data_pagamento.split("-").reverse().join("/"):"Não informado"}</strong></div>
-              <div><span>Valor</span><strong>{selected.valor?Number(selected.valor).toLocaleString("pt-BR",{style:"currency",currency:"BRL"}):"Não identificado"}</strong></div>
-              <div><span>Contraparte</span><strong>{selected.contraparte||"Não identificada"}</strong></div>
-            </section>
-            {selected.titular_sugerido&&<section className="review-enrichment">
-              {selected.titular_sugerido&&<div className="enrichment-line">
-                <strong>Possível novo titular</strong>
-                <span>{selected.titular_sugerido}</span>
-                <small>O documento cita essa pessoa como possível responsável. O sistema não cria titulares automaticamente.</small>
-                {user.isAdmin?
-                  <Link href={"/admin?sugerir_titular="+encodeURIComponent(selected.titular_sugerido)}
-                    className="flat-button">Conferir e cadastrar titular</Link>:
-                  <small>O cadastro de titulares depende de um administrador.</small>}
-              </div>}
-
-            </section>}
-            {selected.avisos?.length>0&&<details className="review-notices">
-              <summary>{selected.avisos.length} ponto(s) para conferir <span>Ver detalhes</span></summary>
-              <ul>{selected.avisos.map((notice,i)=><li key={i}>{notice}</li>)}</ul>
-            </details>}
-            <details className="review-edit-data" open={Boolean(selected.categoria_sugerida_nome)||
-              selected.avisos?.some(x=>x.startsWith("Titular não identificado automaticamente")||x.startsWith("Quem fez o Pix")||x.startsWith("Não foi possível ler quem fez o Pix"))||
-              (selected.avisos?.length??0)>1}>
-              <summary>Corrigir informações sugeridas</summary>
-              <div className="review-fields-grid">
-                <label className="review-span-all">Descrição do lançamento
-                  <input name="titulo" defaultValue={selected.titulo} required maxLength={170}/>
-                </label>
-                <label>Titular
-                  <select name="titularId" defaultValue={
-                    selected.avisos?.some(x=>x.startsWith("Titular não identificado automaticamente")||x.startsWith("Quem fez o Pix")||x.startsWith("Não foi possível ler quem fez o Pix"))?
-                    "":selected.titular_id
-                  } required>
-                    <option value="">Selecione o titular do documento</option>
-                    {books.map(b=><option key={b.id} value={b.id}>{b.nome}</option>)}
-                  </select>
-                </label>
-                <ReviewCategoryPicker key={selected.id} cats={cats} selectedId={selected.categoria_id}
-                  suggestedName={selected.categoria_sugerida_nome||""}
-                  suggestedSubcategory={selected.categoria_sugerida_subcategoria||""}/>
-                <label>Competência {selected.competencia_estimada&&<em>(estimada)</em>}
-                  <input name="competencia" type="month" defaultValue={selected.competencia.slice(0,7)} required/>
-                </label>
-                <label>Data do pagamento
-                  <input name="dataPagamento" type="date" defaultValue={selected.data_pagamento||""}/>
-                  <small>Data da efetivação; deixe vazia se o documento não comprovar o pagamento.</small>
-                </label>
-                <label>Documento
-                  <select name="documentoTipo" defaultValue={selected.documento_tipo}>
-                    {Array.from(new Set(["nota fiscal","boleto","comprovante","recibo","tributo","contrato","outro",selected.documento_tipo])).map(c=><option key={c}>{c}</option>)}
-                  </select>
-                </label>
-                <label>Tipo
-                  <select name="tipo" defaultValue={selected.tipo==="receita"?"outro":selected.tipo}>
-                    <option value="despesa">Despesa</option>
-                    
-                    <option value="outro">Outro</option>
-                  </select>
-                </label>
-                <label>Valor (informativo)
-                  <input name="valor" inputMode="decimal" defaultValue={selected.valor||""}/>
-                </label>
-                <label>Fornecedor / contraparte
-                  <input name="contraparte" defaultValue={selected.contraparte}/>
-                </label>
-                <label>Nº ou referência
-                  <input name="referencia" defaultValue={selected.referencia}/>
-                </label>
-                <label className="review-span-half">Descrição
-                  <textarea name="descricao" defaultValue={selected.descricao} rows={2}/>
-                </label>
+  return <StandaloneWorkspace title="Conferência" section="livros" focusMode>
+    <div className="work-page conference-page">
+      <div className="conference-layout">
+        <aside className="conference-queue-pane" aria-label="Fila de documentos">
+          <ConferenceQueue items={queue} queryRoot={batchQuery} selectedId={selected?.id}
+            selectedFile={activePending?.id} lote={lote} arquivos={batch?.join(",")}/>
+          <BatchQueueRefresh active={Boolean(stats&&(stats.aguardando>0||stats.processando>0))}/>
+        </aside>
+        <main className="conference-document" id="conteudo-conferencia">
+          {query.erro&&<p className="form-error" role="alert">Não foi possível concluir: {query.erro}.</p>}
+          {query.descartado&&<p className="form-success" role="status">Documento descartado e retirado da fila.</p>}
+          {query.revisada&&<p className="form-success" role="status">Conferência salva para depois.</p>}
+          {query.aprovados&&<p className="form-success" role="status">{query.aprovados} lançamento(s) aprovado(s).</p>}
+          {activePending?<div className="conference-panel conference-reading">
+            <LiveReview key={activePending.id} arquivoId={activePending.id} nome={activePending.nome_original}
+              books={books} cats={cats} isAdmin={user.isAdmin}/>
+            <div className="conference-actions"><DiscardDocument arquivoId={activePending.id}
+              arquivos={batch?.join(",")} lote={lote}/></div>
+          </div>:!selected?<div className="conference-empty">
+            <ClipboardCheck size={30}/>
+            <h2>{lote?"Nenhum documento aguardando conferência":"Sua fila está vazia"}</h2>
+            <p>{lote?"O processamento e a aprovação dos documentos deste ZIP estão atualizados.":"Importe documentos para iniciar a conferência."}</p>
+            <Link className="flat-button" href="/importar">Importar documentos</Link>
+          </div>:<>
+            <header className="conference-doc-header">
+              <div className="conference-doc-identity">
+                <FileText size={21}/>
+                <div><h1 title={"Original: "+selected.nome_original}>{selectedName}</h1>
+                  <div className="conference-doc-tags">
+                    <span>{selected.metodo_leitura==="ia"?"IA":selected.metodo_leitura==="xml"?"XML":"OCR"}</span>
+                    {selected.confianca&&<span>{Math.round(Number(selected.confianca)*100)}% confiança estimada</span>}
+                    {selected.pagina_inicial&&<span>{selected.pagina_final&&selected.pagina_final!==selected.pagina_inicial?
+                      Number(selected.pagina_final)-Number(selected.pagina_inicial)+1:1} pág.</span>}
+                  </div>
+                </div>
               </div>
+              <div className="conference-header-actions">
+                <a className="flat-button" href={"/api/documentos/"+selected.arquivo_id}
+                  target="_blank" rel="noreferrer"><ExternalLink size={14}/> Abrir original</a>
+                {nextHref?<Link className="flat-button" href={nextHref}>Próximo <ChevronRight size={15}/></Link>:
+                  <span className="flat-button conference-disabled">Último documento</span>}
+                {!selected.duplicada_de&&<button className="flat-button" type="submit"
+                  form={formId} name="acao" value="salvar"><Save size={14}/> Salvar</button>}
+                <DiscardDocument propostaId={selected.id} arquivos={batch?.join(",")} lote={lote}/>
+              </div>
+            </header>
+            <section className="conference-panel">
+              <h2><FileText size={17}/> Resumo do documento</h2>
+              <div className="conference-summary">
+                <div><span>Tipo do documento</span><strong>{typeLabel}</strong></div>
+                <div><span>{pix?"Quem pagou":"Titular"}</span><strong>{pix?(selected.pagador_identificado||"Não identificado"):realOwner}</strong></div>
+                <div><span>{pix?"Quem recebeu":"Fornecedor / contraparte"}</span><strong>{selected.contraparte||"Não identificado"}</strong></div>
+                <div><span>Valor</span><strong>{displayAmount}</strong></div>
+                <div><span>Data do pagamento</span><strong>{displayDate}</strong></div>
+                <div><span>Competência</span><strong>{displayMonth}</strong></div>
+                <div><span>Categoria sugerida</span><strong className={!selected.categoria_id?"conference-needs-review":""}>{categoryLabel}</strong></div>
+                <div><span>Tipo sugerido</span><strong>{selected.tipo==="despesa"?"Despesa":"Outro"}</strong></div>
+              </div>
+            </section>
+            {selected.duplicada_de&&<div className="duplicate-alert conference-panel">
+              <strong>Documento já identificado anteriormente</strong>
+              <span>Para evitar duplicidade, este lançamento não pode ser aprovado novamente.</span>
+              {selected.arquivo_original_id&&(user.isAdmin||selected.titular_original_id===selected.titular_id)&&
+                <a href={"/api/documentos/"+selected.arquivo_original_id} target="_blank" rel="noreferrer">
+                  Abrir documento anterior</a>}
+            </div>}
+            {selected.titular_sugerido&&<div className="conference-panel conference-suggested-owner">
+              <strong>Possível titular ainda não cadastrado: {selected.titular_sugerido}</strong>
+              <p>O cadastro não é feito automaticamente.</p>
+              {user.isAdmin&&<Link href={"/admin?sugerir_titular="+encodeURIComponent(selected.titular_sugerido)}
+                className="flat-button">Conferir cadastro</Link>}
+            </div>}
+            {!selected.duplicada_de&&<>
+              <section className="conference-panel conference-checklist">
+                <h2><ClipboardCheck size={17}/> O que precisa da sua conferência</h2>
+                <ConferenceChecklist key={selected.id} items={reviewItems}/>
+                {selected.avisos?.length>0&&<details className="conference-notes">
+                  <summary>{selected.avisos.length} observação(ões) da análise</summary>
+                  <ul>{selected.avisos.map((notice,i)=><li key={i}>{notice}</li>)}</ul>
+                </details>}
+              </section>
+              <section className="conference-panel conference-edit">
+                <h2><ClipboardCheck size={17}/> Confirmar lançamento</h2>
+                <form id={formId} action={"/api/propostas/"+selected.id+"/revisar"}
+                  method="post" className="review-form">
+                  {batch&&<input type="hidden" name="arquivos" value={batch.join(",")}/>}
+                  {lote&&<input type="hidden" name="lote" value={lote}/>}
+                  <div className="conference-fields">
+                    <label>Titular
+                      <select name="titularId" defaultValue={needsOwner?"":selected.titular_id} required>
+                        <option value="">Selecione o titular</option>
+                        {books.map(b=><option key={b.id} value={b.id}>{b.nome}</option>)}
+                      </select>
+                    </label>
+                    <ReviewCategoryPicker key={selected.id} cats={cats}
+                      selectedId={selected.categoria_id} suggestedName={selected.categoria_sugerida_nome||""}/>
+                    <label>Tipo
+                      <select name="tipo" defaultValue={selected.tipo==="receita"?"outro":selected.tipo}>
+                        <option value="despesa">Despesa</option><option value="outro">Outro</option>
+                      </select>
+                    </label>
+                    <label>Valor
+                      <input name="valor" inputMode="decimal" defaultValue={selected.valor||""}/>
+                    </label>
+                    <label>Data do pagamento
+                      <input name="dataPagamento" type="date" defaultValue={selected.data_pagamento||""}/>
+                    </label>
+                    <label>Competência
+                      <input name="competencia" type="month" defaultValue={selected.competencia.slice(0,7)} required/>
+                    </label>
+                    <label className="conference-field-double">Recebedor / contraparte
+                      <input name="contraparte" defaultValue={selected.contraparte}/>
+                    </label>
+                    <label className="conference-field-double">Descrição do lançamento
+                      <textarea name="titulo" required maxLength={170} rows={2} defaultValue={selected.titulo}/>
+                    </label>
+                    <label>Documento
+                      <select name="documentoTipo" defaultValue={selected.documento_tipo}>
+                        {Array.from(new Set(["nota fiscal","boleto","comprovante","recibo","tributo","contrato","outro",selected.documento_tipo]))
+                          .map(c=><option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </label>
+                    <label>Número / referência
+                      <input name="referencia" defaultValue={selected.referencia}/>
+                    </label>
+                  </div>
+                  <details className="conference-extra">
+                    <summary>Observações adicionais</summary>
+                    <label>Detalhes do documento
+                      <textarea name="descricao" rows={2} defaultValue={selected.descricao}/>
+                    </label>
+                  </details>
+                </form>
+              </section>
+              <div className="conference-action-bar">
+                <button className="primary-btn" type="submit" form={formId} name="acao" value="aprovar">
+                  <CheckCircle2 size={16}/> Aprovar lançamento</button>
+                <button className="flat-button" type="submit" form={formId} name="acao" value="salvar">
+                  <Save size={15}/> Salvar para depois</button>
+                <DiscardDocument propostaId={selected.id} arquivos={batch?.join(",")} lote={lote}/>
+              </div>
+            </>}
+            <details className="conference-text">
+              <summary><FileText size={15}/> Texto extraído do documento</summary>
+              <pre>{selected.texto_extraido.slice(0,30000)}</pre>
             </details>
-            <div className="review-approval-actions">
-              <button type="submit" name="acao" value="aprovar" className="primary-btn">Aprovar lançamento</button>
-              <button type="submit" name="acao" value="salvar" className="flat-button">Salvar para depois</button>
-            </div>
-            <span className="muted">Confira os dados acima antes de aprovar. Nada será organizado definitivamente sem sua confirmação.</span>
-          </form>}
-          <DiscardDocument propostaId={selected.id} arquivos={batch?.join(",")} lote={lote}/>
-          <details className="text-extracted"><summary>Texto extraído do documento</summary><pre>{selected.texto_extraido.slice(0,30000)}</pre></details>
-        </>}
-      </section>
+          </>}
+        </main>
+      </div>
     </div>
-  </div></StandaloneWorkspace>;
+  </StandaloneWorkspace>;
 }
