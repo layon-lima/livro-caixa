@@ -132,6 +132,7 @@ export function ExpenseSpreadsheet({bookId,cats,books,canEdit,canDelete,months,
       </button>
     </div>
     {error&&<p className="form-error expense-error" role="alert">{error}</p>}
+    <div className="expense-table-card">
     <div className="expense-grid-scroller">
       <div className="expense-table-header" role="row">
         <span>{sortButton("Data","data")}</span>
@@ -167,5 +168,6 @@ export function ExpenseSpreadsheet({bookId,cats,books,canEdit,canDelete,months,
           onClick={()=>setPage(p=>p+1)}><ChevronRight size={16}/></button>
       </nav>
     </footer>
+    </div>
   </div>;
 }

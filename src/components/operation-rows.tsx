@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { FileText, Folder, FolderInput, Pencil, Trash2, X, Eye, ChevronLeft, ChevronDown, ChevronRight } from "lucide-react";
+import { FileText, Folder, FolderInput, Pencil, Trash2, X, Eye, ChevronLeft, ChevronDown, ChevronRight, CalendarDays } from "lucide-react";
 import { suggestDocumentName } from "@/lib/document-name";
 import { documentTypeLabel, formatTransactionDate } from "@/lib/spreadsheet-fields";
 
@@ -85,8 +85,9 @@ export function OperationRows({operations,documents,books,canEdit,canDelete,book
             onClick={()=>setCollapsed(old=>closed?old.filter(x=>x!==month):[...old,month])}
             aria-expanded={!closed}>
             {closed?<ChevronRight size={15}/>:<ChevronDown size={15}/>}
+            <CalendarDays size={15} className="expense-month-icon" aria-hidden="true"/>
             <strong>{monthLabel(month)}</strong>
-            <span>{total?.quantidade??entries.length} lançamentos</span>
+            <span className="expense-month-count">{total?.quantidade??entries.length} lançamentos</span>
             <span className="expense-month-total">Total do mês: <strong>{money(total?.total||"0")}</strong></span>
           </button>
           {!closed&&entries.map(op=><div key={op.id} className={"expense-sheet-row"+(selected===op.id?" selected":"")}
@@ -109,8 +110,9 @@ export function OperationRows({operations,documents,books,canEdit,canDelete,book
             <span className="expense-kind" title={documentTypeLabel(op)}>
               {documentTypeLabel(op)}
             </span>
-            <span className="expense-document" title={op.documento||"Sem documento"}>
-              {op.documento||"Sem documento"}
+            <span className={"expense-document"+(!op.documento?" expense-document-missing":"")} title={op.documento||"Sem documento"}>
+              {op.documento&&<FileText size={15} strokeWidth={1.7} aria-hidden="true"/>}
+              <span>{op.documento||"Sem documento"}</span>
             </span>
           </div>)}
         </section>;
