@@ -11,6 +11,7 @@ import { suggestDocumentName } from "@/lib/document-name";
 import { BatchQueueRefresh } from "@/components/batch-queue-refresh";
 import { ZipBatchReport } from "@/components/zip-batch-report";
 import { summarizeZipBatch,type ZipBatchEntry } from "@/lib/zip-batch-status";
+import { buildZipQueue } from "@/lib/zip-conference-queue";
 import { DiscardDocument } from "@/components/discard-document";
 import { notFound } from "next/navigation";
 export const dynamic="force-dynamic";
@@ -45,8 +46,8 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
   const queryArgs:(number|string|number[])[] = user.isAdmin?[]:[user.id];
   if(lote)queryArgs.push(lote);
   else if(batch)queryArgs.push(batch);
-  const scope=lote?"AND EXISTS(SELECT 1 FROM lote_itens li WHERE li.lote_id=$"+queryArgs.length+
-    " AND li.arquivo_id=p.arquivo_id) ":
+  const scope=lote?"AND a.status=\'pronto\' AND EXISTS(SELECT 1 FROM lote_itens li WHERE li.lote_id=$"+queryArgs.length+
+    " AND li.status_entrada IN (\'importado\',\'reprocessado\') AND li.arquivo_id=p.arquivo_id) ":
     batch?"AND p.arquivo_id = ANY($"+queryArgs.length+"::bigint[]) ":"";
   const rows=await db.query<Queued>(
     "SELECT p.id::text,p.arquivo_id::text,p.titular_id::text,p.titulo,p.documento_tipo,p.contraparte,"+
@@ -71,7 +72,7 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
   const pendingExtra=lote?
     "AND EXISTS(SELECT 1 FROM lote_itens li WHERE li.lote_id=$"+pendingArgs.length+" AND li.arquivo_id=a.id) ":
     pendingIds?"AND a.id=ANY($"+pendingArgs.length+"::bigint[]) ":"";
-  const pending=await db.query<{
+  const pending=lote?null:await db.query<{
     id:string;nome_original:string;titular_envio_id:string;nome_titular:string;status:string;
   }>(
     "SELECT a.id::text,a.nome_original,a.titular_envio_id::text,t.nome AS nome_titular,a.status "+
@@ -117,20 +118,18 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
     "ORDER BY p.aprovado_em DESC LIMIT 300",
     user.isAdmin?[lote]:[lote,user.id]
   ):null;
-  const queue:QueueItem[]=[
-    ...all.map(p=>({
-      id:p.id,arquivo_id:p.arquivo_id,titulo:p.titulo,nome_titular:p.nome_titular,referencia:p.referencia,
-      status:(p.duplicada_de?"duplicado":p.revisada_em?"revisado":"pendente") as QueueItem["status"]
-    })),
-    ...inProgress.map(p=>({
-      id:"file-"+p.id,arquivo_id:p.id,titulo:p.nome_original,nome_titular:p.nome_titular,
-      status:p.status as QueueItem["status"]
-    })),
-    ...(completed?.rows||[]).map(p=>({
-      id:p.id,arquivo_id:p.arquivo_id,titulo:p.titulo,nome_titular:p.nome_titular,
-      operacao_id:p.operacao_id,status:"aprovado" as const
-    }))
-  ];
+  const queue:QueueItem[]=lote?
+    buildZipQueue(batchEntries,all,completed?.rows||[]):
+    [
+      ...all.map(p=>({
+        id:p.id,arquivo_id:p.arquivo_id,titulo:p.titulo,nome_titular:p.nome_titular,referencia:p.referencia,
+        status:(p.duplicada_de?"duplicado":p.revisada_em?"revisado":"pendente") as QueueItem["status"]
+      })),
+      ...inProgress.map(p=>({
+        id:"file-"+p.id,arquivo_id:p.id,titulo:p.nome_original,nome_titular:p.nome_titular,
+        status:p.status as QueueItem["status"]
+      }))
+    ];
   const position=selected?all.findIndex(x=>x.id===selected.id):-1;
   const nextItem=selected?all.slice(position+1).find(x=>x.id!==selected.id):all[0];
   const nextHref=nextItem?"/conferencia?"+(lote?"lote="+encodeURIComponent(lote)+"&":
@@ -159,7 +158,7 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
       <div className="conference-layout">
         <aside className="conference-queue-pane" aria-label="Fila de documentos">
           <ConferenceQueue items={queue} queryRoot={batchQuery} selectedId={selected?.id}
-            selectedFile={activePending?.id} lote={lote} arquivos={batch?.join(",")}/>
+            selectedFile={activePending?.id} lote={lote} arquivos={batch?.join(",")} loteTotal={batchEntries.length}/>
           <BatchQueueRefresh active={Boolean((zipBatch&&(zipBatch.status==="recebendo"||zipBatch.status==="extraindo"))||batchEntries.some(x=>x.leitura_status==="aguardando"||x.leitura_status==="processando"))}/>
         </aside>
         <main className="conference-document" id="conteudo-conferencia">
@@ -167,7 +166,7 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
           {zipBatch&&(zipBatch.status==="recebendo"||zipBatch.status==="extraindo")&&
             <p className="form-success" role="status">
               {zipBatch.status==="recebendo"?"ZIP recebido. Preparando extração…":
-                "Lendo os documentos do ZIP um por um. Os concluídos já aparecem na fila."}
+                "Todos os arquivos do ZIP aparecem à esquerda; os concluídos ficam disponíveis para validar."}
             </p>}
           {zipBatch?.status==="erro"&&<p className="form-error" role="alert">
             O ZIP não foi concluído: {zipBatch.erro||"falha na extração"}. Os documentos já recebidos foram preservados.
@@ -191,8 +190,8 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
               arquivos={batch?.join(",")} lote={lote}/></div>
           </div>:!selected?<div className="conference-empty">
             <ClipboardCheck size={30}/>
-            <h2>{zipBatch&&(zipBatch.status==="recebendo"||zipBatch.status==="extraindo")?"Recebendo documentos…":zipBatch&&batchSummary.duplicate===batchSummary.total&&batchSummary.total>0?"Nenhum documento novo para conferir":lote?"Nenhum documento aguardando conferência":"Sua fila está vazia"}</h2>
-            <p>{zipBatch&&(zipBatch.status==="recebendo"||zipBatch.status==="extraindo")?"O ZIP está sendo extraído na VPS. A lista acima será preenchida conforme os documentos forem cadastrados.":zipBatch&&batchSummary.duplicate===batchSummary.total&&batchSummary.total>0?"Os documentos já constavam no sistema. Consulte o relatório do ZIP acima para verificar cada arquivo.":lote?"Consulte o resultado de cada arquivo acima, inclusive duplicados e falhas de leitura.":"Importe documentos para iniciar a conferência."}</p>
+            <h2>{zipBatch&&(zipBatch.status==="recebendo"||zipBatch.status==="extraindo")?"Preparando a fila de documentos…":zipBatch&&batchSummary.duplicate===batchSummary.total&&batchSummary.total>0?"Nenhum documento novo para conferir":lote&&batchEntries.some(e=>e.status_entrada==="pendente"||e.leitura_status==="aguardando"||e.leitura_status==="processando")?"Aguardando documentos ficarem prontos":lote?"Nenhum documento aguardando conferência":"Sua fila está vazia"}</h2>
+            <p>{zipBatch&&(zipBatch.status==="recebendo"||zipBatch.status==="extraindo")?"Assim que o índice do ZIP for lido, todos os arquivos aparecerão à esquerda. Os opacos ainda não podem ser validados.":zipBatch&&batchSummary.duplicate===batchSummary.total&&batchSummary.total>0?"Os documentos já constavam no sistema. Consulte o relatório do ZIP acima para verificar cada arquivo.":lote?"Consulte o resultado de cada arquivo acima, inclusive duplicados e falhas de leitura.":"Importe documentos para iniciar a conferência."}</p>
             <Link className="flat-button" href="/importar">Importar documentos</Link>
           </div>:<>
             <header className="conference-doc-header">

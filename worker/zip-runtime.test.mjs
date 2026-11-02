@@ -1,7 +1,7 @@
 import {test} from "node:test";
 import assert from "node:assert/strict";
 import {deflateRawSync} from "node:zlib";
-import {eachZipDocument} from "../src/lib/zip-documents.ts";
+import {eachZipDocument,listZipDocuments} from "../src/lib/zip-documents.ts";
 
 function crc32(buffer){
   let crc=0xffffffff;
@@ -52,4 +52,14 @@ test("ZIP sem PDF/XML/PNG/JPG não pode ser aceito silenciosamente",async()=>{
     /ZIP não contém/
   );
   assert.match(rejected,/Formato ignorado/);
+});
+
+test("Índice completo do ZIP fica disponível antes de descompactar os documentos",async()=>{
+  const zip=zipWithOne("documentos/comprovante.pdf",Buffer.from("%PDF-1.4\nTeste\n"));
+  const manifest=await listZipDocuments(zip);
+  assert.deepEqual(manifest,[{ordem:1,nome:"comprovante.pdf"}]);
+});
+test("O índice inclui entradas não suportadas para informar erros na fila",async()=>{
+  const zip=zipWithOne("documentos/anotacao.txt",Buffer.from("teste"));
+  assert.deepEqual(await listZipDocuments(zip),[{ordem:1,nome:"anotacao.txt"}]);
 });

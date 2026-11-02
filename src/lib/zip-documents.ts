@@ -43,6 +43,36 @@ async function readMember(zip:ZipFile,entry:Entry):Promise<Buffer>{
   return Buffer.concat(parts,bytes);
 }
 
+/** Lê primeiro o índice central do ZIP, sem descompactar documentos.
+ * Permite mostrar a fila completa antes do OCR e da extração item a item.
+ * A ordem deve ser idêntica à usada em eachZipDocument.
+ */
+export async function listZipDocuments(data:Buffer):Promise<{ordem:number;nome:string}[]>{
+  if(data.length>MAX_ZIP_BYTES||data.length<4)
+    throw Error("ZIP inválido ou maior que 80 MB.");
+  const zip=await openZip(data);
+  const entries:{ordem:number;nome:string}[]=[];
+  let fatalError:Error|undefined;
+  zip.on("error",(error:Error)=>{fatalError=error;});
+  try{
+    for(;;){
+      if(fatalError)throw fatalError;
+      const entry=await nextEntry(zip);
+      if(fatalError)throw fatalError;
+      if(!entry)break;
+      const full=entry.fileName;
+      if(full.endsWith("/")||full.startsWith("__MACOSX/")||
+         /\/(?:__MACOSX|\.DS_Store)(?:\/|$)/.test(full))continue;
+      if(entries.length>=MAX_MEMBERS)throw Error("ZIP acima do limite de 300 arquivos.");
+      if(full.startsWith("/")||full.includes("\\")||
+         full.split("/").some(part=>part===".."||part==="."||part===""))
+        throw Error("ZIP possui nomes de arquivos ou caminhos inválidos.");
+      entries.push({ordem:entries.length+1,nome:(full.split("/").at(-1)||"").slice(0,255)});
+    }
+    return entries;
+  }finally{zip.close();}
+}
+
 /** Descompacta na memória um único membro de cada vez, sem extrair caminhos. */
 export async function eachZipDocument(
   data:Buffer,

@@ -1,7 +1,7 @@
 // Serviço independente: descompacta os ZIPs no volume compartilhado, item por item.
 // O app confirma o envio imediatamente; o OCR principal permanece separado.
 import {Pool} from "pg";
-import {eachZipDocument} from "../src/lib/zip-documents.ts";
+import {eachZipDocument,listZipDocuments} from "../src/lib/zip-documents.ts";
 import {reimportDecision,reopenDiscardedDocument} from "../src/lib/reimport-discarded.ts";
 import {createHash} from "node:crypto";
 import {gzipSync,gunzipSync} from "node:zlib";
@@ -150,18 +150,31 @@ async function claim(){
 async function record(job,ordinal,name,result){
   await db.query(
     "INSERT INTO lote_itens(lote_id,ordem,nome_entrada,arquivo_id,status_entrada,erro) "+
-    "VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(lote_id,ordem) DO NOTHING",
+    "VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(lote_id,ordem) DO UPDATE "+
+    "SET arquivo_id=EXCLUDED.arquivo_id,status_entrada=EXCLUDED.status_entrada,"+
+    "erro=EXCLUDED.erro WHERE lote_itens.status_entrada='pendente'",
     [job.id,ordinal,name,result.id||null,result.status,result.error||""]);
   await db.query("UPDATE lotes_importacao SET atualizado_em=now() WHERE id=$1",[job.id]);
 }
 async function unpack(job){
   const path=filename(job.id);
   let index=0;
-  const known=await db.query(
-    "SELECT ordem FROM lote_itens WHERE lote_id=$1 ORDER BY ordem",[job.id]);
-  const processed=new Set(known.rows.map(r=>r.ordem));
   try{
     const zip=await readFile(path);
+    // Primeira passada usa apenas metadados: a interface vê TODAS as entradas
+    // imediatamente; depois a leitura pesada avança em segundo plano.
+    const manifest=await listZipDocuments(zip);
+    await db.query(
+      "INSERT INTO lote_itens(lote_id,ordem,nome_entrada,status_entrada,erro) "+
+      "SELECT $1::uuid,x.ordem,x.nome,'pendente','' "+
+      "FROM jsonb_to_recordset($2::jsonb) AS x(ordem integer,nome text) "+
+      "ON CONFLICT(lote_id,ordem) DO NOTHING",
+      [job.id,JSON.stringify(manifest)]);
+    await db.query("UPDATE lotes_importacao SET atualizado_em=now() WHERE id=$1",[job.id]);
+    const known=await db.query(
+      "SELECT ordem FROM lote_itens WHERE lote_id=$1 AND status_entrada<>'pendente' "+
+      "ORDER BY ordem",[job.id]);
+    const processed=new Set(known.rows.map(r=>r.ordem));
     await eachZipDocument(zip,async(name,buffer)=>{
       const ordinal=++index;
       if(processed.has(ordinal))return;
@@ -183,6 +196,11 @@ async function unpack(job){
   }catch(error){
     const detail=String(error instanceof Error?error.message:error).slice(0,500);
     console.error("Erro ao descompactar ZIP",job.id,detail);
+    // Não deixar itens pendentes indefinidamente após um erro fatal.
+    await db.query(
+      "UPDATE lote_itens SET status_entrada='erro',erro=$2 "+
+      "WHERE lote_id=$1 AND status_entrada='pendente'",
+      [job.id,"Extração interrompida: "+detail]).catch(console.error);
     await db.query("UPDATE lotes_importacao SET status='erro',erro=$2,atualizado_em=now() "+
       "WHERE id=$1",[job.id,detail]);
     // Preservar o ZIP original em falhas, para diagnóstico e reprocessamento.

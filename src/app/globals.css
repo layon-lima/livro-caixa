@@ -962,3 +962,21 @@ button { cursor: pointer; }
   .zip-report-metrics {grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;}
   .zip-report-metrics>div {padding:7px;}
 }
+
+/* Conferência do ZIP: todos os documentos sempre visíveis, só os prontos clicáveis. */
+.cq-batch-progress {display:flex;flex-direction:column;gap:4px;margin-top:9px;
+  padding:8px 10px;border-radius:7px;background:#f4f8fd;border:1px solid #e6eef8;}
+.cq-batch-progress strong {font-size:11px;color:#2b537a;font-weight:700;}
+.cq-batch-progress span {font-size:10px;color:#6e829b;}
+.cq-row .cq-item-number {color:#97abc0;font-size:10px;font-weight:500;}
+.cq-row-locked {opacity:.45;background:#f7f9fc;cursor:not-allowed;}
+.cq-row-locked:hover {background:#f7f9fc;}
+.cq-row-locked .cq-row-link {cursor:not-allowed;}
+.cq-row-locked .cq-status {background:#e7ebf0;color:#6b7a8c;}
+.cq-row-ready:not(.cq-row-locked) {background:#fff;opacity:1;}
+.cq-row-ready:not(.cq-row-locked):hover {background:#edf7ff;}
+.cq-row-ready .cq-status.cq-pendente {background:#e5f6ee;color:#168051;font-weight:700;}
+.cq-row-ready .cq-status.cq-revisado {background:#e8f3ff;color:#326ea7;font-weight:700;}
+.cq-row-ready:not(.selected) .cq-file-icon {color:#357dc0;}
+.cq-row-ready .cq-row-link strong {color:#24496b;}
+.cq-row-ready.selected {background:#e9f4ff;}

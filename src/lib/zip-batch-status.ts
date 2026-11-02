@@ -14,6 +14,7 @@ export type ZipBatchEntry={
 export type ZipEntryView={label:string;group:"new"|"duplicate"|"problem"|"done";description:string};
 export function describeZipEntry(entry:ZipBatchEntry):ZipEntryView{
   const status=entry.status_entrada;
+  if(status==="pendente")return {label:"Aguardando extração",group:"new",description:"Na fila de descompactação."};
   if(status==="importado"||status==="reprocessado"){
     if(entry.leitura_status==="erro")return {label:"Erro no OCR",group:"problem",
       description:entry.leitura_erro||"Falha na leitura do documento."};
