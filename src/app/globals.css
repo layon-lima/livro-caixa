@@ -927,3 +927,38 @@ button { cursor: pointer; }
 .zip-history-pronto {background:#e8f5ec;color:#328057;}
 .zip-history-erro {background:#fff0eb;color:#b04d38;}
 .zip-history-error {color:#ad493b!important;font-weight:600;}
+
+/* Relatório de importação de ZIP: detalhado e compacto, sem scroll de tela. */
+.zip-report {display:flex;flex-direction:column;gap:10px;flex:none;background:#fff;
+  border:1px solid #dfe7f0;border-radius:10px;padding:13px 14px;
+  box-shadow:0 1px 2px rgba(31,62,93,.035);}
+.zip-report-head {display:flex;align-items:center;gap:10px;}
+.zip-report-head>svg {color:#6283a4;flex-shrink:0;}
+.zip-report-head>div {display:flex;flex-direction:column;gap:2px;min-width:0;flex:1;}
+.zip-report-head strong {font-size:12px;color:#263e57;}
+.zip-report-head small {font-size:10px;color:#8294a8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.zip-report-head>span {font-size:10px;color:#547491;background:#edf4fb;
+  border-radius:6px;padding:5px 8px;white-space:nowrap;}
+.zip-report-metrics {display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;}
+.zip-report-metrics>div {background:#f7f9fc;border:1px solid #edf0f5;border-radius:7px;
+  padding:8px;min-width:0;display:flex;flex-direction:column;gap:3px;}
+.zip-report-metrics strong {font-size:17px;color:#324c68;font-variant-numeric:tabular-nums;}
+.zip-report-metrics span {font-size:10px;line-height:1.3;color:#7b8da3;}
+.zip-report-note {margin:0;font-size:11px;color:#617790;}
+.zip-report-details summary {cursor:pointer;font-size:11px;font-weight:650;color:#376ea3;}
+.zip-report-items {max-height:300px;overflow-y:auto;margin-top:10px;border:1px solid #edf1f5;border-radius:6px;}
+.zip-report-item {display:flex;align-items:center;flex-wrap:wrap;gap:6px 11px;
+  padding:8px 10px;border-bottom:1px solid #eef2f5;font-size:10px;}
+.zip-report-item:last-child {border-bottom:0;}
+.zip-report-filename {flex:1 1 190px;min-width:0;overflow-wrap:anywhere;color:#344a63;}
+.zip-report-tag {font-size:9px;font-weight:650;white-space:nowrap;padding:3px 6px;border-radius:5px;}
+.zip-report-new {background:#ecf4fe;color:#3c77b2;}
+.zip-report-done {background:#e8f5ee;color:#317956;}
+.zip-report-duplicate {background:#f0f2f5;color:#66788e;}
+.zip-report-problem {background:#fff1ec;color:#b35d43;}
+.zip-report-item>small {flex-basis:100%;font-size:10px;color:#8d6471;}
+@media(max-width:760px){
+  .zip-report {padding:10px;gap:8px;}
+  .zip-report-metrics {grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;}
+  .zip-report-metrics>div {padding:7px;}
+}

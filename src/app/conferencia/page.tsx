@@ -9,6 +9,8 @@ import { ReviewCategoryPicker } from "@/components/review-category-picker";
 import { ConferenceQueue, type QueueItem } from "@/components/conference-queue";
 import { suggestDocumentName } from "@/lib/document-name";
 import { BatchQueueRefresh } from "@/components/batch-queue-refresh";
+import { ZipBatchReport } from "@/components/zip-batch-report";
+import { summarizeZipBatch,type ZipBatchEntry } from "@/lib/zip-batch-status";
 import { DiscardDocument } from "@/components/discard-document";
 import { notFound } from "next/navigation";
 export const dynamic="force-dynamic";
@@ -23,20 +25,19 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
     "SELECT id::text,enviado_por::text,status,erro,nome_arquivo FROM lotes_importacao WHERE id=$1",[lote]):null;
   const zipBatch=loteInfo?.rows[0];
   if(lote&&(!zipBatch||(!user.isAdmin&&String(user.id)!==zipBatch.enviado_por)))notFound();
-  const batchStats=zipBatch?await db.query<{
-    total:number;prontos:number;aprovados:number;aguardando:number;processando:number;falhas:number;descartados:number;
-  }>(
-    "SELECT COUNT(*)::int AS total,"+
-    "COUNT(*) FILTER (WHERE a.descartado_em IS NULL AND a.status='pronto' AND EXISTS(SELECT 1 FROM propostas p WHERE p.arquivo_id=a.id AND p.aprovado_em IS NULL AND p.descartado_em IS NULL))::int AS prontos,"+
-    "COUNT(*) FILTER (WHERE a.id IS NOT NULL AND EXISTS(SELECT 1 FROM propostas p WHERE p.arquivo_id=a.id AND p.aprovado_em IS NOT NULL))::int AS aprovados,"+
-    "COUNT(*) FILTER (WHERE a.status='aguardando' AND a.descartado_em IS NULL)::int AS aguardando,"+
-    "COUNT(*) FILTER (WHERE a.status='processando' AND a.descartado_em IS NULL)::int AS processando,"+
-    "COUNT(*) FILTER (WHERE (a.status='erro' AND a.descartado_em IS NULL) OR (li.arquivo_id IS NULL AND li.status_entrada<>'descartado'))::int AS falhas,"+
-    "COUNT(*) FILTER (WHERE a.descartado_em IS NOT NULL OR li.status_entrada='descartado')::int AS descartados "+
-    "FROM lote_itens li LEFT JOIN arquivos a ON a.id=li.arquivo_id WHERE li.lote_id=$1",
-    [lote]
+  // A fonte da verdade é lote_itens, não aprovações de imports anteriores.
+  const batchRows=zipBatch?await db.query<ZipBatchEntry>(
+    "SELECT li.ordem,li.nome_entrada,li.status_entrada,li.erro,li.arquivo_id::text,"+
+    "a.status AS leitura_status,a.erro AS leitura_erro,"+
+    "EXISTS(SELECT 1 FROM propostas p WHERE p.arquivo_id=li.arquivo_id AND "+
+    "p.aprovado_em IS NULL AND p.descartado_em IS NULL) AS tem_pendente,"+
+    "EXISTS(SELECT 1 FROM propostas p WHERE p.arquivo_id=li.arquivo_id AND "+
+    "p.aprovado_em IS NOT NULL) AS tem_aprovado "+
+    "FROM lote_itens li LEFT JOIN arquivos a ON a.id=li.arquivo_id "+
+    "WHERE li.lote_id=$1 ORDER BY li.ordem LIMIT 300",[lote]
   ):null;
-  const stats=batchStats?.rows[0];
+  const batchEntries=batchRows?.rows||[];
+  const batchSummary=summarizeZipBatch(batchEntries);
   const ids=query.arquivos && /^\d+(?:,\d+){0,99}$/.test(query.arquivos)
     ? [...new Set(query.arquivos.split(",").map(Number))].filter(x=>Number.isSafeInteger(x)&&x>0)
     : null;
@@ -111,7 +112,8 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
     "FROM propostas p JOIN lote_itens li ON li.arquivo_id=p.arquivo_id "+
     "JOIN titulares t ON t.id=p.titular_id "+
     (user.isAdmin?"":"JOIN user_titular_permissions up ON up.titular_id=p.titular_id AND up.user_id=$2 AND up.can_view=TRUE ")+
-    "WHERE li.lote_id=$1 AND p.aprovado_em IS NOT NULL "+
+    "WHERE li.lote_id=$1 AND li.status_entrada IN ('importado','reprocessado') "+
+    "AND p.aprovado_em IS NOT NULL "+
     "ORDER BY p.aprovado_em DESC LIMIT 300",
     user.isAdmin?[lote]:[lote,user.id]
   ):null;
@@ -158,9 +160,10 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
         <aside className="conference-queue-pane" aria-label="Fila de documentos">
           <ConferenceQueue items={queue} queryRoot={batchQuery} selectedId={selected?.id}
             selectedFile={activePending?.id} lote={lote} arquivos={batch?.join(",")}/>
-          <BatchQueueRefresh active={Boolean((zipBatch&&(zipBatch.status==="recebendo"||zipBatch.status==="extraindo"))||(stats&&(stats.aguardando>0||stats.processando>0)))}/>
+          <BatchQueueRefresh active={Boolean((zipBatch&&(zipBatch.status==="recebendo"||zipBatch.status==="extraindo"))||batchEntries.some(x=>x.leitura_status==="aguardando"||x.leitura_status==="processando"))}/>
         </aside>
         <main className="conference-document" id="conteudo-conferencia">
+          {zipBatch&&<ZipBatchReport name={zipBatch.nome_arquivo} status={zipBatch.status} items={batchEntries}/>}
           {zipBatch&&(zipBatch.status==="recebendo"||zipBatch.status==="extraindo")&&
             <p className="form-success" role="status">
               {zipBatch.status==="recebendo"?"ZIP recebido. Preparando extração…":
@@ -188,8 +191,8 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
               arquivos={batch?.join(",")} lote={lote}/></div>
           </div>:!selected?<div className="conference-empty">
             <ClipboardCheck size={30}/>
-            <h2>{zipBatch&&(zipBatch.status==="recebendo"||zipBatch.status==="extraindo")?"Recebendo documentos…":lote?"Nenhum documento aguardando conferência":"Sua fila está vazia"}</h2>
-            <p>{zipBatch&&(zipBatch.status==="recebendo"||zipBatch.status==="extraindo")?"O ZIP está sendo extraído na VPS. Os documentos aparecerão automaticamente aqui.":lote?"O processamento e a aprovação dos documentos deste ZIP estão atualizados.":"Importe documentos para iniciar a conferência."}</p>
+            <h2>{zipBatch&&(zipBatch.status==="recebendo"||zipBatch.status==="extraindo")?"Recebendo documentos…":zipBatch&&batchSummary.duplicate===batchSummary.total&&batchSummary.total>0?"Nenhum documento novo para conferir":lote?"Nenhum documento aguardando conferência":"Sua fila está vazia"}</h2>
+            <p>{zipBatch&&(zipBatch.status==="recebendo"||zipBatch.status==="extraindo")?"O ZIP está sendo extraído na VPS. A lista acima será preenchida conforme os documentos forem cadastrados.":zipBatch&&batchSummary.duplicate===batchSummary.total&&batchSummary.total>0?"Os documentos já constavam no sistema. Consulte o relatório do ZIP acima para verificar cada arquivo.":lote?"Consulte o resultado de cada arquivo acima, inclusive duplicados e falhas de leitura.":"Importe documentos para iniciar a conferência."}</p>
             <Link className="flat-button" href="/importar">Importar documentos</Link>
           </div>:<>
             <header className="conference-doc-header">

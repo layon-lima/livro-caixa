@@ -68,7 +68,7 @@ async function storeDocument(job,name,buffer){
       const approved=await cx.query(
         "SELECT 1 FROM propostas WHERE arquivo_id=$1 AND aprovado_em IS NOT NULL LIMIT 1",
         [original.id]);
-      if(!approved.rowCount&&original.status==="erro"&&
+      if(!approved.rowCount&&["pronto","erro"].includes(original.status)&&
          original.titular_envio_id===String(job.titular_envio_id)&&
          original.armazenamento==="local"){
         const reviewed=await cx.query(
@@ -168,7 +168,11 @@ async function unpack(job){
     await db.query("UPDATE lotes_importacao SET status='pronto',erro='',atualizado_em=now() "+
       "WHERE id=$1",[job.id]);
     await unlink(path).catch(e=>console.warn("Falha ao limpar ZIP processado",job.id,e));
-    console.log("ZIP importado",job.id,index,"entradas");
+    const summary=await db.query(
+      "SELECT status_entrada,count(*)::int AS quantidade FROM lote_itens "+
+      "WHERE lote_id=$1 GROUP BY status_entrada ORDER BY status_entrada",[job.id]);
+    console.log("ZIP extraído",job.id,index,"entradas. Resultado:",
+      JSON.stringify(Object.fromEntries(summary.rows.map(r=>[r.status_entrada,r.quantidade]))));
   }catch(error){
     const detail=String(error instanceof Error?error.message:error).slice(0,500);
     console.error("Erro ao descompactar ZIP",job.id,detail);

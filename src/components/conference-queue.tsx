@@ -1,6 +1,6 @@
 "use client";
 
-import {useMemo,useState} from "react";
+import {useEffect,useMemo,useState} from "react";
 import Link from "next/link";
 import {CheckCircle2,ChevronLeft,ChevronRight,FileText,LoaderCircle,Search} from "lucide-react";
 
@@ -41,6 +41,13 @@ export function ConferenceQueue({items,queryRoot,selectedId,selectedFile,lote,ar
     conferidos:items.filter(x=>x.status==="aprovado").length,
     erros:items.filter(x=>x.status==="erro").length
   };
+  // Quando o último pendente some da fila, não deixar o filtro
+  // de pendentes selecionado com conteúdo em outra aba.
+  useEffect(()=>{
+    if(filter==="pendentes"&&counts.pendentes===0&&counts.todos>0){
+      setFilter("todos");setPage(0);
+    }
+  },[filter,counts.pendentes,counts.todos]);
   const filtered=useMemo(()=>{
     const term=fold(search.trim());
     return items.filter(x=>{
