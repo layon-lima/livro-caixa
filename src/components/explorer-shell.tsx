@@ -67,13 +67,12 @@ export function ExplorerShell({ user, titulares, selected, children, pageTitle, 
             </div>
           </> : <nav className="home-books-grid" aria-label="Abrir livro caixa">
             {titulares.map(t => <Link className="home-book-tile" key={t.id} href={"/livros/" + t.id}
-              title={"Abrir livro caixa de "+t.nome}>
-              <span className="home-folder-figure" aria-hidden="true">
-                <span className="home-folder-back"/>
-                <span className="home-folder-paper"/>
-                <span className="home-folder-front"/>
+              aria-label={"Abrir livro caixa de "+t.nome}>
+              <span className="home-book-icon" aria-hidden="true">
+                <Folder size={44} strokeWidth={1.4} fill="#f5d789"/>
               </span>
               <span className="home-book-label">{t.nome}</span>
+              <span className="home-book-hint">Abrir livro <ChevronRight size={13} strokeWidth={1.7}/></span>
             </Link>)}
             {titulares.length === 0 && <p className="muted">Nenhum livro disponível para este usuário.</p>}
           </nav>}
