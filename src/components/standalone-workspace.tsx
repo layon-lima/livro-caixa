@@ -3,8 +3,8 @@ import { requireUser } from "@/lib/auth";
 import { titularesPermitidos } from "@/lib/document-data";
 import { ExplorerShell } from "@/components/explorer-shell";
 
-// O mesmo Explorador e barra lateral usados em Livros ficam presentes
-// em Administração, Lixeira, Conferência, importação e edição.
+// A barra lateral de titulares permanece disponível também na administração,
+// lixeira, conferência, importação e edição.
 export async function StandaloneWorkspace({children,title,section="livros"}:{
   children:ReactNode;title:string;section?:"livros"|"admin"|"lixeira";
 }){

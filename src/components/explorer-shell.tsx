@@ -1,19 +1,18 @@
 import Link from "next/link";
 import {
-  BookOpen, ChevronDown, ChevronRight, Folder, FolderOpen,
-  LayoutList, LogOut, Settings2, Trash2, Table2,
+  BookOpen, ChevronRight, Folder,
+  LayoutList, LogOut, Settings2, Trash2,
 } from "lucide-react";
 import type { AuthUser } from "@/lib/auth";
 
 export type Titular = { id: string; nome: string };
 type Props = {
   user: AuthUser; titulares: Titular[]; selected?: Titular;
-  children?: React.ReactNode; folderContent?: React.ReactNode;
-  operationCount?: number; tabBookId?:string; activeTab?:"explorador"|"planilha";
+  children?: React.ReactNode;
   pageTitle?:string; activeSection?:"livros"|"admin"|"lixeira";
 };
 
-export function ExplorerShell({ user, titulares, selected, children, folderContent, operationCount, tabBookId, activeTab="explorador", pageTitle, activeSection="livros" }: Props) {
+export function ExplorerShell({ user, titulares, selected, children, pageTitle, activeSection="livros" }: Props) {
   return (
     <div className="workspace">
       <aside className="rail" aria-label="Navegação">
@@ -29,13 +28,8 @@ export function ExplorerShell({ user, titulares, selected, children, folderConte
         </Link>}
       </aside>
 
-      <aside className="folder-pane" aria-label="Pastas e titulares">
-        <div className="pane-heading"><span>EXPLORADOR</span></div>
-        <Link className="folder-root" href="/">
-          <ChevronDown size={14} className="tree-chevron" />
-          <FolderOpen size={16} className="folder-icon" />
-          <span>Livros Caixa</span>
-        </Link>
+      <aside className="folder-pane" aria-label="Titulares dos livros-caixa">
+        <div className="pane-heading"><span>LIVROS CAIXA</span></div>
         {titulares.map(t => (
           <Link key={t.id} className={"tree-link" + (selected?.id === t.id ? " tree-link-selected" : "")}
             href={"/livros/" + t.id}>
@@ -43,8 +37,6 @@ export function ExplorerShell({ user, titulares, selected, children, folderConte
           </Link>
         ))}
         {titulares.length === 0 && <p className="tree-empty">Nenhum livro autorizado</p>}
-        <div className="explorer-divider" role="separator" aria-label="Outras pastas"/>
-        {folderContent}
       </aside>
 
       <main className="content-pane">
@@ -71,12 +63,6 @@ export function ExplorerShell({ user, titulares, selected, children, folderConte
               <p>{selected ? "Operações e documentos" : pageTitle?"Área de trabalho":"Selecione o titular para abrir seu livro"}</p></div>
           </div>
 
-          {tabBookId&&<nav className="book-subtabs" aria-label="Visualização do livro">
-            <Link className={activeTab==="explorador"?"active":""}
-              href={"/livros/"+tabBookId}><Folder size={15}/> Explorador</Link>
-            <Link className={activeTab==="planilha"?"active":""}
-              href={"/livros/"+tabBookId+"?aba=planilha"}><Table2 size={15}/> Planilha</Link>
-          </nav>}
           {children ? children : selected ? <>
             <div className="file-columns" aria-hidden="true">
               <div className="col-main">Nome da operação</div><div className="col-category">Categoria</div>
@@ -94,7 +80,7 @@ export function ExplorerShell({ user, titulares, selected, children, folderConte
           </div>}
         </section>
         <footer className="statusbar">
-          <span><LayoutList size={13} /> {selected ? (activeTab==="planilha"?"Planilha de saídas":(operationCount ?? 0) + " operações") : titulares.length + " livros"}</span>
+          <span><LayoutList size={13} /> {selected ? "Planilha de saídas" : titulares.length + " livros"}</span>
           <span>Livro Caixa Inteligente</span>
         </footer>
       </main>

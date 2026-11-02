@@ -15,14 +15,16 @@ type Data={rows:ExpenseItem[];summary:{total:string;quantidade:number};
 type Sort="data"|"contraparte"|"valor";
 const fmt=(n:string)=>Number(n||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 
-export function ExpenseSpreadsheet({bookId,cats,books,canEdit,canDelete,months}:{
-  bookId:string;cats:Category[];books:Book[];canEdit:boolean;canDelete:boolean;months:string[];
+export function ExpenseSpreadsheet({bookId,cats,books,canEdit,canDelete,months,
+  initialMonth="",initialCategory="",initialSearch=""}:{
+  bookId:string;cats:Category[];books:Book[];canEdit:boolean;canDelete:boolean;
+  months:string[];initialMonth?:string;initialCategory?:string;initialSearch?:string;
 }){
-  const [month,setMonth]=useState("");
-  const [category,setCategory]=useState("");
+  const [month,setMonth]=useState(initialMonth);
+  const [category,setCategory]=useState(initialCategory);
   const [status,setStatus]=useState("todos");
-  const [typing,setTyping]=useState("");
-  const [q,setQ]=useState("");
+  const [typing,setTyping]=useState(initialSearch);
+  const [q,setQ]=useState(initialSearch);
   const [page,setPage]=useState(1);
   const [pageSize,setPageSize]=useState(50);
   const [sort,setSort]=useState<Sort>("data");

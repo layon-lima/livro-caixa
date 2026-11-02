@@ -216,3 +216,19 @@ Atualização: apenas código, **sem migração SQL**.
 git pull --ff-only
 docker compose up -d --build app worker
 ```
+
+## Navegação simplificada: planilha única
+
+O modo Explorador (abas, pastas virtuais por categoria/recebedor e árvore de
+pastas) foi retirado. O usuário seleciona um titular na barra lateral e sua
+planilha de saídas aparece diretamente, sem a antiga aba "Explorador".
+Os filtros por mês/categoria, a pesquisa, a exportação, os documentos e as
+ações de edição continuam funcionando. Links antigos com filtros básicos são
+aceitos na planilha. Nenhum lançamento foi excluído e não há migração SQL.
+
+Implantar na VPS, no diretório do aplicativo:
+
+```bash
+git pull --ff-only
+docker compose up -d --build app worker
+```
