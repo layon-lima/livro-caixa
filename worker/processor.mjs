@@ -228,17 +228,32 @@ async function processFile(file){
           }
         });
         if(fromOllama?.length){
-          // IA complementa o OCR sem substituir comprovantes e categorias confiáveis.
-          items=mergeOcrReview(items,fromOllama,{protectedPixReceiver});
+          // A IA complementa o OCR. Guardar um indicador fiel do que foi sugerido.
+          const before=items;
+          const merged=mergeOcrReview(items,fromOllama,{protectedPixReceiver});
+          const watched=["categoria","contraparte","tipo","descricao","valor",
+            "titulo","referencia","data_pagamento","titular_id"];
+          const changed=merged.flatMap((item,i)=>watched.filter(k=>
+            String(item[k]??"").trim()&&String(item[k]??"").trim()!==
+              String(before[i]?.[k]??"").trim()));
+          items=merged;
           method="ia";
-        }
-        else {
-          aiNotice="IA Central retornou dados incompletos ou inválidos; mantida leitura OCR local.";
+          if(!changed.length)aiNotice="A IA Central analisou o documento, mas não encontrou novos dados seguros.";
+          await db.query("UPDATE arquivos SET progresso_dados=progresso_dados || $2::jsonb,atualizado_em=now() WHERE id=$1",
+            [file.id,JSON.stringify({ia_resultado:changed.length?
+              "Sugestões adicionais: "+[...new Set(changed)].join(", "):
+              "Análise concluída sem novas informações confirmáveis."})]);
+        }else{
+          aiNotice="A IA Central não retornou uma análise estruturada aproveitável; preservada a leitura OCR.";
+          await db.query("UPDATE arquivos SET progresso_dados=progresso_dados || $2::jsonb,atualizado_em=now() WHERE id=$1",
+            [file.id,JSON.stringify({ia_resultado:"Não foi possível interpretar a resposta da IA."})]);
           console.warn("IA Central sem dados válidos; mantido extrator local",file.id);
         }
       }catch(e){
         const detail=String(e instanceof Error?e.message:e).slice(0,125);
         aiNotice="IA Central não concluiu a leitura ("+detail+"); mantido OCR local.";
+        await db.query("UPDATE arquivos SET progresso_dados=progresso_dados || $2::jsonb,atualizado_em=now() WHERE id=$1",
+          [file.id,JSON.stringify({ia_resultado:"IA indisponível ou excedeu o tempo de resposta. OCR preservado."})]).catch(()=>{});
         console.warn("IA Central indisponível, mantido OCR local",file.id,detail);
       }finally{
         timing.ia_ms=Date.now()-aiStarted;

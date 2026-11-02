@@ -917,3 +917,5 @@ button { cursor: pointer; }
 
 .nav-arrows button:disabled {opacity:.32;color:#9aa6b5;cursor:default;background:transparent;}
 .nav-arrows button:disabled:hover {background:transparent;color:#9aa6b5;}
+
+.conference-ai-note {margin:0;padding:8px 11px;border:1px solid #e5eaf1;border-radius:7px;background:#f9fbfd;color:#58728c;font-size:11px;line-height:1.5;}

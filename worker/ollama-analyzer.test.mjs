@@ -70,3 +70,17 @@ test("Evitar Outras despesas quando a IA não especifica gasto",()=>{
     {...options,categories:[...options.categories,"Outras despesas"]});
   assert.equal(item.categoria,"");
 });
+
+
+test("Recupera primeiro item JSON completo mesmo com fim truncado",()=>{
+  const partial='{"itens":[{"titulo":"Pix identificado","documento_tipo":"comprovante",'+
+    '"contraparte":"ARMAZEM SL LTDA","categoria":"Compras Fazenda",'+
+    '"tipo":"despesa","valor":"36027.03","titular_id":"1","pagina_inicial":1,'+
+    '"pagina_final":1},"incompleto"';
+  const result=parseOllamaOutput(partial,options);
+  assert.equal(result?.[0]?.categoria,"Compras Fazenda");
+  assert.equal(result?.[0]?.titular_id,"1");
+});
+test("Não aceita objeto incompleto nem campos inventados no JSON truncado",()=>{
+  assert.equal(parseOllamaOutput('{"itens":[{"titulo":"incompleto",',options),null);
+});

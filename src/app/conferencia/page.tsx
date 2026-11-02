@@ -227,6 +227,9 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
                 <div><span>Tipo sugerido</span><strong>{selected.tipo==="despesa"?"Despesa":"Outro"}</strong></div>
               </div>
             </section>
+            {selected.avisos?.filter(message=>message.startsWith("IA Central")||
+                message.startsWith("A IA Central")).map((message,i)=>
+              <p key={"ia-"+i} className="conference-ai-note" role="status">{message}</p>)}
             {selected.duplicada_de&&<div className="duplicate-alert conference-panel">
               <strong>Documento já identificado anteriormente</strong>
               <span>Para evitar duplicidade, este lançamento não pode ser aprovado novamente.</span>
