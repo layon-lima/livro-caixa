@@ -15,7 +15,10 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
   const form=await request.formData();
   const batchRaw=String(form.get("arquivos")||"");
   const batch=/^\d+(?:,\d+){0,99}$/.test(batchRaw)?batchRaw:"";
-  const suffix=batch?"&arquivos="+batch:"";
+  const lote=String(form.get("lote")||"");
+  const batchSuffix=/^[a-f\d]{8}-(?:[a-f\d]{4}-){3}[a-f\d]{12}$/i.test(lote)?
+    "&lote="+encodeURIComponent(lote):"";
+  const suffix=batch?"&arquivos="+batch:batchSuffix;
   const error=(cause:string)=>backTo("/conferencia?erro="+cause+suffix);
   const action=String(form.get("acao")||"salvar");
 

@@ -232,3 +232,28 @@ Implantar na VPS, no diretório do aplicativo:
 git pull --ff-only
 docker compose up -d --build app worker
 ```
+
+## ZIP em massa: extração e processamento sequencial (migração 011)
+
+Arraste um **ZIP** com PDFs, XMLs e imagens pelo importador ou sobre a janela.
+Limites de segurança: ZIP até 80 MB, no máximo 300 documentos, 25 MB por
+documento e 500 MB descompactados. Não extrai pastas no filesystem: lê cada
+membro na memória, valida e grava como documento original compactado usando
+o mesmo deduplicador das importações comuns.
+
+Os itens entram imediatamente na fila do PostgreSQL. O worker OCR/IA já
+seleciona um documento por vez; não depende do navegador e continua rodando
+enquanto o usuário confere e aprova os primeiros arquivos prontos. A página
+`/conferencia?lote=UUID` mostra o progresso do lote e atualiza a lista
+automaticamente. As aprovações mantêm a referência ao lote para abrir o próximo.
+
+**Antes de atualizar o app**, aplicar a migração 011, sem excluir tabelas:
+```bash
+cd /opt/apps/livro-caixa
+git pull --ff-only
+docker compose exec -T database sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1' < db/migrations/011_zip_import_batches.sql
+docker compose up -d --build app worker
+```
+
+Se o proxy limitar uploads a menos de 80 MB, sua configuração de tamanho de
+corpo HTTP também precisará aceitar ZIPs desse tamanho.

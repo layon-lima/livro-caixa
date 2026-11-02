@@ -8,7 +8,7 @@ type Book={id:string;nome:string};
 type Context={importBooks:Book[];editBooks:Book[];approveBooks:Book[]};
 type UploadResult={name:string;status:string;id?:string;error?:string;titular_nome?:string};
 type Pending={count:number;href:string};
-const accepted=new Set(["pdf","xml","png","jpg","jpeg"]);
+const accepted=new Set(["pdf","xml","png","jpg","jpeg","zip"]);
 
 export function GlobalWorkspaceActions(){
   const pathname=usePathname();
@@ -50,6 +50,7 @@ export function GlobalWorkspaceActions(){
     if(busy.current||!context?.importBooks.length)return;
     busy.current=true;setUploading(true);setMessage("");
     const results:UploadResult[]=[];
+    let zipBatch="";
     try{
       if(list.length>100)throw Error("Envie até 100 arquivos por lote.");
       for(let i=0;i<list.length;i+=20){
@@ -66,6 +67,13 @@ export function GlobalWorkspaceActions(){
         const body=await response.json().catch(()=>({error:"Resposta inválida do servidor."}));
         if(!response.ok)throw Error(body.error||"Falha ao importar.");
         results.push(...(body.results||[]));
+        if(body.lote)zipBatch=String(body.lote);
+      }
+      if(zipBatch){
+        setMessage("");
+        if(context.approveBooks.length)router.push("/conferencia?lote="+encodeURIComponent(zipBatch));
+        else {setMessage("ZIP recebido. Leitura iniciada no servidor.");router.push("/importar");}
+        return;
       }
       const ids=[...new Set(results.filter(x=>x.id&&
         ["importado","reprocessado","duplicado","outro_titular"].includes(x.status))
@@ -156,7 +164,7 @@ export function GlobalWorkspaceActions(){
     </div>}
     {(uploading||message)&&<div className="global-upload-toast" role="status">
       {uploading?<LoaderCircle size={16} className="spin"/>:<FileUp size={16}/>}
-      <span>{uploading?"Enviando documento, abrindo conferência…":message}</span>
+      <span>{uploading?"Enviando documentos para leitura em fila…":message}</span>
       {!uploading&&<button type="button" aria-label="Fechar aviso" onClick={()=>setMessage("")}>
         <X size={15}/>
       </button>}

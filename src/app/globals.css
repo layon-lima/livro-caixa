@@ -541,3 +541,13 @@ button { cursor: pointer; }
 .explorer-file-row .explorer-file-value {font-weight:600;color:#ab3434;text-align:right;font-variant-numeric:tabular-nums;}
 .explorer-file-row>span:nth-child(2) {color:#566b80;}
 .explorer-file-row>span:nth-child(3) {font-variant-numeric:tabular-nums;}
+
+/* Leitura em massa: placar da fila, sem interromper a conferência. */
+.batch-queue-summary {display:flex;flex-direction:column;gap:5px;padding:10px 9px;margin-bottom:9px;border-bottom:1px solid var(--line);font-size:11px;color:#50677c;}
+.batch-queue-summary strong {font-size:12px;color:#294c6a;overflow-wrap:anywhere;}
+.batch-queue-summary small {font-size:10px;color:#6e8192;}
+
+.batch-queue-ignored {font-size:10px;color:#60738a;}
+.batch-queue-ignored small {display:block;margin:4px 0;overflow-wrap:anywhere;}
+.batch-previous {display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:8px 10px;margin:5px 0 8px;border:1px solid var(--line);font-size:11px;color:#506982;}
+.batch-previous a {color:#2468a8;text-decoration:underline;}

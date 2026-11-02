@@ -61,6 +61,10 @@ export default async function Importar({searchParams}:{searchParams:Promise<{tit
       })
     };
   });
+  const previous=await getDatabase().query<{id:string;nome_arquivo:string;criado_em:string}>(
+    "SELECT id::text,nome_arquivo,criado_em::text FROM lotes_importacao "+
+    (user.isAdmin?"":"WHERE enviado_por=$1 ")+
+    "ORDER BY criado_em DESC LIMIT 3",user.isAdmin?[]:[user.id]);
   const percent=Math.min(100,(usedBytes/STORAGE_LIMIT_BYTES)*100);
   const gb=(bytes:number)=>(bytes/1_000_000_000).toLocaleString("pt-BR",{maximumFractionDigits:2});
   return <StandaloneWorkspace title="Importação" section="livros"><div className="work-page">
@@ -91,6 +95,12 @@ export default async function Importar({searchParams}:{searchParams:Promise<{tit
       </details>
       {selected?<ImportDrop key={selected.id} titularId={selected.id} canApprove={canApprove}/>
         :<p className="form-error">Este usuário não possui permissão de importação.</p>}
+      {previous.rows.length>0&&<div className="batch-previous">
+        <strong>Retomar conferência dos ZIPs</strong>
+        {previous.rows.map(l=><Link key={l.id} href={"/conferencia?lote="+l.id}>
+          {l.nome_arquivo}
+        </Link>)}
+      </div>}
       <div className="page-title-compact"><h2>Arquivos recebidos</h2><span>Processamento automático na VPS</span></div>
       <ImportStatusRefresh active={list.rows.some(a=>a.status==="aguardando"||a.status==="processando")}/>
       <ImportedFileRows files={namedFiles}/>

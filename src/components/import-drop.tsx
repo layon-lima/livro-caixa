@@ -42,6 +42,7 @@ export function ImportDrop({titularId,canApprove}:{titularId:string;canApprove:b
     sending.current=true;
     setBusy(true);setPhase("enviando");setError("");setResults([]);
     const all:UploadResult[]=[];
+    let zipBatch="";
     try {
       for(let i=0;i<pending.length;i+=20) {
         const form=new FormData();
@@ -51,11 +52,21 @@ export function ImportDrop({titularId,canApprove}:{titularId:string;canApprove:b
         const content=await response.json().catch(()=>({error:"Resposta inválida do servidor."}));
         if(!response.ok)throw Error(content.error||"Não foi possível enviar os arquivos.");
         all.push(...(content.results||[]));
+        if(content.lote)zipBatch=String(content.lote);
         if(alive.current)setResults([...all]);
       }
       if(!alive.current)return;
       setFiles([]);
       router.refresh();
+      if(zipBatch){
+        setPhase("lendo");
+        if(canApprove)router.push("/conferencia?lote="+encodeURIComponent(zipBatch));
+        else{
+          setPhase("concluido");
+          setError("ZIP recebido. Os arquivos estão sendo lidos um por vez na VPS; um usuário com permissão poderá conferir os documentos concluídos.");
+        }
+        return;
+      }
       const ids=[...new Set(all.filter(x=>(x.status==="importado"||x.status==="reprocessado"||x.status==="duplicado") && x.id).map(x=>x.id!))];
       const failed=all.filter(x=>x.status==="erro");
       const approved=all.filter(x=>x.status==="ja_aprovado");
@@ -145,8 +156,8 @@ export function ImportDrop({titularId,canApprove}:{titularId:string;canApprove:b
       aria-disabled={busy}>
       <FolderUp size={26}/>
       <strong>Solte aqui para iniciar a leitura</strong>
-      <span>PDF, XML, JPG e PNG • até 25 MB por arquivo</span>
-      <input ref={input} type="file" accept=".pdf,.xml,.png,.jpg,.jpeg" multiple hidden disabled={busy}
+      <span>PDF, XML, JPG, PNG ou ZIP • ZIP até 80 MB (300 documentos)</span>
+      <input ref={input} type="file" accept=".pdf,.xml,.png,.jpg,.jpeg,.zip" multiple hidden disabled={busy}
         onChange={(e:ChangeEvent<HTMLInputElement>)=>{if(e.target.files)accept(e.target.files);e.target.value="";}}/>
     </div>
     <div className="upload-actions">

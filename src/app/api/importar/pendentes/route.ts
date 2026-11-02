@@ -27,7 +27,13 @@ export async function GET(){
     arquivo_id:string;proposta_id:string|null;nome_original:string;status:string;
   }>(query,user.isAdmin?[]:[user.id]);
   const first=result.rows[0];
-  const href=first?(first.proposta_id?
+  // O botão global preserva o contexto do ZIP mesmo após navegar em outras telas.
+  const recent=first?await getDatabase().query<{id:string}>(
+    "SELECT l.id::text FROM lotes_importacao l JOIN lote_itens li ON li.lote_id=l.id "+
+    "WHERE li.arquivo_id=$1 AND l.enviado_por=$2 "+
+    "ORDER BY l.criado_em DESC LIMIT 1",[first.arquivo_id,user.id]):null;
+  const href=recent?.rows[0]?"/conferencia?lote="+recent.rows[0].id:
+    first?(first.proposta_id?
     "/conferencia?id="+encodeURIComponent(first.proposta_id):
     "/conferencia?arquivo="+encodeURIComponent(first.arquivo_id)):"";
   return NextResponse.json({count:result.rows.length,href},

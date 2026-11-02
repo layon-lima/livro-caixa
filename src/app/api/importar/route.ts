@@ -8,6 +8,7 @@ import {
   localKey,
 } from "@/lib/storage-actions";
 import { sameOriginPost } from "@/lib/request-security";
+import { eachZipDocument, MAX_ZIP_BYTES } from "@/lib/zip-documents";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -48,12 +49,11 @@ export async function POST(request: Request) {
 
   const db = getDatabase();
   const results: {name:string;status:string;id?:string;error?:string;titular_nome?:string}[] = [];
-  for (const entry of entries) {
-    if (!(entry instanceof File)) continue;
+  const importOne=async (entry:File):Promise<void> => {
     const name = entry.name.slice(0,255);
     const ext = name.split(".").pop()?.toLowerCase() || "";
     if (!allowed[ext] || entry.size===0 || entry.size>MAX_FILE) {
-      results.push({name,status:"erro",error:"Arquivo inválido ou maior que 25 MB."}); continue;
+      results.push({name,status:"erro",error:"Arquivo inválido ou maior que 25 MB."}); return;
     }
     try {
       const buffer = Buffer.from(await entry.arrayBuffer());
@@ -64,7 +64,7 @@ export async function POST(request: Request) {
         : ext==="jpg" || ext==="jpeg" ? buffer[0]===255 && buffer[1]===216
         : buffer.subarray(0,2048).toString("utf8").includes("<");
       if (!valid) {
-        results.push({name,status:"erro",error:"Conteúdo não corresponde ao tipo de arquivo."}); continue;
+        results.push({name,status:"erro",error:"Conteúdo não corresponde ao tipo de arquivo."}); return;
       }
       const digest = createHash("sha256").update(buffer).digest("hex");
       const compressed = await compressedOriginal(buffer);
@@ -100,7 +100,7 @@ export async function POST(request: Request) {
               );
               await connection.query("COMMIT");
               results.push({name,status:"reprocessado",id:original.id});
-              continue;
+              return;
             }
           }
           // Mesmo PDF já cadastrado em OUTRO livro: nunca abrir uma proposta
@@ -112,7 +112,7 @@ export async function POST(request: Request) {
             if(!allowed){
               await connection.query("COMMIT");
               results.push({name,status:"duplicado_restrito"});
-              continue;
+              return;
             }
             const owner=await connection.query<{nome:string;ja_aprovado:boolean}>(
               "SELECT t.nome, EXISTS(SELECT 1 FROM propostas p WHERE p.arquivo_id=$1 "+
@@ -127,7 +127,7 @@ export async function POST(request: Request) {
             }else{
               results.push({name,status:"outro_titular",id:original.id,titular_nome});
             }
-            continue;
+            return;
           }
           // Documento já aprovado: não reprocessar nem abrir conferência vazia.
           const belongs=original.titular_envio_id===String(titularId);
@@ -139,7 +139,7 @@ export async function POST(request: Request) {
           results.push(approved?.rowCount?
             {name,status:"ja_aprovado"}:
             belongs?{name,status:"duplicado",id:original.id}:{name,status:"duplicado"});
-          continue;
+          return;
         }
         await writeCompressedOriginal(key, compressed);
         const inserted = await connection.query<{id:string}>(
@@ -162,6 +162,52 @@ export async function POST(request: Request) {
         results.push({name,status:"erro",error:"Falha ao armazenar o documento na VPS."});
       }
     }
+  };
+  // O ZIP é um lote: descompactar e enfileirar na ordem do arquivo.
+  // O worker OCR já é sequencial e independente da requisição HTTP.
+  const zipped=entries.length===1&&entries[0] instanceof File&&
+    entries[0].name.toLowerCase().endsWith(".zip");
+  if(zipped) {
+    const archive=entries[0] as File;
+    if(archive.size===0||archive.size>MAX_ZIP_BYTES)
+      return NextResponse.json({error:"ZIP inválido ou maior que 80 MB."},{status:413});
+    const sign=Buffer.from(await archive.slice(0,4).arrayBuffer());
+    if(!sign.equals(Buffer.from([0x50,0x4b,0x03,0x04])))
+      return NextResponse.json({error:"O arquivo não contém um ZIP válido."},{status:400});
+    const lot=await db.query<{id:string}>(
+      "INSERT INTO lotes_importacao(enviado_por,nome_arquivo,status) VALUES($1,$2,'recebendo') RETURNING id::text",
+      [user.id,archive.name.slice(0,255)]
+    );
+    const lote=lot.rows[0].id;
+    let ordinal=0;
+    try {
+      await eachZipDocument(Buffer.from(await archive.arrayBuffer()),async (name,buffer)=>{
+        const file=new File([new Uint8Array(buffer)],name);
+        const before=results.length;
+        await importOne(file);
+        const latest=results[before]||{name,status:"erro",error:"Não foi possível importar."};
+        await db.query(
+          "INSERT INTO lote_itens(lote_id,ordem,nome_entrada,arquivo_id,status_entrada,erro) VALUES($1,$2,$3,$4,$5,$6)",
+          [lote,++ordinal,name,latest.id||null,latest.status,latest.error||""]
+        );
+      },async (name,reason)=>{
+        const latest={name,status:"erro",error:reason};
+        results.push(latest);
+        await db.query(
+          "INSERT INTO lote_itens(lote_id,ordem,nome_entrada,status_entrada,erro) VALUES($1,$2,$3,'erro',$4)",
+          [lote,++ordinal,name,reason]
+        );
+      });
+      await db.query("UPDATE lotes_importacao SET status='pronto',atualizado_em=now() WHERE id=$1",[lote]);
+    } catch(error) {
+      const detail=error instanceof Error?error.message:"ZIP inválido";
+      await db.query("UPDATE lotes_importacao SET status='erro',erro=$2,atualizado_em=now() WHERE id=$1",[lote,detail.slice(0,500)]);
+      if(!ordinal)return NextResponse.json({error:detail},{status:400});
+    }
+    return NextResponse.json({lote,results},{headers:{"Cache-Control":"private, no-store"}});
   }
-  return NextResponse.json({results},{headers:{"Cache-Control":"no-store"}});
+  if(entries.some(e=>e instanceof File&&e.name.toLowerCase().endsWith(".zip")))
+    return NextResponse.json({error:"Envie um ZIP por vez, sem misturá-lo com outros arquivos."},{status:400});
+  for(const entry of entries)if(entry instanceof File)await importOne(entry);
+  return NextResponse.json({results},{headers:{"Cache-Control":"private, no-store"}});
 }

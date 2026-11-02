@@ -11,7 +11,10 @@ export async function POST(request:Request){
   const user=await currentUser();if(!user)return forbidden();
   const form=await request.formData();
   const batchRaw=String(form.get("arquivos")||"");
-  const batch=/^\d+(?:,\d+){0,99}$/.test(batchRaw)?"&arquivos="+batchRaw:"";
+  const lote=String(form.get("lote")||"");
+  const batch=/^\d+(?:,\d+){0,99}$/.test(batchRaw)?"&arquivos="+batchRaw:
+    /^[a-f\d]{8}-(?:[a-f\d]{4}-){3}[a-f\d]{12}$/i.test(lote)?
+      "&lote="+encodeURIComponent(lote):"";
   const ids=[...new Set(form.getAll("ids").map(safeId).filter((n):n is number=>n!==null))];
   if(!ids.length||ids.length>100)return backTo("/conferencia?erro=selecione");
   const db=getDatabase();
