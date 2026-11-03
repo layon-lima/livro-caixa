@@ -22,6 +22,8 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Verificar sintaxe do serviço de ZIP
         run: node --check worker/zip-ingester.mjs
+      - name: Validar rotina de retirada de IA da VPS
+        run: sh -n scripts/remove-ai-central.sh
       - name: Testes do worker
         run: node --test worker/*.test.mjs
       - name: Compilar Next.js

@@ -9,7 +9,6 @@ type LiveFields={
   titulo?:string;documento_tipo?:string;titular_id?:string;categoria?:string;
   competencia?:string;data_pagamento?:string;tipo?:string;valor?:string;contraparte?:string;
   referencia?:string;descricao?:string;titular_sugerido?:string;pagador_identificado?:string;
-  ia_resultado?:string;
   consulta_empresa?:{cnpj?:string;status?:string;razao_social?:string;nome_fantasia?:string;atividade?:string;fonte?:string};
 };
 type FileState={
@@ -21,7 +20,6 @@ type Category={id:string;nome:string;subcategoria:string};
 const stages:Record<string,string>={
   aguardando:"Aguardando início da leitura",
   ocr:"Lendo o documento com OCR…",
-  ia:"Interpretando com a IA Central…",
   xml:"Interpretando o XML…",
   pronto:"Leitura concluída. Abrindo conferência…",
   erro:"Não foi possível concluir a leitura",
@@ -105,7 +103,6 @@ export function LiveReview({arquivoId,nome,books,cats,isAdmin}:{
       <span>Os campos são preenchidos automaticamente conforme os dados são encontrados.</span>
     </div>
     {error&&<p className="form-error" role="alert">{error}</p>}
-    {fields.ia_resultado&&<p className="conference-ai-note" role="status">{fields.ia_resultado}</p>}
     <section className="review-auto-summary">
       <div><span>Documento</span><strong>{fields.documento_tipo||"Identificando…"}</strong></div>
       {fields.pagador_identificado&&<div><span>Quem fez o Pix</span><strong>{fields.pagador_identificado}</strong></div>}

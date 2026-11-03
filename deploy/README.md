@@ -57,16 +57,16 @@ Se o resultado for maior que zero, **não apague arquivos do R2** nem suas crede
 ## Uso e segurança
 
 - Importação: PDF/XML/JPG/PNG, até 25 MB por arquivo, em lotes de até 20.
-- Worker: OCR local com Poppler + Tesseract, XML estruturado e interpretação opcional por API de IA (OPENAI_API_KEY). Sem IA, a separação de vários documentos em um PDF não é confiável.
+- Worker: extração PDF com Poppler, OCR Tesseract (português e inglês), XML estruturado e reconhecimento local. PDFs com vários documentos exigem referências fortes para separação automática.
 - Propostas precisam ser explicitamente revisadas e aprovadas, não entram no livro automaticamente.
 - Organização por titular → competência → categoria → operação, com arquivos vinculados.
 - Senhas permanecem em hash. Repositório deve ser privado.
 - Mantenha backup externo: volume persistente não é backup; falhas da VPS ainda podem causar perda.
 - Caddy deve continuar apontando "livrocaixa-web:3000". Não publicar porta da aplicação ou do PostgreSQL no host.
 
-## Leitura local automática (sem IA)
+## Leitura OCR local e aprendizado por aprovação
 
-O Livro Caixa funciona sem chave de API, sem assinatura de IA e sem conexões externas no trabalhador de OCR.
+O Livro Caixa não usa modelo de IA, API de interpretação, Ollama ou serviço externo. O worker lê OCR local e aplica regras de identificação, complementadas exclusivamente pelo histórico confirmado por usuários.
 
 Após a importação, o Tesseract ou o pdftotext obtém o texto. Um extrator local identifica:
 - tipo (nota fiscal, boleto, comprovante, tributo, recibo ou contrato);
@@ -86,33 +86,9 @@ Não é possível garantir o reconhecimento de documentos arbitrários ou digita
 
 A imagem Docker executa os testes básicos de extração local antes de construir o aplicativo. A migração 005_intelligent_review.sql deve já estar aplicada antes desta atualização.
 
-A rede `egress` e as variáveis OPENAI foram removidas do serviço worker. A integração externa não faz parte do fluxo ativo. Para uso futuro, somente mediante escolha explícita do responsável e revisão de privacidade e custos.
+O worker não participa de redes de IA e não envia texto extraído para modelos externos ou locais. O serviço ZIP também opera apenas com arquivos e banco internos.
 
 Arquivos já importados e não revisados podem ser reprocessados na página de importação sem novo upload.
-
-
-## IA Central por demanda (Ollama independente)
-
-O Ollama pertence à VPS (projeto /opt/apps/ia-central), não ao Livro Caixa. O serviço central deve estar na rede Docker externa `ia_central_net`, com hostname `ollama`, modelo `qwen3-vl:2b-instruct` já baixado.
-
-O Livro Caixa conecta APENAS o seu worker à rede externa e usa:
-- OLLAMA_URL=http://ollama:11434
-- OLLAMA_MODEL=qwen3-vl:2b-instruct
-- `keep_alive: 0` em CADA solicitação, descarregando o modelo da RAM ao terminar.
-
-Sem Ollama ou em caso de erro/timeout, o OCR e as regras locais seguem funcionando. Arquivos XML de NF-e utilizam extração estruturada direta, sem chamar o modelo. PDFs e imagens primeiro passam por extração/OCR e depois pelo modelo local.
-
-A IA Central conserva o container do servidor em standby, mas não mantém o modelo carregado. Para usar o mesmo comportamento em todos os aplicativos, altere o `OLLAMA_KEEP_ALIVE` do compose da IA Central para `"0"`. Requisições individuais ainda podem sobrescrever essa configuração.
-
-O envio começa automaticamente ao soltar arquivos na área de importação ou selecioná-los no navegador; o processamento continua assíncrono e os dados só são registrados definitivamente após aprovação.
-
-Instalação do código do Livro Caixa:
-
-    cd /opt/apps/livro-caixa
-    git pull --ff-only
-    docker compose up -d --build
-
-O compose requer a rede `ia_central_net` pré-existente, mas não cria ou atualiza o container Ollama. Modelos e dados da IA Central permanecem em seu volume separado.
 
 
 ## Sugestão de titular e consulta pública de recebedores
@@ -124,18 +100,18 @@ Migração adicional:
     docker compose exec -T database sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1' < db/migrations/007_enrichment.sql
     docker compose up -d --build
 
-Ao identificar pagador/comprador com nome completo ainda inexistente, o OCR ou o Ollama
+Ao identificar pagador/comprador com nome completo ainda inexistente, o OCR local
 pode sugerir novo titular; **não cria** o registro nem altera a titularidade do
 documento. A criação depende da confirmação de um administrador em /admin, e a
 atribuição ao documento continua sendo uma ação separada na conferência.
 
 A consulta pública de CNPJ foi desativada no processamento atual; a classificação usa
-OCR local, IA local e aprovações anteriores do mesmo titular.
+OCR local e aprovações anteriores do mesmo titular.
 
-## Categorias sugeridas pela IA
+## Sugestões de categoria e aprendizado local
 
-A partir da migração `008_category_suggestions.sql`, o OCR e a IA podem
-propor categorias ainda não cadastradas (por exemplo, `Veículos > Pneus`).
+A partir da migração `008_category_suggestions.sql`, a conferência permite
+propor categorias ainda não cadastradas. O OCR só seleciona categorias existentes quando há evidência.
 A sugestão aparece na conferência e pode ser editada. `Salvar para depois`
 armazena a proposta sem alterar a lista global; somente `Aprovar`
 cria ou reaproveita a categoria dentro da mesma transação do lançamento.
@@ -148,9 +124,7 @@ Instalação:
     docker compose exec -T database sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1' < db/migrations/008_category_suggestions.sql
     docker compose up -d --build
 
-A IA usa as categorias aprovadas do PostgreSQL nos próximos documentos e
-evita a escolha automática genérica de "Outras despesas". Em Pix sem
-descrição da compra, o CNAE obtido por CNPJ é uma hipótese editável.
+O aprendizado por aprovação guarda as categorias por titular e recebedor; em um documento semelhante, sugere uma categoria existente que o usuário confirma antes do lançamento. Não assume categorias genéricas sem evidência.
 
 
 ## Explorador agrupado e data real de pagamento (migração 009)
@@ -162,7 +136,7 @@ continuam distintos no banco**. O menu de ações permanece em cada lançamento.
 
 A aba Planilha usa `operacoes.data_pagamento` (efetivação do Pix,
 transferência ou cobrança) na primeira coluna e no Excel, nunca
-`criado_em`. O OCR/IA só preenche data se o documento comprovar pagamento.
+`criado_em`. O OCR local só preenche data se o documento comprovar pagamento.
 Boleto não quitado e nota fiscal apenas emitida deixam a data em branco.
 A conferência e os lançamentos manuais permitem informar/corrigir a data.
 
@@ -179,12 +153,12 @@ e com evidência válida de pagamento e informa quantas foram corrigidas.
 Sem evidência, mantém NULL para revisão manual. O comando pode ser repetido
 sem apagar dados anteriores.
 
-## OCR, IA revisora e aprendizado após aprovação (migração 010)
+## OCR local com aprendizado humano (migração 010)
 
-O OCR local lê primeiro, a IA Ollama complementa campos faltantes sem substituir
-valores e recebedores confiáveis; não há consulta externa de CNPJ. O histórico
-é segregado por titular e criado exclusivamente após aprovação humana. Nenhum
-lançamento é aprovado automaticamente.
+O OCR local reconhece tipo, recebedor, pagador, datas, valores e referências. O histórico
+aprovado ensina categorias por titular e contraparte e permite reconhecer aliases de
+pagador comprovados repetidamente. Não há chamadas para modelos de IA, Ollama ou
+consulta externa de CNPJ; lançamentos continuam exigindo aprovação humana.
 
 Após `git pull --ff-only` na VPS, execute:
 
@@ -241,7 +215,7 @@ documento e 500 MB descompactados. Não extrai pastas no filesystem: lê cada
 membro na memória, valida e grava como documento original compactado usando
 o mesmo deduplicador das importações comuns.
 
-Os itens entram imediatamente na fila do PostgreSQL. O worker OCR/IA já
+Os itens entram imediatamente na fila do PostgreSQL. O worker OCR já
 seleciona um documento por vez; não depende do navegador e continua rodando
 enquanto o usuário confere e aprova os primeiros arquivos prontos. A página
 `/conferencia?lote=UUID` mostra o progresso do lote e atualiza a lista
@@ -265,7 +239,7 @@ Manutenção Fazenda, Pagamento de Serviços, Pagamento de Dívidas Fazenda,
 Pagamento de Dívidas Pessoais. As categorias antigas são desativadas (não
 apagadas). Lançamentos aprovados mantêm seu histórico; propostas pendentes
 com classificação antiga ou sugestão automática são liberadas para nova
-conferência. O OCR e a IA usam apenas as categorias ativas, e o usuário
+conferência. O OCR utiliza apenas as categorias ativas, e o usuário
 continua podendo criar uma categoria manualmente. Nenhuma categoria
 extra sugerida foi cadastrada.
 
@@ -357,3 +331,19 @@ git pull --ff-only
 docker compose exec -T database sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1' < db/migrations/014_duplicate_guard.sql
 docker compose up -d --build app worker
 ```
+
+
+## Desativação da integração IA Central (novembro de 2026)
+
+O Livro Caixa não depende mais do projeto `/opt/apps/ia-central`. Foram removidos
+as variáveis de Ollama, o cliente do modelo, a rede `ia_central_net` no worker e os
+indicadores da IA na conferência. O mecanismo permanece com Poppler, Tesseract,
+XML, regras locais e memória das aprovações já realizadas.
+
+Atualize com `git pull --ff-only && docker compose up -d --build app worker zip-worker`.
+O Ollama é um projeto separado na VPS. Após atualizar o Livro Caixa, rode
+`sh scripts/remove-ai-central.sh` para **remover a IA Central dedicada**, inclusive
+os volumes dos modelos. O script verifica se outros aplicativos fazem referência
+à rede ou se há contêineres estranhos conectados e **aborta sem destruir nada**
+quando encontra compartilhamento. A remoção do Livro Caixa da rede é automática
+ao recriar o worker. Os documentos e lançamentos do Livro Caixa são preservados.

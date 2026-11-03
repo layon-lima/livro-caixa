@@ -2,10 +2,9 @@ import { paymentDateFromText,verifiedPaymentDate } from "./payment-date.mjs";
 import {extractPixEndToEndId} from "./pix-identifier.mjs";
 import { Pool } from "pg";
 import { parseLocalDocument } from "./local-parser.mjs";
-import { analyzeWithOllama } from "./ollama-analyzer.mjs";
 import { candidateNewOwner, confirmedPixReceiver, confirmedPixPayer, knownPixPayer } from "./company-lookup.mjs";
 import { categoryFromApprovals } from "./classification-learning.mjs";
-import { mergeOcrReview } from "./ocr-ai-merge.mjs";
+import {learnedPixOwner,knownOwnerByName,ownerMentionedInDocument} from "./owner-learning.mjs";
 import { XMLParser } from "fast-xml-parser";
 import { bestCategory } from "./category-suggestions.mjs";
 import { mkdtemp, writeFile, rm, readFile } from "node:fs/promises";
@@ -111,18 +110,15 @@ function normalizeName(value) {
   return String(value||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"")
     .toUpperCase().replace(/[^A-Z0-9]/g," ").replace(/\s+/g," ").trim();
 }
-function recognizedOwner(text,books) {
-  const haystack=" "+normalizeName(text)+" ";
-  const matched=books.filter(b=>haystack.includes(" "+normalizeName(b.nome)+" "));
-  return matched.length===1?matched[0]:null;
+function recognizedOwner(text,books){
+  return ownerMentionedInDocument(text,books);
 }
-function fromAiOwner(value,books) {
-  const term=normalizeName(value);
-  if(!term)return null;
-  return books.find(b=>String(b.id)===String(value)||normalizeName(b.nome)===term)||null;
+function recognizedStructuredOwner(value,books){
+  const exact=books.filter(b=>normalizeName(b.nome)===normalizeName(value));
+  return exact.length===1?exact[0]:knownOwnerByName(value,books);
 }
 async function processFile(file){
-  const timing={started:Date.now(),ocr_ms:0,ia_ms:0};
+  const timing={started:Date.now(),ocr_ms:0};
   const folder=await mkdtemp(join(tmpdir(),"lc-"));
   try{
     if(file.armazenamento!=="local")throw Error("Arquivo anterior requer migração para a VPS");
@@ -146,28 +142,33 @@ async function processFile(file){
     const allNames=(await db.query("SELECT nome FROM titulares")).rows.map(x=>x.nome);
     const defaultBook=allowedBooks.find(x=>String(x.id)===String(file.titular_envio_id));
     if(!defaultBook)throw Error("Titular do envio não está autorizado para o usuário.");
-    // O modelo só carrega durante a análise e descarrega ao terminar (keep_alive: 0).
-    let method=output.xml?"xml":"local";
-    let aiNotice="";
-    let items=output.xml||parseLocalDocument(output.text,file.nome_original,file.mime);
+    const method=output.xml?"xml":"local";
+    const items=output.xml||parseLocalDocument(output.text,file.nome_original,file.mime);
+    const payerCache=new Map();
+    async function resolvePayer(payer){
+      const key=normalizeName(payer);
+      if(!key)return null;
+      if(!payerCache.has(key))payerCache.set(key,await learnedPixOwner(db,payer,allowedBooks));
+      return payerCache.get(key);
+    }
     if(!items.length)throw Error("Não foi possível identificar documentos no arquivo.");
     // Primeira etapa: OCR detecta campos e possíveis titulares ainda não cadastrados.
     const first=items[0];
-    // Categorias genéricas do OCR não devem impedir sugestões específicas da IA.
+    // Não preencher categoria com um rótulo genérico sem evidência do documento.
     if(["OUTRAS DESPESAS","OUTRA DESPESA"].includes(normalizeName(first.categoria)))
       first.categoria="";
     const protectedPixReceiver=items.length===1?confirmedPixReceiver(output.text):"";
     const pixPayer=items.length===1?confirmedPixPayer(output.text):"";
-    const payerOwner=knownPixPayer(pixPayer,allowedBooks);
+    const payerOwner=await resolvePayer(pixPayer);
     const isPixReceipt=/\bPIX\b/i.test(output.text.slice(0,5000))&&
       /comprovante|pagamento|transfere|enviado|realizado/i.test(output.text.slice(0,5000));
-    // Dados estruturados do comprovante têm prioridade sobre interpretações do modelo.
+    // Dados explícitos do comprovante prevalecem sobre padrões genéricos.
     if(protectedPixReceiver&&normalizeName(first.contraparte)!==normalizeName(protectedPixReceiver)){
       first.contraparte=protectedPixReceiver;
       first.titulo="Comprovante Pix — "+protectedPixReceiver;
     }
     const knownNames=allNames;
-    const localSuggestedOwner=candidateNewOwner(output.text,first.documento_tipo,knownNames);
+    const localSuggestedOwner=payerOwner?"":candidateNewOwner(output.text,first.documento_tipo,knownNames);
     const dateInitial=competence(first.competencia);
     const matchingOwner=isPixReceipt?payerOwner:recognizedOwner(output.text,allowedBooks);
     // Classificação aprendida apenas com aprovações de mesmo titular.
@@ -196,69 +197,6 @@ async function processFile(file){
       "UPDATE arquivos SET progresso_etapa=$2,progresso_dados=$3::jsonb,atualizado_em=now() WHERE id=$1",
       [file.id,output.xml?"xml":"ocr",JSON.stringify(initialFields)]
     );
-    if(method==="local" && process.env.OLLAMA_URL){
-      const aiStarted=Date.now();
-      try{
-        const labels=cats.map(x=>x.nome);
-        const maxPages=Number(output.text.match(/^PÁGINA \d+ DE (\d+)/m)?.[1]||1);
-        await db.query("UPDATE arquivos SET progresso_etapa='ia',atualizado_em=now() WHERE id=$1",[file.id]);
-        const fromOllama=await analyzeWithOllama({
-          text:output.text,filename:file.nome_original,categories:labels,
-          owners:allowedBooks,maxPages,ocrItems:items,
-          onPartial:async fields=>{
-            if(!Object.keys(fields).length)return;
-            // Prévia: preserva campos confiáveis já encontrados pelo OCR.
-            for(const key of ["contraparte","competencia","categoria","tipo",
-              "valor","referencia","data_pagamento","documento_tipo"]){
-              const current=key==="data_pagamento"?
-                paymentDateFromText(output.text,first.documento_tipo):first[key];
-              if(current&&current!=="outro")delete fields[key];
-            }
-            if(isPixReceipt){delete fields.titular_id;delete fields.pagador_identificado;}
-            if(protectedPixReceiver){
-              delete fields.contraparte;
-              delete fields.titulo;
-            }
-            if(fields.titular_sugerido&&allNames.some(
-              x=>normalizeName(x)===normalizeName(fields.titular_sugerido)))
-              delete fields.titular_sugerido;
-            if(!Object.keys(fields).length)return;
-            await db.query("UPDATE arquivos SET progresso_dados=progresso_dados || $2::jsonb,atualizado_em=now() WHERE id=$1",
-              [file.id,JSON.stringify(fields)]);
-          }
-        });
-        if(fromOllama?.length){
-          // A IA complementa o OCR. Guardar um indicador fiel do que foi sugerido.
-          const before=items;
-          const merged=mergeOcrReview(items,fromOllama,{protectedPixReceiver});
-          const watched=["categoria","contraparte","tipo","descricao","valor",
-            "titulo","referencia","data_pagamento","titular_id"];
-          const changed=merged.flatMap((item,i)=>watched.filter(k=>
-            String(item[k]??"").trim()&&String(item[k]??"").trim()!==
-              String(before[i]?.[k]??"").trim()));
-          items=merged;
-          method="ia";
-          if(!changed.length)aiNotice="A IA Central analisou o documento, mas não encontrou novos dados seguros.";
-          await db.query("UPDATE arquivos SET progresso_dados=progresso_dados || $2::jsonb,atualizado_em=now() WHERE id=$1",
-            [file.id,JSON.stringify({ia_resultado:changed.length?
-              "Sugestões adicionais: "+[...new Set(changed)].join(", "):
-              "Análise concluída sem novas informações confirmáveis."})]);
-        }else{
-          aiNotice="A IA Central não retornou uma análise estruturada aproveitável; preservada a leitura OCR.";
-          await db.query("UPDATE arquivos SET progresso_dados=progresso_dados || $2::jsonb,atualizado_em=now() WHERE id=$1",
-            [file.id,JSON.stringify({ia_resultado:"Não foi possível interpretar a resposta da IA."})]);
-          console.warn("IA Central sem dados válidos; mantido extrator local",file.id);
-        }
-      }catch(e){
-        const detail=String(e instanceof Error?e.message:e).slice(0,125);
-        aiNotice="IA Central não concluiu a leitura ("+detail+"); mantido OCR local.";
-        await db.query("UPDATE arquivos SET progresso_dados=progresso_dados || $2::jsonb,atualizado_em=now() WHERE id=$1",
-          [file.id,JSON.stringify({ia_resultado:"IA indisponível ou excedeu o tempo de resposta. OCR preservado."})]).catch(()=>{});
-        console.warn("IA Central indisponível, mantido OCR local",file.id,detail);
-      }finally{
-        timing.ia_ms=Date.now()-aiStarted;
-      }
-    }
 
     const connection=await db.connect();
     try{
@@ -273,7 +211,6 @@ async function processFile(file){
       }
       for(const item of items){
         const notice=[];
-        if(aiNotice)notice.push(aiNotice);
         const suggested=short(item.titular_sugerido||localSuggestedOwner,120);
         const cleanSuggested=suggested&&
           !allNames.some(x=>normalizeName(x)===normalizeName(suggested))?
@@ -283,24 +220,20 @@ async function processFile(file){
         const currentPayer=confirmedPixPayer(fullText)||(items.length===1?pixPayer:"");
         const currentPix=/\bPIX\b/i.test(fullText.slice(0,5000))&&
           /comprovante|pagamento|transfere|enviado|realizado/i.test(fullText.slice(0,5000));
-        const explicitPayerOwner=knownPixPayer(currentPayer,allowedBooks);
-        const hinted=fromAiOwner(item.titular_id||item.titular_nome,allowedBooks);
-        const seller=fromAiOwner(item.emitente_nome,allowedBooks);
-        const buyer=fromAiOwner(item.destinatario_nome,allowedBooks);
+        const explicitPayerOwner=await resolvePayer(currentPayer);
+        const seller=recognizedStructuredOwner(item.emitente_nome,allowedBooks);
+        const buyer=recognizedStructuredOwner(item.destinatario_nome,allowedBooks);
         const structuredOwner=seller&&!buyer?seller:buyer&&!seller?buyer:null;
         const byText=currentPix?explicitPayerOwner:recognizedOwner(fullText,allowedBooks);
         const owner=currentPix?(explicitPayerOwner||defaultBook):
-          (structuredOwner||hinted||byText||defaultBook);
+          (structuredOwner||byText||defaultBook);
         // O titular usado no armazenamento é técnico, não uma escolha do usuário.
-        // Se IA/OCR não encontrarem titular confiável, a conferência exige escolha.
+        // Quando o OCR não identifica o titular, a conferência exige escolha humana.
         if(currentPix&&!explicitPayerOwner)notice.push(currentPayer?
           "Quem fez o Pix foi lido, mas não corresponde a um titular único; selecione o titular.":
           "Não foi possível ler quem fez o Pix; selecione o titular na conferência.");
-        else if(!currentPix&&!structuredOwner&&!hinted&&!byText)
+        else if(!currentPix&&!structuredOwner&&!byText)
           notice.push("Titular não identificado automaticamente; selecione o titular na conferência antes de aprovar.");
-        if(hinted&&byText&&String(hinted.id)!==String(byText.id)){
-          notice.push("Há divergência na identificação do titular; confira antes de aprovar.");
-        }
         const ownerId=Number(owner.id);
         const date=competence(item.competencia);
         if(date.estimated)notice.push("Competência estimada; confirme mês e ano.");
@@ -308,7 +241,7 @@ async function processFile(file){
         const cat=foundCategory.existing;
         let categorySuggestion=foundCategory.suggested;
         if(!cat&&!categorySuggestion)notice.push("Categoria não identificada; confira a classificação.");
-        if(categorySuggestion)notice.push("Categoria sugerida pela IA; escolha uma categoria válida.");
+        if(categorySuggestion)notice.push("Categoria não cadastrada; escolha uma categoria válida.");
         const xmlIncoming=method==="xml"&&buyer&&String(buyer.id)===String(owner.id)&&!seller;
         const xmlOutgoing=method==="xml"&&seller&&String(seller.id)===String(owner.id)&&!buyer;
         if(method==="xml"&&!xmlIncoming&&!xmlOutgoing)notice.push("Confira se a nota representa compra ou venda.");
@@ -325,6 +258,13 @@ async function processFile(file){
         const type=xmlIncoming?"despesa":xmlOutgoing?"receita":item.tipo;
         if(method==="xml"&&xmlOutgoing)notice.push("Nota de saída identificada: confirme se deve entrar como receita.");
         let category=cat;
+        // Aprendizado local: categoria recorrente somente quando o titular foi
+        // identificado com evidência e existem classificações aprovadas.
+        if(!category&&party&&(currentPix?explicitPayerOwner:(structuredOwner||byText))){
+          const approved=await categoryFromApprovals(db,ownerId,party);
+          category=cats.find(c=>normalizeName(c.nome)===normalizeName(approved))||null;
+          if(category)notice.push("Categoria baseada em aprovações anteriores; confira.");
+        }
         if(!category&&method==="xml"){
           const products=normalizeName(item.descricao);
           const guess=/DIESEL|GASOLINA|COMBUSTIVEL|ETANOL/.test(products)?"Abastecimento":
@@ -403,7 +343,7 @@ async function processFile(file){
       );
       await connection.query("COMMIT");
       console.log("Arquivo processado",file.id,"método",method,"documentos",items.length,
-        "tempos_ms",JSON.stringify({ocr:timing.ocr_ms,ia:timing.ia_ms,total:Date.now()-timing.started}));
+        "tempos_ms",JSON.stringify({ocr:timing.ocr_ms,total:Date.now()-timing.started}));
     }catch(error){
       await connection.query("ROLLBACK");
       throw error;

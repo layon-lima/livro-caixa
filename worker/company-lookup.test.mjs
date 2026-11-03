@@ -35,3 +35,22 @@ test("Não confunde recebedor com pagador",()=>{
 test("Identifica pagador quando Nome está na linha seguinte",()=>{
  assert.equal(confirmedPixPayer("Comprovante Pix\nDados do pagador\nNome\nDAVI MARLOW\nCPF: 000\nDados de quem recebeu\nNome: POSTO"),"DAVI MARLOW");
 });
+
+test("OCR identifica titular em seções alternativas dos bancos sem confundir recebedor",()=>{
+ const text=[
+  "COMPROVANTE PIX","DADOS DO CLIENTE","Nome: ANGELINA RABELO",
+  "CPF: ***.***.***-12","Dados de quem recebeu","Nome: AUTO POSTO AVENIDA",
+  "Valor do pagamento: R$ 280,00"
+ ].join("\n");
+ assert.equal(confirmedPixPayer(text),"ANGELINA RABELO");
+});
+test("OCR reconhece pagador explicitamente indicado como titular da conta",()=>{
+ const text="Comprovante Pix\nTitular da conta de origem: DAVI MARLOW\n"+
+   "Favorecido: COMERCIAL XYZ LTDA";
+ assert.equal(confirmedPixPayer(text),"DAVI MARLOW");
+});
+test("OCR não presume nome pelo recebedor sem contexto de origem",()=>{
+ const text="Comprovante Pix\nDados de quem recebeu\nNome: DAVI MARLOW\n"+
+   "Banco: BANCO EXEMPLO";
+ assert.equal(confirmedPixPayer(text),"");
+});

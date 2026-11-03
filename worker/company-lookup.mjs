@@ -25,10 +25,10 @@ export function confirmedPixPayer(text){
   };
   for(const line of lines){
     const norm=fold(line);
-    const m=norm.match(/^(?:NOME\s+(?:DO\s+)?PAGADOR|PAGADOR|QUEM\s+PAGOU|NOME\s+DO\s+REMETENTE|REMETENTE|TITULAR\s+DA\s+CONTA\s+DE\s+ORIGEM)\s*[:–-]\s*(.+)$/);
+    const m=norm.match(/^(?:NOME\s+(?:DO\s+)?PAGADOR|PAGADOR|QUEM\s+PAGOU|NOME\s+DO\s+REMETENTE|REMETENTE|TITULAR\s+DA\s+CONTA\s+DE\s+ORIGEM|NOME\s+DO\s+TITULAR\s+DA\s+CONTA|CONTA\s+DEBITADA\s+POR|PAGAMENTO\s+REALIZADO\s+POR)\s*[:–-]\s*(.+)$/);
     if(m){const found=valid(line.slice(line.length-m[1].length));if(found)return found;}
   }
-  const section=/^(?:DADOS\s+(?:DE\s+)?QUEM\s+(?:FEZ\s+(?:A\s+)?TRANSACAO|PAGOU|ENVIOU)|DADOS\s+DO\s+PAGADOR|DADOS\s+DO\s+REMETENTE|QUEM\s+PAGOU|PAGADOR|ORIGEM\s+DA\s+TRANSFERENCIA|DADOS\s+DE\s+ORIGEM)\s*:?$/;
+  const section=/^(?:DADOS\s+(?:DE\s+)?QUEM\s+(?:FEZ\s+(?:A\s+)?TRANSACAO|PAGOU|ENVIOU)|DADOS\s+DO\s+PAGADOR|DADOS\s+DO\s+REMETENTE|DADOS\s+DO\s+CLIENTE|DADOS\s+DA\s+CONTA\s+DE\s+ORIGEM|QUEM\s+PAGOU|PAGADOR|ORIGEM\s+DA\s+TRANSFERENCIA|DADOS\s+DE\s+ORIGEM|PAGAMENTO\s+REALIZADO\s+POR)\s*:?$/;
   const boundary=/^(?:DADOS\s+(?:DE\s+)?QUEM\s+(?:RECEBEU|PAGOU|FEZ|ENVIOU)|DADOS\s+(?:DA\s+)?TRANSACAO|DADOS\s+DO\s+(?:RECEBEDOR|BENEFICIARIO|PAGAMENTO)|DESTINO|RECEBEDOR|BENEFICIARIO|AUTENTICACAO)\b/;
   for(let i=0;i<lines.length;i++){
     if(!section.test(fold(lines[i])))continue;

@@ -199,7 +199,7 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
                 <FileText size={21}/>
                 <div><h1 title={"Original: "+selected.nome_original}>{selectedName}</h1>
                   <div className="conference-doc-tags">
-                    <span>{selected.metodo_leitura==="ia"?"IA":selected.metodo_leitura==="xml"?"XML":"OCR"}</span>
+                    <span>{selected.metodo_leitura==="xml"?"XML":"OCR"}</span>
                     {selected.confianca&&<span>{Math.round(Number(selected.confianca)*100)}% confiança estimada</span>}
                     {selected.pagina_inicial&&<span>{selected.pagina_final&&selected.pagina_final!==selected.pagina_inicial?
                       Number(selected.pagina_final)-Number(selected.pagina_inicial)+1:1} pág.</span>}
@@ -229,9 +229,6 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
                 <div><span>Tipo sugerido</span><strong>{selected.tipo==="despesa"?"Despesa":"Outro"}</strong></div>
               </div>
             </section>
-            {selected.avisos?.filter(message=>message.startsWith("IA Central")||
-                message.startsWith("A IA Central")).map((message,i)=>
-              <p key={"ia-"+i} className="conference-ai-note" role="status">{message}</p>)}
             {selected.duplicada_de&&<div className="duplicate-alert conference-panel">
               <strong>Documento já identificado anteriormente</strong>
               <span>Para evitar duplicidade, este lançamento não pode ser aprovado novamente.</span>
