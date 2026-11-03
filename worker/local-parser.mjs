@@ -84,7 +84,7 @@ function dateCandidate(t) {
   const s=normalizeLocal(t);
   const labels=[
     /(?:COMPETENCIA|REFERENCIA|PERIODO DE APURACAO|EXERCICIO)\s*[:\-]?\s*((?:0[1-9]|1[0-2])\/20\d{2}|20\d{2}[-/](?:0[1-9]|1[0-2])|\d{2}\/\d{2}\/20\d{2}|20\d{2})/,
-    /(?:DATA DE EMISSAO|EMITIDO EM|EMISSAO|DATA DO PAGAMENTO|DATA DA TRANSACAO|VENCIMENTO|DATA)\s*[:\-]?\s*(\d{2}\/\d{2}\/20\d{2}|20\d{2}-\d{2}-\d{2}|\d{2}\/20\d{2})/
+    /(?:DATA DO DEBITO|DATA DE DEBITO|DATA DE PAGAMENTO|DATA DO PAGAMENTO|DATA DA TRANSACAO|DATA DE EMISSAO|EMITIDO EM|EMISSAO|VENCIMENTO|DATA)\s*[:\-]?\s*(\d{2}\/\d{2}\/20\d{2}|20\d{2}-\d{2}-\d{2}|\d{2}\/20\d{2})/
   ];
   for(const re of labels){
     const m=s.match(re);
@@ -103,7 +103,7 @@ function monetary(t) {
   const money="(?:R\\$\\s*)?(\\d{1,3}(?:\\.\\d{3})*,\\d{2}|\\d{1,12}[,.]\\d{2})";
   const labels=[
     "VALOR TOTAL DA NOTA","VALOR DA NOTA","VALOR TOTAL DO DOCUMENTO","VALOR DO DOCUMENTO",
-    "VALOR PAGO","VALOR DO PAGAMENTO","VALOR A PAGAR","TOTAL A PAGAR",
+    "VALOR PAGO","VALOR DO PAGAMENTO","VALOR INICIAL","VALOR DEBITADO","VALOR A PAGAR","TOTAL A PAGAR",
     "VALOR TOTAL","VALOR DA TRANSACAO","VALOR","TOTAL"
   ];
   for(const label of labels){

@@ -73,3 +73,22 @@ test("Comprovante Pix bancario com duas secoes Nome identifica recebedor certo",
   assert.equal(item.competencia,"28/10/2026");
   assert.equal(item.referencia,"E60746948202610281247A5793TDHH7o");
 });
+
+
+test("Comprovante de boleto pago extrai beneficiário, valor inicial e data do débito",()=>{
+  const text=[
+    "PÁGINA 1 DE 1","COMPROVANTE DE PAGAMENTO DE BOLETO",
+    "Dados de quem vai receber","Razão social: CONDOMINIO MIRANTE DO LAGO",
+    "Beneficiário: CONDOMINIO MIRANTE DO LAGO",
+    "Dados da transação",
+    "Data do débito: 28/10/2026","Data do vencimento: 30/10/2026",
+    "Valor inicial: R$ 2.830,50",
+    "Dados de quem fez o pagamento","Nome: JONAS NELMAR MARLOW",
+    "Dados do pagador registrados no boleto","Nome: ANGELITA RABELO MARLOW"
+  ].join("\n");
+  const [doc]=parseLocalDocument(text,"boleto-pago.pdf","application/pdf");
+  assert.equal(doc.contraparte,"CONDOMINIO MIRANTE DO LAGO");
+  assert.equal(doc.valor,"2.830,50");
+  assert.equal(doc.competencia,"28/10/2026");
+  assert.equal(doc.tipo,"despesa");
+});

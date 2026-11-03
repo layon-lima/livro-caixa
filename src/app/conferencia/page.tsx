@@ -141,6 +141,8 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
     selected.documento_tipo==="nota fiscal"?"Nota fiscal":selected.documento_tipo):"";
   const needsOwner=Boolean(selected?.avisos?.some(x=>
     x.startsWith("Titular não identificado automaticamente")||
+    x.startsWith("Quem fez o pagamento")||
+    x.startsWith("Não foi possível identificar quem fez o pagamento")||
     x.startsWith("Quem fez o Pix")||
     x.startsWith("Não foi possível ler quem fez o Pix")));
   const realOwner=selected?(needsOwner?"Aguardando identificação":selected.nome_titular):"";
@@ -220,7 +222,7 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
               <h2><FileText size={17}/> Resumo do documento</h2>
               <div className="conference-summary">
                 <div><span>Tipo do documento</span><strong>{typeLabel}</strong></div>
-                <div><span>{pix?"Quem pagou":"Titular"}</span><strong>{pix?(selected.pagador_identificado||"Não identificado"):realOwner}</strong></div>
+                <div><span>{pix||selected.pagador_identificado?"Quem fez o pagamento":"Titular"}</span><strong>{selected.pagador_identificado||realOwner}</strong></div>
                 <div><span>{pix?"Quem recebeu":"Fornecedor / contraparte"}</span><strong>{selected.contraparte||"Não identificado"}</strong></div>
                 <div><span>Valor</span><strong>{displayAmount}</strong></div>
                 <div><span>Data do pagamento</span><strong>{displayDate}</strong></div>

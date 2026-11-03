@@ -2,7 +2,7 @@ import { paymentDateFromText,verifiedPaymentDate } from "./payment-date.mjs";
 import {extractPixEndToEndId} from "./pix-identifier.mjs";
 import { Pool } from "pg";
 import { parseLocalDocument } from "./local-parser.mjs";
-import { candidateNewOwner, confirmedPixReceiver, confirmedPixPayer, knownPixPayer } from "./company-lookup.mjs";
+import { candidateNewOwner, confirmedPixReceiver, confirmedPaymentExecutor, isPaymentReceipt } from "./company-lookup.mjs";
 import { categoryFromApprovals } from "./classification-learning.mjs";
 import {learnedPixOwner,knownOwnerByName,ownerMentionedInDocument} from "./owner-learning.mjs";
 import { XMLParser } from "fast-xml-parser";
@@ -158,10 +158,10 @@ async function processFile(file){
     if(["OUTRAS DESPESAS","OUTRA DESPESA"].includes(normalizeName(first.categoria)))
       first.categoria="";
     const protectedPixReceiver=items.length===1?confirmedPixReceiver(output.text):"";
-    const pixPayer=items.length===1?confirmedPixPayer(output.text):"";
-    const payerOwner=await resolvePayer(pixPayer);
-    const isPixReceipt=/\bPIX\b/i.test(output.text.slice(0,5000))&&
-      /comprovante|pagamento|transfere|enviado|realizado/i.test(output.text.slice(0,5000));
+    const paymentExecutor=items.length===1?confirmedPaymentExecutor(output.text):"";
+    const payerOwner=await resolvePayer(paymentExecutor);
+    const paymentReceipt=isPaymentReceipt(output.text)&&method!=="xml";
+    const isPixReceipt=paymentReceipt&&/\bPIX\b/i.test(output.text.slice(0,5000));
     // Dados explícitos do comprovante prevalecem sobre padrões genéricos.
     if(protectedPixReceiver&&normalizeName(first.contraparte)!==normalizeName(protectedPixReceiver)){
       first.contraparte=protectedPixReceiver;
@@ -170,10 +170,10 @@ async function processFile(file){
     const knownNames=allNames;
     const localSuggestedOwner=payerOwner?"":candidateNewOwner(output.text,first.documento_tipo,knownNames);
     const dateInitial=competence(first.competencia);
-    const matchingOwner=isPixReceipt?payerOwner:recognizedOwner(output.text,allowedBooks);
+    const matchingOwner=paymentReceipt?payerOwner:recognizedOwner(output.text,allowedBooks);
     // Classificação aprendida apenas com aprovações de mesmo titular.
     // Evidência explícita do documento continua tendo prioridade.
-    if(items.length===1&&!first.categoria&&first.contraparte&&(!isPixReceipt||payerOwner)){
+    if(items.length===1&&!first.categoria&&first.contraparte&&(!paymentReceipt||payerOwner)){
       const fromHistory=await categoryFromApprovals(db,
         matchingOwner?.id||defaultBook.id,first.contraparte);
       if(fromHistory){
@@ -190,7 +190,7 @@ async function processFile(file){
       referencia:short(first.referencia,100),
       data_pagamento:paymentDateFromText(output.text,first.documento_tipo),
       ...(matchingOwner?{titular_id:String(matchingOwner.id)}:{}),
-      ...(pixPayer?{pagador_identificado:pixPayer}:{}),
+      ...(paymentExecutor?{pagador_identificado:paymentExecutor}:{}),
       ...(localSuggestedOwner?{titular_sugerido:localSuggestedOwner}:{})
     };
     await db.query(
@@ -217,22 +217,23 @@ async function processFile(file){
           suggested.toLocaleUpperCase("pt-BR"):"";
         if(cleanSuggested)notice.push("Possível titular não cadastrado: "+cleanSuggested+". Confirme antes de criar.");
         const fullText=item.trecho||output.text;
-        const currentPayer=confirmedPixPayer(fullText)||(items.length===1?pixPayer:"");
-        const currentPix=/\bPIX\b/i.test(fullText.slice(0,5000))&&
-          /comprovante|pagamento|transfere|enviado|realizado/i.test(fullText.slice(0,5000));
+        const currentPayer=confirmedPaymentExecutor(fullText)||
+          (items.length===1?paymentExecutor:"");
+        const currentPayment=isPaymentReceipt(fullText)&&method!=="xml";
+        const currentPix=currentPayment&&/\bPIX\b/i.test(fullText.slice(0,5000));
         const explicitPayerOwner=await resolvePayer(currentPayer);
         const seller=recognizedStructuredOwner(item.emitente_nome,allowedBooks);
         const buyer=recognizedStructuredOwner(item.destinatario_nome,allowedBooks);
         const structuredOwner=seller&&!buyer?seller:buyer&&!seller?buyer:null;
-        const byText=currentPix?explicitPayerOwner:recognizedOwner(fullText,allowedBooks);
-        const owner=currentPix?(explicitPayerOwner||defaultBook):
+        const byText=currentPayment?explicitPayerOwner:recognizedOwner(fullText,allowedBooks);
+        const owner=currentPayment?(explicitPayerOwner||defaultBook):
           (structuredOwner||byText||defaultBook);
         // O titular usado no armazenamento é técnico, não uma escolha do usuário.
         // Quando o OCR não identifica o titular, a conferência exige escolha humana.
-        if(currentPix&&!explicitPayerOwner)notice.push(currentPayer?
-          "Quem fez o Pix foi lido, mas não corresponde a um titular único; selecione o titular.":
-          "Não foi possível ler quem fez o Pix; selecione o titular na conferência.");
-        else if(!currentPix&&!structuredOwner&&!byText)
+        if(currentPayment&&!explicitPayerOwner)notice.push(currentPayer?
+          "Quem fez o pagamento foi identificado, mas não corresponde a um titular único; selecione o titular.":
+          "Não foi possível identificar quem fez o pagamento; selecione o titular na conferência.");
+        else if(!currentPayment&&!structuredOwner&&!byText)
           notice.push("Titular não identificado automaticamente; selecione o titular na conferência antes de aprovar.");
         const ownerId=Number(owner.id);
         const date=competence(item.competencia);
@@ -260,7 +261,7 @@ async function processFile(file){
         let category=cat;
         // Aprendizado local: categoria recorrente somente quando o titular foi
         // identificado com evidência e existem classificações aprovadas.
-        if(!category&&party&&(currentPix?explicitPayerOwner:(structuredOwner||byText))){
+        if(!category&&party&&(currentPayment?explicitPayerOwner:(structuredOwner||byText))){
           const approved=await categoryFromApprovals(db,ownerId,party);
           category=cats.find(c=>normalizeName(c.nome)===normalizeName(approved))||null;
           if(category)notice.push("Categoria baseada em aprovações anteriores; confira.");
@@ -331,6 +332,8 @@ async function processFile(file){
       const agreed=new Set(ownerRows.rows.map(x=>x.id));
       const uncertain=ownerRows.rows.some(x=>Array.isArray(x.avisos)&&x.avisos.some(
         warning=>String(warning).startsWith("Titular não identificado automaticamente")||
+          String(warning).startsWith("Quem fez o pagamento")||
+          String(warning).startsWith("Não foi possível identificar quem fez o pagamento")||
           String(warning).startsWith("Quem fez o Pix")||String(warning).startsWith("Não foi possível ler quem fez o Pix")
       ));
       if(!uncertain&&agreed.size===1&&ownerRows.rows.length===items.length){
