@@ -27,15 +27,12 @@ test("Itens disponíveis ficam prontos, enquanto demais continuam opacos",()=>{
   assert.deepEqual(queue.map(x=>x.status),["pendente","processando","aguardando"]);
   assert.deepEqual(queue.map(x=>x.ordinal),[1,2,3]);
 });
-test("Não expor proposta antiga de um PDF duplicado",()=>{
+test("Proposta antiga de um PDF duplicado fica fora da fila elegível",()=>{
   const entries=[entry(1,"duplicado",{arquivo_id:"10",leitura_status:"pronto"})];
   const old=[{id:"99",arquivo_id:"10",titulo:"Documento velho",nome_titular:"Outro"}];
-  const queue=buildZipQueue(entries,old,[]);
-  assert.equal(queue.length,1);
-  assert.equal(queue[0].status,"ja-existente");
-  assert.equal(queue[0].titulo,"documento-1.pdf");
+  assert.deepEqual(buildZipQueue(entries,old,[]),[]);
 });
-test("Não omitir erros, descartes, multi-propostas nem aprovados",()=>{
+test("Fila mantém multi-propostas e aprovações, sem misturar erros ou descartes",()=>{
   const entries=[
     entry(1,"importado",{arquivo_id:"10",leitura_status:"pronto"}),
     entry(2,"erro",{erro:"Formato inválido"}),
@@ -48,5 +45,36 @@ test("Não omitir erros, descartes, multi-propostas nem aprovados",()=>{
   ];
   const approved=[{id:"201",arquivo_id:"20",operacao_id:"501",titulo:"Lançamento",nome_titular:"B"}];
   const q=buildZipQueue(entries,pending,approved);
-  assert.deepEqual(q.map(x=>x.status),["pendente","pendente","erro","descartado","aprovado"]);
+  assert.deepEqual(q.map(x=>x.status),["pendente","pendente","aprovado"]);
+});
+
+test("Caso real: 49 entradas com 15 elegíveis entram todas na fila antes do OCR",()=>{
+  const entries=[
+    ...Array.from({length:15},(_,i)=>entry(i+1,"importado",{
+      arquivo_id:String(100+i),
+      leitura_status:i<3?"pronto":i<5?"processando":"aguardando"
+    })),
+    ...Array.from({length:32},(_,i)=>entry(16+i,"ja_aprovado",{
+      arquivo_id:String(500+i),leitura_status:"pronto"
+    })),
+    ...Array.from({length:2},(_,i)=>entry(48+i,"erro",{erro:"Formato não suportado"}))
+  ];
+  const proposals=Array.from({length:3},(_,i)=>({
+    id:String(200+i),arquivo_id:String(100+i),titulo:"Documento pronto "+(i+1),
+    nome_titular:"Titular"
+  }));
+  const q=buildZipQueue(entries,proposals,[]);
+  assert.equal(q.length,15);
+  assert.deepEqual(q.map(x=>x.status).slice(0,5),[
+    "pendente","pendente","pendente","processando","processando"]);
+  assert.ok(q.slice(5).every(x=>x.status==="aguardando"));
+  assert.ok(q.every(x=>x.ordinal<=15));
+});
+
+test("Erro OCR sem proposta não é elegível para aprovação",()=>{
+  const q=buildZipQueue([
+    entry(1,"importado",{arquivo_id:"10",leitura_status:"erro",leitura_erro:"Falha OCR"}),
+    entry(2,"importado",{arquivo_id:"11",leitura_status:"pronto",tem_pendente:false})
+  ],[],[]);
+  assert.deepEqual(q,[]);
 });

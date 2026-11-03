@@ -95,8 +95,8 @@ export function ConferenceQueue({items,queryRoot,selectedId,selectedFile,lote,ar
           </button>)}
       </div>
       {lote&&<div className="cq-batch-progress" role="status">
-        <strong>{loteTotal??items.length} arquivos no ZIP</strong>
-        <span>{readyCount} pronto(s) para validar · {waitingCount} em leitura</span>
+        <strong>{items.length} documento(s) elegível(is) na fila</strong>
+        <span>{readyCount} pronto(s) para validar · {waitingCount} em leitura · {loteTotal??items.length} no ZIP</span>
       </div>}
     </div>
     <form action="/api/propostas/aprovar" method="post" className="cq-form">
@@ -138,7 +138,7 @@ export function ConferenceQueue({items,queryRoot,selectedId,selectedFile,lote,ar
       </div>
       <div className="cq-bottom">
         <div className="cq-pages">
-          {lote?<span>{filtered.length} exibido(s) · {loteTotal??items.length} arquivo(s) do ZIP</span>:<>
+          {lote?<span>{filtered.length} elegível(is) exibido(s) · {loteTotal??items.length} arquivo(s) verificado(s)</span>:<>
             <span>{filtered.length?current*PAGE_SIZE+1:0}–{Math.min(filtered.length,(current+1)*PAGE_SIZE)} de {filtered.length}</span>
             <button type="button" aria-label="Página anterior" disabled={current===0}
               onClick={()=>setPage(current-1)}><ChevronLeft size={17}/></button>

@@ -16,8 +16,10 @@ export type ZipQueueItem={
   ordinal?:number;
 };
 
-/** Lista CADA entrada do ZIP mesmo sem arquivo/proposta.
- * Documentos com múltiplas propostas mostram cada subproposta na mesma posição.
+/** Lista imediatamente os arquivos elegíveis para conferência.
+ * O relatório de ZIP exibe duplicados, descartados e erros separadamente.
+ * Enquanto o ZIP não foi identificado por SHA, as entradas são provisórias.
+ * Documentos com várias propostas preservam cada subproposta na mesma posição.
  */
 export function buildZipQueue(
   entries:ZipBatchEntry[],pending:ZipQueueProposal[],approved:ZipQueueApproved[]
@@ -33,6 +35,9 @@ export function buildZipQueue(
     group.push(p);approvedByFile.set(p.arquivo_id,group);
   }
   return entries.flatMap(entry=>{
+    // Duplicados, descartados e arquivos recusados ficam apenas no relatório.
+    // Nunca aparecem como documentos novos para validar.
+    if(!["pendente","importado","reprocessado"].includes(entry.status_entrada))return [];
     const file=entry.arquivo_id||"";
     const ordinal=entry.ordem;
     const base=(status:ZipQueueStatus,detail:string):ZipQueueItem=>({
@@ -42,16 +47,14 @@ export function buildZipQueue(
     if(entry.status_entrada==="pendente")
       return [base("recebendo","Aguardando extração do ZIP")];
     if(entry.status_entrada==="importado"||entry.status_entrada==="reprocessado"){
-      if(entry.leitura_status==="erro")
-        return [base("erro",entry.leitura_erro||"Erro na leitura OCR")];
+      if(entry.leitura_status==="erro")return []; // Falha de OCR no relatório, sem proposta validável.
       if(entry.leitura_status==="pronto"){
         const proposals=pendingByFile.get(file)||[];
         const accepted=approvedByFile.get(file)||[];
-        const rows:ZipQueueItem[]=proposals.map(p=>({
+        const rows:ZipQueueItem[]=proposals.filter(p=>!p.duplicada_de).map(p=>({
           id:p.id,arquivo_id:file,
           titulo:proposals.length===1?p.titulo:entry.nome_entrada+" — "+p.titulo,
-          nome_titular:p.nome_titular,status:p.duplicada_de?"duplicado":
-            p.revisada_em?"revisado":"pendente",
+          nome_titular:p.nome_titular,status:p.revisada_em?"revisado":"pendente",
           referencia:p.referencia,ordinal
         }));
         rows.push(...accepted.map(p=>({
@@ -60,16 +63,11 @@ export function buildZipQueue(
           operacao_id:p.operacao_id,ordinal
         })));
         if(rows.length)return rows;
-        return [base("sem-proposta","OCR finalizado sem documento disponível para validar")];
+        return []; // Falha sem proposta fica visível no relatório por arquivo.
       }
       return [base(entry.leitura_status==="processando"?"processando":"aguardando",
         entry.leitura_status==="processando"?"OCR/IA em andamento":"Aguardando leitura OCR")];
     }
-    if(entry.status_entrada==="descartado")
-      return [base("descartado","Descartado na conferência")];
-    if(["duplicado","ja_aprovado","aprovado_outro_titular","outro_titular",
-       "duplicado_restrito"].includes(entry.status_entrada))
-      return [base("ja-existente","Arquivo já existente; não gerou nova proposta")];
-    return [base("erro",entry.erro||"Arquivo não importado")];
+    return [];
   });
 }
