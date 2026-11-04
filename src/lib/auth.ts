@@ -38,13 +38,18 @@ export async function requireAdmin(): Promise<AuthUser> {
   return user;
 }
 export async function canAccessTitular(user: AuthUser, titularId: number, action: "view" | "import" | "approve" | "edit" | "delete"): Promise<boolean> {
-  if (user.isAdmin) return true;
+  if (user.isAdmin) {
+    const active=await getDatabase().query<{ativo:boolean}>(
+      "SELECT ativo FROM titulares WHERE id=$1",[titularId]);
+    return active.rows[0]?.ativo===true;
+  }
   const column = ({
     view: "can_view", import: "can_import", approve: "can_approve",
     edit: "can_edit", delete: "can_delete",
   } as const)[action];
   const result = await getDatabase().query<{ allowed: boolean }>(
-    "SELECT " + column + " AS allowed FROM user_titular_permissions WHERE user_id = $1 AND titular_id = $2",
+    "SELECT p." + column + " AS allowed FROM user_titular_permissions p JOIN titulares t ON t.id=p.titular_id "+
+    "WHERE p.user_id = $1 AND p.titular_id = $2 AND t.ativo=TRUE",
     [user.id, titularId],
   );
   return result.rows[0]?.allowed === true;

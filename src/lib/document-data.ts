@@ -31,13 +31,13 @@ export function safeId(input: unknown): number | null {
 export async function titularesPermitidos(user: AuthUser, action: "view" | "import" | "approve" | "edit" | "delete" = "view"): Promise<Titular[]> {
   const db = getDatabase();
   if (user.isAdmin) {
-    const r = await db.query<Titular>("SELECT id::text AS id,nome FROM titulares ORDER BY nome");
+    const r = await db.query<Titular>("SELECT id::text AS id,nome FROM titulares WHERE ativo=TRUE ORDER BY nome");
     return r.rows;
   }
   const col = ({view:"can_view",import:"can_import",approve:"can_approve",edit:"can_edit",delete:"can_delete"} as const)[action];
   const r = await db.query<Titular>(
     "SELECT t.id::text AS id,t.nome FROM titulares t JOIN user_titular_permissions p ON p.titular_id=t.id " +
-    "WHERE p.user_id=$1 AND p." + col + "=true ORDER BY t.nome",[user.id],
+    "WHERE p.user_id=$1 AND t.ativo=TRUE AND p." + col + "=true ORDER BY t.nome",[user.id],
   );
   return r.rows;
 }

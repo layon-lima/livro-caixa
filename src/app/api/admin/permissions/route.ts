@@ -15,15 +15,17 @@ export async function POST(request: Request) {
 
   const db = getDatabase();
   const target = await db.query<{ is_admin: boolean }>(
-    "SELECT is_admin FROM users WHERE id=$1", [userId],
+    "SELECT is_admin FROM users WHERE id=$1 AND is_active=TRUE", [userId],
   );
   if (!target.rows[0] || target.rows[0].is_admin) return forbidden();
 
-  const titulares = await db.query<{ id: string }>("SELECT id::text AS id FROM titulares");
+  const titulares = await db.query<{ id: string }>("SELECT id::text AS id FROM titulares WHERE ativo=TRUE");
   const connection = await db.connect();
   try {
     await connection.query("BEGIN");
-    await connection.query("DELETE FROM user_titular_permissions WHERE user_id=$1", [userId]);
+    // Preserva permissões históricas de titulares arquivados para eventual restauração.
+    await connection.query("DELETE FROM user_titular_permissions WHERE user_id=$1 "+
+      "AND titular_id IN (SELECT id FROM titulares WHERE ativo=TRUE)", [userId]);
     for (const titular of titulares.rows) {
       const values = keys.map(key => form.get("p_" + titular.id + "_" + key) === "on");
       // Permissão de ação implica permissão de visualização do livro.
@@ -44,5 +46,5 @@ export async function POST(request: Request) {
   } finally {
     connection.release();
   }
-  return backTo("/admin?saved=1");
+  return backTo("/admin?tab=usuarios&saved=1");
 }

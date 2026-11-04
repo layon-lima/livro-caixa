@@ -19,13 +19,13 @@ export default async function Livro({params,searchParams}:{
   const db=getDatabase();
   const query=await searchParams;
   const [title,books,cats,months,editBooks,canEdit,canDelete]=await Promise.all([
-    db.query<Titular>("SELECT id::text,nome FROM titulares WHERE id=$1",[id]),
+    db.query<Titular>("SELECT id::text,nome FROM titulares WHERE id=$1 AND ativo=TRUE",[id]),
     user.isAdmin
-      ?db.query<Titular>("SELECT id::text,nome FROM titulares ORDER BY nome")
+      ?db.query<Titular>("SELECT id::text,nome FROM titulares WHERE ativo=TRUE ORDER BY nome")
       :db.query<Titular>(
         "SELECT t.id::text,t.nome FROM titulares t "+
         "JOIN user_titular_permissions p ON p.titular_id=t.id "+
-        "WHERE p.user_id=$1 AND p.can_view=TRUE ORDER BY t.nome",[user.id]),
+        "WHERE p.user_id=$1 AND p.can_view=TRUE AND t.ativo=TRUE ORDER BY t.nome",[user.id]),
     categorias(),
     db.query<{mes:string}>(
       "SELECT DISTINCT to_char(o.competencia,'YYYY-MM') AS mes FROM operacoes o "+

@@ -12,7 +12,7 @@ export async function POST(request: Request) {
   const userId = Number(form.get("userId"));
   const password = String(form.get("password") || "");
   if (!Number.isSafeInteger(userId) || userId < 1 || !validPassword(password))
-    return backTo("/admin?error=dados");
+    return backTo("/admin?tab=usuarios&error=dados");
 
   const passwordHash = await hashPassword(password);
   const db = getDatabase();
@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     );
     if (!updated.rowCount) {
       await connection.query("ROLLBACK");
-      return backTo("/admin?error=dados");
+      return backTo("/admin?tab=usuarios&error=dados");
     }
     await connection.query("DELETE FROM user_sessions WHERE user_id=$1", [userId]);
     await connection.query("COMMIT");
@@ -35,5 +35,5 @@ export async function POST(request: Request) {
   } finally {
     connection.release();
   }
-  return backTo("/admin?saved=1");
+  return backTo("/admin?tab=usuarios&saved=1");
 }
