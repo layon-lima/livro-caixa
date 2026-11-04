@@ -3,13 +3,12 @@ import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { getDatabase } from "@/lib/database";
 import { categorias, titularesPermitidos, type Proposta } from "@/lib/document-data";
-import {FileText, ExternalLink, ChevronRight, Save, CheckCircle2, ClipboardCheck} from "lucide-react";
+import {FileText, ExternalLink, ChevronRight, ChevronDown, Save, CheckCircle2, ClipboardCheck} from "lucide-react";
 import { LiveReview } from "@/components/live-review";
 import { ReviewCategoryPicker } from "@/components/review-category-picker";
 import { ConferenceQueue, type QueueItem } from "@/components/conference-queue";
 import { suggestDocumentName } from "@/lib/document-name";
 import { BatchQueueRefresh } from "@/components/batch-queue-refresh";
-import { ZipBatchReport } from "@/components/zip-batch-report";
 import { summarizeZipBatch,type ZipBatchEntry } from "@/lib/zip-batch-status";
 import { buildZipQueue } from "@/lib/zip-conference-queue";
 import { DiscardDocument } from "@/components/discard-document";
@@ -164,7 +163,6 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
           <BatchQueueRefresh active={Boolean((zipBatch&&(zipBatch.status==="recebendo"||zipBatch.status==="extraindo"))||batchEntries.some(x=>x.leitura_status==="aguardando"||x.leitura_status==="processando"))}/>
         </aside>
         <main className="conference-document" id="conteudo-conferencia">
-          {zipBatch&&<ZipBatchReport name={zipBatch.nome_arquivo} status={zipBatch.status} items={batchEntries}/>}
           {zipBatch&&(zipBatch.status==="recebendo"||zipBatch.status==="extraindo")&&
             <p className="form-success" role="status">
               {zipBatch.status==="recebendo"?"ZIP recebido. Preparando extração…":
@@ -213,8 +211,19 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
                   target="_blank" rel="noreferrer"><ExternalLink size={14}/> Abrir original</a>
                 {nextHref?<Link className="flat-button" href={nextHref}>Próximo <ChevronRight size={15}/></Link>:
                   <span className="flat-button conference-disabled">Último documento</span>}
-                {!selected.duplicada_de&&<button className="flat-button" type="submit"
-                  form={formId} name="acao" value="salvar"><Save size={14}/> Salvar</button>}
+                {!selected.duplicada_de&&<details className="conference-save-menu">
+                  <summary className="flat-button" aria-label="Salvar ou aprovar lançamento">
+                    <Save size={14}/> Salvar <ChevronDown size={13}/>
+                  </summary>
+                  <div className="conference-save-options">
+                    <button type="submit" form={formId} name="acao" value="aprovar" className="conference-save-approve">
+                      <CheckCircle2 size={15}/> Aprovar lançamento
+                    </button>
+                    <button type="submit" form={formId} name="acao" value="salvar">
+                      <Save size={15}/> Salvar para depois
+                    </button>
+                  </div>
+                </details>}
                 <DiscardDocument propostaId={selected.id} arquivos={batch?.join(",")} lote={lote}/>
               </div>
             </header>
@@ -302,13 +311,6 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
                   </details>
                 </form>
               </section>
-              <div className="conference-action-bar">
-                <button className="primary-btn" type="submit" form={formId} name="acao" value="aprovar">
-                  <CheckCircle2 size={16}/> Aprovar lançamento</button>
-                <button className="flat-button" type="submit" form={formId} name="acao" value="salvar">
-                  <Save size={15}/> Salvar para depois</button>
-                <DiscardDocument propostaId={selected.id} arquivos={batch?.join(",")} lote={lote}/>
-              </div>
             </>}
             <details className="conference-text">
               <summary><FileText size={15}/> Texto extraído do documento</summary>
