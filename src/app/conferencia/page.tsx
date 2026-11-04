@@ -3,7 +3,7 @@ import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { getDatabase } from "@/lib/database";
 import { categorias, titularesPermitidos, type Proposta } from "@/lib/document-data";
-import {FileText, ExternalLink, ChevronRight, ChevronDown, Save, CheckCircle2, ClipboardCheck} from "lucide-react";
+import {FileText, ExternalLink, ChevronRight, Save, ClipboardCheck} from "lucide-react";
 import { LiveReview } from "@/components/live-review";
 import { ReviewCategoryPicker } from "@/components/review-category-picker";
 import {TagPicker} from "@/components/tag-picker";
@@ -173,8 +173,8 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
               "Não foi possível concluir: "+query.erro+"."}
           </div>}
           {query.descartado&&<p className="form-success" role="status">Documento descartado e retirado da fila.</p>}
-          {query.revisada&&<p className="form-success" role="status">Conferência salva para depois.</p>}
-          {query.aprovados&&<p className="form-success" role="status">{query.aprovados} lançamento(s) aprovado(s).</p>}
+          {query.revisada&&<p className="form-success" role="status">Conferência atualizada.</p>}
+          {query.aprovados&&<p className="form-success" role="status">{query.aprovados} lançamento(s) salvo(s).</p>}
           {activePending?<div className="conference-panel conference-reading">
             <LiveReview key={activePending.id} arquivoId={activePending.id} nome={activePending.nome_original}
               books={books} cats={cats} isAdmin={user.isAdmin}/>
@@ -183,7 +183,7 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
           </div>:!selected?<div className="conference-empty">
             <ClipboardCheck size={30}/>
             <h2>{zipBatch&&(zipBatch.status==="recebendo"||zipBatch.status==="extraindo")?"Preparando a fila de documentos…":zipBatch&&batchSummary.duplicate===batchSummary.total&&batchSummary.total>0?"Nenhum documento novo para conferir":lote&&batchEntries.some(e=>e.status_entrada==="pendente"||e.leitura_status==="aguardando"||e.leitura_status==="processando")?"Aguardando documentos ficarem prontos":lote?"Nenhum documento pendente neste ZIP":"Sua fila está vazia"}</h2>
-            <p>{zipBatch&&(zipBatch.status==="recebendo"||zipBatch.status==="extraindo")?"Assim que o índice do ZIP for lido, todos os arquivos aparecerão à esquerda. Os opacos ainda não podem ser validados.":zipBatch&&batchSummary.duplicate===batchSummary.total&&batchSummary.total>0?"Todos os documentos já estavam cadastrados. Não há novos lançamentos para conferir.":lote?"Os documentos aprovados saem desta fila automaticamente. Você pode importar outros arquivos.":"Importe documentos para iniciar a conferência."}</p>
+            <p>{zipBatch&&(zipBatch.status==="recebendo"||zipBatch.status==="extraindo")?"Assim que o índice do ZIP for lido, todos os arquivos aparecerão à esquerda. Os opacos ainda não podem ser validados.":zipBatch&&batchSummary.duplicate===batchSummary.total&&batchSummary.total>0?"Todos os documentos já estavam cadastrados. Não há novos lançamentos para conferir.":lote?"Os documentos salvos saem desta fila automaticamente. Você pode importar outros arquivos.":"Importe documentos para iniciar a conferência."}</p>
             <Link className="flat-button" href="/importar">Importar documentos</Link>
           </div>:<>
             <header className="conference-doc-header">
@@ -203,20 +203,7 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
                   target="_blank" rel="noreferrer"><ExternalLink size={14}/> Abrir original</a>
                 {nextHref?<Link className="flat-button" href={nextHref}>Próximo <ChevronRight size={15}/></Link>:
                   <span className="flat-button conference-disabled">Último documento</span>}
-                {!selected.duplicada_de&&<details className="conference-save-menu">
-                  <summary className="flat-button" aria-label="Salvar ou aprovar lançamento">
-                    <Save size={14}/> Salvar <ChevronDown size={13}/>
-                  </summary>
-                  <div className="conference-save-options">
-                    <button type="submit" form={formId} name="acao" value="aprovar" className="conference-save-approve">
-                      <CheckCircle2 size={15}/> Aprovar lançamento
-                    </button>
-                    <button type="submit" form={formId} name="acao" value="salvar">
-                      <Save size={15}/> Salvar para depois
-                    </button>
-                  </div>
-                </details>}
-                <DiscardDocument propostaId={selected.id} arquivos={batch?.join(",")} lote={lote}/>
+
               </div>
             </header>
             <section className="conference-panel">
@@ -309,6 +296,12 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
               <summary><FileText size={15}/> Texto extraído do documento</summary>
               <pre>{selected.texto_extraido.slice(0,30000)}</pre>
             </details>
+            <div className="conference-bottom-actions" aria-label="Ações de conferência">
+              {!selected.duplicada_de&&<button type="submit" form={formId} name="acao" value="aprovar" className="primary-btn">
+                <Save size={15}/> Salvar
+              </button>}
+              <DiscardDocument propostaId={selected.id} arquivos={batch?.join(",")} lote={lote} compact/>
+            </div>
           </>}
         </main>
       </div>

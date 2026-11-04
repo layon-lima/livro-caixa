@@ -969,29 +969,14 @@ button { cursor: pointer; }
 .cq-row-ready .cq-row-link strong {color:#24496b;}
 .cq-row-ready.selected {background:#e9f4ff;}
 
-/* Ações da conferência concentradas exclusivamente no cabeçalho. */
-.conference-save-menu {position:relative;z-index:9;display:inline-flex;align-items:center;}
-.conference-save-menu summary.flat-button {list-style:none;cursor:pointer;user-select:none;}
-.conference-save-menu summary::-webkit-details-marker {display:none;}
-.conference-save-menu[open] summary.flat-button {background:#edf5ff;border-color:#88b4e9;}
-.conference-save-options {
-  position:absolute;top:calc(100% + 6px);right:0;z-index:10;
-  display:flex;flex-direction:column;gap:4px;min-width:202px;
-  padding:6px;background:#fff;border:1px solid #d8e3f0;border-radius:8px;
-  box-shadow:0 10px 26px rgba(22,48,75,.14);
-}
-.conference-save-options button {
-  display:flex;align-items:center;gap:8px;width:100%;
-  padding:9px 10px;white-space:nowrap;text-align:left;cursor:pointer;
-  background:#fff;border:0;border-radius:6px;color:#405a77;
-  font-size:11px;font-weight:600;
-}
-.conference-save-options button:hover,.conference-save-options button:focus-visible {
-  background:#eef5fc;outline:none;
-}
-.conference-save-options .conference-save-approve {color:#166abf;}
-.conference-save-options .conference-save-approve:hover,
-.conference-save-options .conference-save-approve:focus-visible {background:#e9f3ff;}
+/* Conferência: apenas Salvar e Descartar, abaixo do documento. */
+.conference-bottom-actions {display:flex;align-items:center;justify-content:center;
+  flex-wrap:wrap;gap:10px;padding:9px 0 14px;flex:0 0 auto;}
+.conference-bottom-actions .primary-btn {min-height:35px;min-width:116px;cursor:pointer;}
+.conference-bottom-actions .discard-document {margin:0;}
+.conference-bottom-actions .discard-document>.flat-button {min-height:35px;
+  border-color:#f0c1c4;color:#bd4044;background:#fffafa;}
+.conference-bottom-actions .discard-document>.flat-button:hover {background:#fff0f0;}
 
 
 /* Administração v2: três áreas, listas densas, formulários objetivos e modais seguros. */

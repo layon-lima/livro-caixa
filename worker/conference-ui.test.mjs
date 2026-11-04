@@ -15,14 +15,15 @@ test("Conferência não duplica filtros ou botões inferiores",async()=>{
   assert.match(queue,/placeholder="Buscar documento, titular ou referência"/);
 });
 
-test("Só cabeçalho oferece aprovação, salvar para depois e descarte",async()=>{
+test("Conferência oferece apenas Salvar e Descartar no rodapé",async()=>{
   const page=await read("src/app/conferencia/page.tsx");
   assert.match(page,/className="conference-header-actions"/);
-  assert.match(page,/className="conference-save-menu"/);
-  assert.match(page,/form=\{formId\} name="acao" value="aprovar"/);
-  assert.match(page,/form=\{formId\} name="acao" value="salvar"/);
-  assert.equal((page.match(/form=\{formId\} name="acao"/g)||[]).length,2);
-  assert.match(page,/<DiscardDocument propostaId=\{selected.id\}/);
+  assert.doesNotMatch(page,/conference-save-menu|conference-save-options|Salvar para depois|Aprovar lançamento/);
+  assert.match(page,/className="conference-bottom-actions"/);
+  assert.ok(page.indexOf('className="conference-bottom-actions"')>page.indexOf('className="conference-text"'));
+  assert.match(page,/form=\{formId\} name="acao" value="aprovar" className="primary-btn"/);
+  assert.equal((page.match(/form=\{formId\} name="acao"/g)||[]).length,1);
+  assert.match(page,/<DiscardDocument propostaId=\{selected.id\}[^\n]*compact\/>/);
   assert.match(page,/Abrir original/);
   assert.match(page,/Próximo/);
 });
