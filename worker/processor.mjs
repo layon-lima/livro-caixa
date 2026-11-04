@@ -130,8 +130,8 @@ async function processFile(file){
       db.query(
         "SELECT t.id::text,t.nome FROM titulares t "+
         "JOIN users u ON u.id=$1 AND u.is_active=TRUE "+
-        "WHERE u.is_admin=TRUE OR EXISTS ("+
-        "SELECT 1 FROM user_titular_permissions p WHERE p.user_id=u.id AND p.titular_id=t.id AND p.can_import=TRUE)",
+        "WHERE t.ativo=TRUE AND (u.is_admin=TRUE OR EXISTS ("+
+        "SELECT 1 FROM user_titular_permissions p WHERE p.user_id=u.id AND p.titular_id=t.id AND p.can_import=TRUE))",
         [file.enviado_por]
       )
     ]);

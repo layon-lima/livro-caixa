@@ -33,9 +33,9 @@ export async function POST(request: Request) {
   if(automatico){
     const choices=await getDatabase().query<{id:string}>(
       user.isAdmin?
-        "SELECT id::text FROM titulares ORDER BY id LIMIT 1":
+        "SELECT id::text FROM titulares WHERE ativo=TRUE ORDER BY id LIMIT 1":
         "SELECT t.id::text FROM titulares t JOIN user_titular_permissions p "+
-        "ON p.titular_id=t.id WHERE p.user_id=$1 AND p.can_import=TRUE "+
+        "ON p.titular_id=t.id WHERE p.user_id=$1 AND p.can_import=TRUE AND t.ativo=TRUE "+
         "ORDER BY p.can_approve DESC,t.id LIMIT 1",
       user.isAdmin?[]:[user.id]
     );
