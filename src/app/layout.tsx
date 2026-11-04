@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import {Suspense} from "react";
 import { GlobalWorkspaceActions } from "@/components/global-workspace-actions";
 
 export const metadata: Metadata = {
@@ -13,7 +14,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="pt-BR">
-      <body>{children}<GlobalWorkspaceActions/></body>
+      <body>{children}<Suspense fallback={null}><GlobalWorkspaceActions/></Suspense></body>
     </html>
   );
 }

@@ -109,21 +109,8 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
     category:selectedCat?.nome||selected.categoria_sugerida_nome,
     paymentDate:selected.data_pagamento
   }):"";
-  // Aba "Conferidos" do ZIP: lista aprovações para consulta, sem reaprová-las.
-  const completed=lote?await db.query<{
-    id:string;arquivo_id:string;operacao_id:string|null;titulo:string;nome_titular:string;
-  }>(
-    "SELECT p.id::text,p.arquivo_id::text,p.operacao_id::text,p.titulo,t.nome AS nome_titular "+
-    "FROM propostas p JOIN lote_itens li ON li.arquivo_id=p.arquivo_id "+
-    "JOIN titulares t ON t.id=p.titular_id "+
-    (user.isAdmin?"":"JOIN user_titular_permissions up ON up.titular_id=p.titular_id AND up.user_id=$2 AND up.can_view=TRUE ")+
-    "WHERE li.lote_id=$1 AND li.status_entrada IN ('importado','reprocessado') "+
-    "AND p.aprovado_em IS NOT NULL "+
-    "ORDER BY p.aprovado_em DESC LIMIT 300",
-    user.isAdmin?[lote]:[lote,user.id]
-  ):null;
   const queue:QueueItem[]=lote?
-    buildZipQueue(batchEntries,all,completed?.rows||[]):
+    buildZipQueue(batchEntries,all):
     [
       ...all.map(p=>({
         id:p.id,arquivo_id:p.arquivo_id,titulo:p.titulo,nome_titular:p.nome_titular,referencia:p.referencia,
@@ -195,8 +182,8 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
               arquivos={batch?.join(",")} lote={lote}/></div>
           </div>:!selected?<div className="conference-empty">
             <ClipboardCheck size={30}/>
-            <h2>{zipBatch&&(zipBatch.status==="recebendo"||zipBatch.status==="extraindo")?"Preparando a fila de documentos…":zipBatch&&batchSummary.duplicate===batchSummary.total&&batchSummary.total>0?"Nenhum documento novo para conferir":lote&&batchEntries.some(e=>e.status_entrada==="pendente"||e.leitura_status==="aguardando"||e.leitura_status==="processando")?"Aguardando documentos ficarem prontos":lote?"Nenhum documento aguardando conferência":"Sua fila está vazia"}</h2>
-            <p>{zipBatch&&(zipBatch.status==="recebendo"||zipBatch.status==="extraindo")?"Assim que o índice do ZIP for lido, todos os arquivos aparecerão à esquerda. Os opacos ainda não podem ser validados.":zipBatch&&batchSummary.duplicate===batchSummary.total&&batchSummary.total>0?"Os documentos já constavam no sistema. Consulte o relatório do ZIP acima para verificar cada arquivo.":lote?"Consulte o resultado de cada arquivo acima, inclusive duplicados e falhas de leitura.":"Importe documentos para iniciar a conferência."}</p>
+            <h2>{zipBatch&&(zipBatch.status==="recebendo"||zipBatch.status==="extraindo")?"Preparando a fila de documentos…":zipBatch&&batchSummary.duplicate===batchSummary.total&&batchSummary.total>0?"Nenhum documento novo para conferir":lote&&batchEntries.some(e=>e.status_entrada==="pendente"||e.leitura_status==="aguardando"||e.leitura_status==="processando")?"Aguardando documentos ficarem prontos":lote?"Nenhum documento pendente neste ZIP":"Sua fila está vazia"}</h2>
+            <p>{zipBatch&&(zipBatch.status==="recebendo"||zipBatch.status==="extraindo")?"Assim que o índice do ZIP for lido, todos os arquivos aparecerão à esquerda. Os opacos ainda não podem ser validados.":zipBatch&&batchSummary.duplicate===batchSummary.total&&batchSummary.total>0?"Todos os documentos já estavam cadastrados. Não há novos lançamentos para conferir.":lote?"Os documentos aprovados saem desta fila automaticamente. Você pode importar outros arquivos.":"Importe documentos para iniciar a conferência."}</p>
             <Link className="flat-button" href="/importar">Importar documentos</Link>
           </div>:<>
             <header className="conference-doc-header">

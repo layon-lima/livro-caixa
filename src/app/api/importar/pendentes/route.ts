@@ -12,19 +12,29 @@ export async function GET(){
   const access=(alias:string)=>user.isAdmin?"TRUE":
     "EXISTS (SELECT 1 FROM user_titular_permissions up WHERE up.user_id=$1 "+
     "AND up.titular_id="+alias+" AND up.can_approve=TRUE)";
+  // Uma única fonte de verdade para o botão global: somente documentos
+  // que ainda precisam de conferência. Aprovados/descartados/duplicados
+  // não entram na contagem. COUNT OVER evita o antigo limite de 50.
   const query=
-    "SELECT * FROM ("+
-    "SELECT a.id::text AS arquivo_id,NULL::text AS proposta_id,a.nome_original,a.status "+
-    "FROM arquivos a WHERE a.descartado_em IS NULL AND a.status IN ('aguardando','processando','erro') "+
-    "AND NOT EXISTS (SELECT 1 FROM propostas p WHERE p.arquivo_id=a.id AND p.aprovado_em IS NULL) "+
+    "WITH elegiveis AS ("+
+    "SELECT a.id::text AS arquivo_id,NULL::text AS proposta_id "+
+    "FROM arquivos a WHERE a.descartado_em IS NULL "+
+    "AND a.status IN ('aguardando','processando') "+
+    "AND NOT EXISTS (SELECT 1 FROM propostas p WHERE p.arquivo_id=a.id "+
+    "AND p.aprovado_em IS NULL AND p.descartado_em IS NULL AND p.duplicada_de IS NULL) "+
+    "AND NOT EXISTS (SELECT 1 FROM propostas p WHERE p.arquivo_id=a.id AND p.aprovado_em IS NOT NULL) "+
     "AND "+access("a.titular_envio_id")+
     " UNION ALL "+
-    "SELECT a.id::text AS arquivo_id,p.id::text AS proposta_id,a.nome_original,a.status "+
+    "SELECT a.id::text AS arquivo_id,p.id::text AS proposta_id "+
     "FROM propostas p JOIN arquivos a ON a.id=p.arquivo_id "+
-    "WHERE p.aprovado_em IS NULL AND p.descartado_em IS NULL AND a.descartado_em IS NULL AND "+access("p.titular_id")+
-    ") x ORDER BY arquivo_id::bigint DESC LIMIT 50";
+    "WHERE p.aprovado_em IS NULL AND p.descartado_em IS NULL "+
+    "AND p.duplicada_de IS NULL AND a.descartado_em IS NULL "+
+    "AND a.status IN ('pronto','aguardando','processando') "+
+    "AND "+access("p.titular_id")+
+    ") SELECT arquivo_id,proposta_id,COUNT(*) OVER()::int AS total "+
+    "FROM elegiveis ORDER BY arquivo_id::bigint DESC LIMIT 1";
   const result=await getDatabase().query<{
-    arquivo_id:string;proposta_id:string|null;nome_original:string;status:string;
+    arquivo_id:string;proposta_id:string|null;total:number;
   }>(query,user.isAdmin?[]:[user.id]);
   const first=result.rows[0];
   // O botão global preserva o contexto do ZIP mesmo após navegar em outras telas.
@@ -36,6 +46,6 @@ export async function GET(){
     first?(first.proposta_id?
     "/conferencia?id="+encodeURIComponent(first.proposta_id):
     "/conferencia?arquivo="+encodeURIComponent(first.arquivo_id)):"";
-  return NextResponse.json({count:result.rows.length,href},
+  return NextResponse.json({count:first?.total||0,href},
     {headers:{"Cache-Control":"private, no-store"}});
 }

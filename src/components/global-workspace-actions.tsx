@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect,useRef,useState } from "react";
-import { usePathname,useRouter } from "next/navigation";
+import { usePathname,useRouter,useSearchParams } from "next/navigation";
 import { ClipboardCheck, FileUp, LoaderCircle, Plus, X } from "lucide-react";
 
 type Book={id:string;nome:string};
@@ -12,6 +12,7 @@ const accepted=new Set(["pdf","xml","png","jpg","jpeg","zip"]);
 
 export function GlobalWorkspaceActions(){
   const pathname=usePathname();
+  const searchKey=useSearchParams().toString();
   const router=useRouter();
   const [context,setContext]=useState<Context|null>(null);
   const [dragging,setDragging]=useState(false);
@@ -31,7 +32,7 @@ export function GlobalWorkspaceActions(){
   },[pathname?.startsWith("/login")]);
 
   useEffect(()=>{
-    if(!context?.approveBooks.length)return;
+    if(!context?.approveBooks.length){setPending({count:0,href:""});return;}
     let alive=true;
     const refresh=async()=>{
       try{
@@ -43,8 +44,18 @@ export function GlobalWorkspaceActions(){
     };
     void refresh();
     const interval=setInterval(()=>void refresh(),10000);
-    return ()=>{alive=false;clearInterval(interval);};
-  },[context,pathname]);
+    // Quando a aba ganha foco, sincroniza imediatamente aprovações feitas em
+    // outra aba ou sessão, sem esperar a próxima atualização periódica.
+    const onFocus=()=>{void refresh();};
+    const onVisible=()=>{if(document.visibilityState==="visible")void refresh();};
+    window.addEventListener("focus",onFocus);
+    document.addEventListener("visibilitychange",onVisible);
+    return ()=>{
+      alive=false;clearInterval(interval);
+      window.removeEventListener("focus",onFocus);
+      document.removeEventListener("visibilitychange",onVisible);
+    };
+  },[context,pathname,searchKey]);
 
   async function upload(list:File[]){
     if(busy.current||!context?.importBooks.length)return;

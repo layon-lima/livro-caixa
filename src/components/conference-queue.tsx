@@ -37,17 +37,20 @@ export function ConferenceQueue({items,queryRoot,selectedId,selectedFile,lote,ar
 }){
   const [search,setSearch]=useState("");
   const [page,setPage]=useState(0);
+  // Defesa adicional: aprovados, descartados e duplicados nunca reaparecem
+  // na interface de pendências, mesmo se um chamador enviar esses registros.
+  const activeItems=useMemo(()=>items.filter(x=>
+    !["aprovado","descartado","duplicado","ja-existente","sem-proposta","erro"].includes(x.status)),[items]);
   const isReady=(status:QueueItem["status"])=>status==="pendente"||status==="revisado";
-  const isLocked=(item:QueueItem)=>!isReady(item.status)&&
-    !(item.status==="aprovado"&&Boolean(item.operacao_id));
-  const readyCount=items.filter(x=>isReady(x.status)).length;
-  const waitingCount=items.filter(x=>
+  const isLocked=(item:QueueItem)=>!isReady(item.status);
+  const readyCount=activeItems.filter(x=>isReady(x.status)).length;
+  const waitingCount=activeItems.filter(x=>
     ["recebendo","aguardando","processando"].includes(x.status)).length;
   const filtered=useMemo(()=>{
     const term=fold(search.trim());
-    return items.filter(x=>!term||fold(x.titulo+" "+x.nome_titular+
+    return activeItems.filter(x=>!term||fold(x.titulo+" "+x.nome_titular+
       " "+(x.referencia||"")).includes(term));
-  },[items,search]);
+  },[activeItems,search]);
   const pageCount=Math.max(1,Math.ceil(filtered.length/PAGE_SIZE));
   const current=Math.min(page,pageCount-1);
   const visible=lote?filtered:filtered.slice(current*PAGE_SIZE,(current+1)*PAGE_SIZE);
@@ -57,8 +60,8 @@ export function ConferenceQueue({items,queryRoot,selectedId,selectedFile,lote,ar
         onChange={e=>{setSearch(e.target.value);setPage(0);}}
         placeholder="Buscar documento, titular ou referência"/></label>
       {lote&&<div className="cq-batch-progress" role="status">
-        <strong>{items.length} documento(s) elegível(is) na fila</strong>
-        <span>{readyCount} pronto(s) para validar · {waitingCount} em leitura · {loteTotal??items.length} no ZIP</span>
+        <strong>{activeItems.length} documento(s) pendente(s) na fila</strong>
+        <span>{readyCount} pronto(s) para validar · {waitingCount} em leitura · {loteTotal??activeItems.length} no ZIP</span>
       </div>}
     </div>
     <div className="cq-form">
@@ -67,9 +70,7 @@ export function ConferenceQueue({items,queryRoot,selectedId,selectedFile,lote,ar
           const locked=isLocked(item);
           const active=!locked&&(selectedId===item.id||
             (selectedFile===item.arquivo_id&&item.arquivo_id!==""));
-          const url=item.status==="aprovado"&&item.operacao_id?
-            "/operacoes/"+item.operacao_id:
-            "/conferencia?"+queryRoot+"id="+item.id;
+          const url="/conferencia?"+queryRoot+"id="+item.id;
           const info=<>
             <strong title={item.titulo}>{item.ordinal&&<span className="cq-item-number">{item.ordinal}. </span>}{item.titulo}</strong>
             <small title={item.nome_titular}>{item.nome_titular||"Titular em identificação"}</small>
@@ -92,7 +93,7 @@ export function ConferenceQueue({items,queryRoot,selectedId,selectedFile,lote,ar
       </div>
       <div className="cq-bottom">
         <div className="cq-pages">
-          {lote?<span>{filtered.length} elegível(is) exibido(s) · {loteTotal??items.length} arquivo(s) verificado(s)</span>:<>
+          {lote?<span>{filtered.length} elegível(is) exibido(s) · {loteTotal??activeItems.length} arquivo(s) verificado(s)</span>:<>
             <span>{filtered.length?current*PAGE_SIZE+1:0}–{Math.min(filtered.length,(current+1)*PAGE_SIZE)} de {filtered.length}</span>
             <button type="button" aria-label="Página anterior" disabled={current===0}
               onClick={()=>setPage(current-1)}><ChevronLeft size={17}/></button>

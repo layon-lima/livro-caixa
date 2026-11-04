@@ -10,7 +10,7 @@ const entry=(index,status_entrada="pendente",extra={})=>({
 
 test("49 entradas visíveis imediatamente antes do OCR com 49 indisponíveis",()=>{
   const entries=Array.from({length:49},(_,i)=>entry(i+1));
-  const queue=buildZipQueue(entries,[],[]);
+  const queue=buildZipQueue(entries,[]);
   assert.equal(queue.length,49);
   assert.ok(queue.every(item=>item.status==="recebendo"));
   assert.equal(queue[0].titulo,"documento-1.pdf");
@@ -23,16 +23,16 @@ test("Itens disponíveis ficam prontos, enquanto demais continuam opacos",()=>{
     entry(3,"importado",{arquivo_id:"12",leitura_status:"aguardando"})
   ];
   const pending=[{id:"100",arquivo_id:"10",titulo:"Pix",nome_titular:"Titular"}];
-  const queue=buildZipQueue(entries,pending,[]);
+  const queue=buildZipQueue(entries,pending);
   assert.deepEqual(queue.map(x=>x.status),["pendente","processando","aguardando"]);
   assert.deepEqual(queue.map(x=>x.ordinal),[1,2,3]);
 });
 test("Proposta antiga de um PDF duplicado fica fora da fila elegível",()=>{
   const entries=[entry(1,"duplicado",{arquivo_id:"10",leitura_status:"pronto"})];
   const old=[{id:"99",arquivo_id:"10",titulo:"Documento velho",nome_titular:"Outro"}];
-  assert.deepEqual(buildZipQueue(entries,old,[]),[]);
+  assert.deepEqual(buildZipQueue(entries,old),[]);
 });
-test("Fila mantém multi-propostas e aprovações, sem misturar erros ou descartes",()=>{
+test("Fila mantém múltiplas propostas pendentes, mas nunca inclui aprovadas ou descartadas",()=>{
   const entries=[
     entry(1,"importado",{arquivo_id:"10",leitura_status:"pronto"}),
     entry(2,"erro",{erro:"Formato inválido"}),
@@ -43,9 +43,8 @@ test("Fila mantém multi-propostas e aprovações, sem misturar erros ou descart
     {id:"101",arquivo_id:"10",titulo:"Documento A",nome_titular:"A"},
     {id:"102",arquivo_id:"10",titulo:"Documento B",nome_titular:"A"}
   ];
-  const approved=[{id:"201",arquivo_id:"20",operacao_id:"501",titulo:"Lançamento",nome_titular:"B"}];
-  const q=buildZipQueue(entries,pending,approved);
-  assert.deepEqual(q.map(x=>x.status),["pendente","pendente","aprovado"]);
+  const q=buildZipQueue(entries,pending);
+  assert.deepEqual(q.map(x=>x.status),["pendente","pendente"]);
 });
 
 test("Caso real: 49 entradas com 15 elegíveis entram todas na fila antes do OCR",()=>{
@@ -63,7 +62,7 @@ test("Caso real: 49 entradas com 15 elegíveis entram todas na fila antes do OCR
     id:String(200+i),arquivo_id:String(100+i),titulo:"Documento pronto "+(i+1),
     nome_titular:"Titular"
   }));
-  const q=buildZipQueue(entries,proposals,[]);
+  const q=buildZipQueue(entries,proposals);
   assert.equal(q.length,15);
   assert.deepEqual(q.map(x=>x.status).slice(0,5),[
     "pendente","pendente","pendente","processando","processando"]);
@@ -75,6 +74,35 @@ test("Erro OCR sem proposta não é elegível para aprovação",()=>{
   const q=buildZipQueue([
     entry(1,"importado",{arquivo_id:"10",leitura_status:"erro",leitura_erro:"Falha OCR"}),
     entry(2,"importado",{arquivo_id:"11",leitura_status:"pronto",tem_pendente:false})
-  ],[],[]);
+  ],[]);
   assert.deepEqual(q,[]);
+});
+
+test("Após aprovar 14 documentos, nenhum permanece na fila do ZIP",()=>{
+  const entries=Array.from({length:14},(_,i)=>
+    entry(i+1,"importado",{
+      arquivo_id:String(i+100),leitura_status:"pronto",
+      tem_aprovado:true,tem_pendente:false
+    }));
+  assert.deepEqual(buildZipQueue(entries,[]),[]);
+});
+
+test("Quando um arquivo tem várias partes, somente as partes não aprovadas ficam na fila",()=>{
+  const entries=[entry(1,"importado",{
+    arquivo_id:"55",leitura_status:"pronto",
+    tem_aprovado:true,tem_pendente:true
+  })];
+  const pending=[{id:"202",arquivo_id:"55",titulo:"Parte ainda pendente",nome_titular:"Jonas"}];
+  const queue=buildZipQueue(entries,pending);
+  assert.equal(queue.length,1);
+  assert.equal(queue[0].id,"202");
+  assert.equal(queue[0].status,"pendente");
+});
+
+test("Um arquivo aprovado não volta à fila como aguardando/processando sem proposta",()=>{
+  const entries=[entry(1,"importado",{
+    arquivo_id:"55",leitura_status:"processando",
+    tem_aprovado:true,tem_pendente:false
+  })];
+  assert.deepEqual(buildZipQueue(entries,[]),[]);
 });
