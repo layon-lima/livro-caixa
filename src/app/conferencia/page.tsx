@@ -6,6 +6,8 @@ import { categorias, titularesPermitidos, type Proposta } from "@/lib/document-d
 import {FileText, ExternalLink, ChevronRight, ChevronDown, Save, CheckCircle2, ClipboardCheck} from "lucide-react";
 import { LiveReview } from "@/components/live-review";
 import { ReviewCategoryPicker } from "@/components/review-category-picker";
+import {TagPicker} from "@/components/tag-picker";
+import {tagsDisponiveis} from "@/lib/tags";
 import { ConferenceQueue, type QueueItem } from "@/components/conference-queue";
 import { suggestDocumentName } from "@/lib/document-name";
 import { BatchQueueRefresh } from "@/components/batch-queue-refresh";
@@ -19,7 +21,7 @@ type Queued=Proposta&{nome_titular:string;duplicada_de:string|null;arquivo_origi
 export default async function Conferencia({searchParams}:{searchParams:Promise<{id?:string;arquivo?:string;arquivos?:string;lote?:string;revisada?:string;aprovados?:string;descartado?:string;erro?:string}>}){
   const user=await requireUser();
   const db=getDatabase();
-  const [query,books,cats]=await Promise.all([searchParams,titularesPermitidos(user,"approve"),categorias()]);
+  const [query,books,cats,tags]=await Promise.all([searchParams,titularesPermitidos(user,"approve"),categorias(),tagsDisponiveis()]);
   const lote=/^[a-f\d]{8}-(?:[a-f\d]{4}-){3}[a-f\d]{12}$/i.test(query.lote||"")?query.lote!:"";
   const loteInfo=lote?await db.query<{id:string;enviado_por:string;status:string;erro:string;nome_arquivo:string}>(
     "SELECT id::text,enviado_por::text,status,erro,nome_arquivo FROM lotes_importacao WHERE id=$1",[lote]):null;
@@ -97,6 +99,9 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
       "SELECT texto_extraido FROM arquivos WHERE id=$1",[selected.arquivo_id]);
     selected.texto_extraido=original.rows[0]?.texto_extraido||"";
   }
+  const selectedTagRows=selected?await db.query<{tag_id:string}>(
+    "SELECT tag_id::text FROM proposta_tags WHERE proposta_id=$1",[selected.id]):null;
+  const selectedTags=selectedTagRows?.rows.map(x=>x.tag_id)||[];
   const selectedCat=selected?cats.find(c=>c.id===selected.categoria_id):null;
   const selectedName=selected?suggestDocumentName({
     originalName:selected.nome_original,documentType:selected.documento_tipo,
@@ -303,6 +308,7 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
                     <input type="checkbox" name="confirmarSemelhante" value="1"/>
                     Verifiquei o lançamento existente. Este é outro pagamento e autorizo registrar separadamente.
                   </label>}
+                  <TagPicker key={"tags-"+selected.id} tags={tags} selected={selectedTags}/>
                   <details className="conference-extra">
                     <summary>Observações adicionais</summary>
                     <label>Detalhes do documento

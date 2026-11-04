@@ -6,6 +6,8 @@ import { getDatabase } from "@/lib/database";
 import { categorias, titularesPermitidos, safeId, type Operacao } from "@/lib/document-data";
 import { ArrowLeft, FileText, Pencil } from "lucide-react";
 import { suggestDocumentName } from "@/lib/document-name";
+import {TagPicker} from "@/components/tag-picker";
+import {tagsDisponiveis} from "@/lib/tags";
 export const dynamic="force-dynamic";
 export default async function Editar({params,searchParams}:{
   params:Promise<{id:string}>;searchParams:Promise<{erro?:string}>;
@@ -18,8 +20,9 @@ export default async function Editar({params,searchParams}:{
     "FROM operacoes WHERE id=$1",[id]);
   const op=data.rows[0];
   if(!op||!await canAccessTitular(user,Number(op.titular_id),"view"))notFound();
-  const [cats,books,files]=await Promise.all([
-    categorias(),titularesPermitidos(user,"edit"),
+  const [cats,books,tags,assigned,files]=await Promise.all([
+    categorias(),titularesPermitidos(user,"edit"),tagsDisponiveis(),
+    db.query<{tag_id:string}>("SELECT tag_id::text FROM operacao_tags WHERE operacao_id=$1",[id]),
     db.query<{arquivo_id:string;nome_original:string;documento_tipo:string;quantidade_no_arquivo:number}>(
       "SELECT oa.arquivo_id::text,a.nome_original,p.documento_tipo,"+
       "(SELECT COUNT(*)::int FROM propostas p2 WHERE p2.arquivo_id=a.id) AS quantidade_no_arquivo "+
@@ -73,6 +76,7 @@ export default async function Editar({params,searchParams}:{
         </div>
         <label>Referência<input name="referencia" defaultValue={op.referencia} disabled={!editable}/></label>
         <label>Descrição<textarea name="descricao" defaultValue={op.descricao} rows={3} disabled={!editable}/></label>
+        <TagPicker tags={tags} selected={assigned.rows.map(x=>x.tag_id)} disabled={!editable}/>
         {editable&&<button className="primary-btn" type="submit">Salvar alterações</button>}
       </form>
       <h2 className="work-heading">Documentos vinculados</h2>

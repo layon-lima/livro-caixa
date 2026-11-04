@@ -6,6 +6,7 @@ import { backTo, forbidden, sameOriginPost } from "@/lib/request-security";
 import { confirmedCategoryId, suggestedCategory } from "@/lib/category-suggestions";
 import {checkDuplicate} from "@/lib/duplicate-guard";
 import {strongDuplicateKey} from "@/lib/duplicate-identity";
+import {parseTagIds,validateTags,writeTags,copyProposalTags} from "@/lib/tags";
 export const runtime="nodejs";
 
 export async function POST(request:Request){
@@ -76,6 +77,7 @@ export async function POST(request:Request){
           strongDuplicateKey(p.documento_tipo,p.referencia)]
       );
       const operationId=Number(created.rows[0].id);
+      await copyProposalTags(cx,Number(p.id),operationId);
       if(p.data_pagamento)await cx.query(
         "UPDATE operacoes SET data_pagamento=COALESCE(data_pagamento,$2) WHERE id=$1",
         [operationId,p.data_pagamento]

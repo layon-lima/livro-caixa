@@ -43,18 +43,18 @@ export async function GET(request:Request,{params}:{params:Promise<{id:string}>}
     wb.creator="Livro Caixa Inteligente";
     wb.created=new Date();
     const list=wb.addWorksheet("Saídas",{views:[{state:"frozen",ySplit:4}]});
-    list.mergeCells("A1:E1");
+    list.mergeCells("A1:F1");
     list.getCell("A1").value="LIVRO CAIXA — SAÍDAS";
     list.getCell("A1").font={size:16,bold:true,color:{argb:"FF153A63"}};
-    list.mergeCells("A2:E2");
+    list.mergeCells("A2:F2");
     list.getCell("A2").value=safeText(title.rows[0].nome)+" • Relatório de saídas";
     list.getCell("A2").font={size:11,color:{argb:"FF53677D"}};
-    list.mergeCells("A3:E3");
+    list.mergeCells("A3:F3");
     list.getCell("A3").value="Filtros: "+(filter.mes||"todos os meses")+
       " | "+(filter.q||"sem busca")+" | "+filter.status+
       " | Exportado em "+new Date().toLocaleString("pt-BR");
     list.getCell("A3").font={size:9,color:{argb:"FF6B7D8E"}};
-    const headers=["Data","Valor (R$)","Recebedor","Tipo","Documento"];
+    const headers=["Data","Valor (R$)","Recebedor","Tipo","Documento","Tags"];
     list.getRow(4).values=headers;
     list.getRow(4).height=27;
     list.getRow(4).eachCell(c=>{
@@ -65,7 +65,7 @@ export async function GET(request:Request,{params}:{params:Promise<{id:string}>}
     list.columns=[
       {key:"data",width:17},{key:"valor",width:19},
       {key:"recebedor",width:38},{key:"tipo",width:18},
-      {key:"documento",width:64},
+      {key:"documento",width:64},{key:"tags",width:38},
     ];
     const totals=new Map<string,{count:number;sum:number}>();
     let overall=0;
@@ -78,7 +78,7 @@ export async function GET(request:Request,{params}:{params:Promise<{id:string}>}
         row.data_pagamento?new Date(row.data_pagamento+"T12:00:00Z"):null,
         money(value),safeText(row.contraparte||""),
         safeText(documentTypeLabel(row)),
-        safeText(row.documento||"Sem documento")
+        safeText(row.documento||"Sem documento"),safeText(row.tags.join(", "))
       ]);
       added.getCell(1).numFmt="dd/mm/yyyy";
       added.getCell(2).numFmt=currencyFmt;
@@ -86,10 +86,10 @@ export async function GET(request:Request,{params}:{params:Promise<{id:string}>}
         c.fill={type:"pattern",pattern:"solid",fgColor:{argb:"FFF5F8FC"}};
       });
     }
-    const sumRow=list.addRow(["TOTAL",money(overall),"","",""]);
+    const sumRow=list.addRow(["TOTAL",money(overall),"","","",""]);
     sumRow.font={bold:true,color:{argb:"FF153A63"}};
     sumRow.getCell(2).numFmt=currencyFmt;
-    list.autoFilter={from:{row:4,column:1},to:{row:Math.max(4,sumRow.number-1),column:5}};
+    list.autoFilter={from:{row:4,column:1},to:{row:Math.max(4,sumRow.number-1),column:6}};
     const summary=wb.addWorksheet("Totais por mês");
     summary.columns=[{width:24},{width:22},{width:25}];
     const heading=summary.addRow(["Competência","Lançamentos","Total de saídas"]);

@@ -6,6 +6,7 @@ import { OperationRows,type AttachedDocument,type OperationEntry } from "@/compo
 
 type Book={id:string;nome:string};
 type Category={id:string;nome:string;subcategoria:string};
+type Tag={id:string;nome:string};
 type ExpenseItem=OperationEntry&{
   arquivo_id:string|null;documento:string|null;tem_documento:boolean;data_registro:string;data_pagamento:string|null;
 };
@@ -15,13 +16,14 @@ type Data={rows:ExpenseItem[];summary:{total:string;quantidade:number};
 type Sort="data"|"contraparte"|"valor";
 const fmt=(n:string)=>Number(n||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 
-export function ExpenseSpreadsheet({bookId,cats,books,canEdit,canDelete,months,
+export function ExpenseSpreadsheet({bookId,cats,tags,books,canEdit,canDelete,months,
   initialMonth="",initialCategory="",initialSearch=""}:{
-  bookId:string;cats:Category[];books:Book[];canEdit:boolean;canDelete:boolean;
+  bookId:string;cats:Category[];tags:Tag[];books:Book[];canEdit:boolean;canDelete:boolean;
   months:string[];initialMonth?:string;initialCategory?:string;initialSearch?:string;
 }){
   const [month,setMonth]=useState(initialMonth);
   const [category,setCategory]=useState(initialCategory);
+  const [tag,setTag]=useState("");
   const [status,setStatus]=useState("todos");
   const [typing,setTyping]=useState(initialSearch);
   const [q,setQ]=useState(initialSearch);
@@ -37,12 +39,13 @@ export function ExpenseSpreadsheet({bookId,cats,books,canEdit,canDelete,months,
     const p=new URLSearchParams();
     if(month)p.set("mes",month);
     if(category)p.set("categoria",category);
+    if(tag)p.set("tag",tag);
     if(status!=="todos")p.set("status",status);
     if(q)p.set("q",q);
     p.set("sort",sort);p.set("direction",direction);
     p.set("page",String(page));p.set("pageSize",String(pageSize));
     return p.toString();
-  },[month,category,status,q,sort,direction,page,pageSize]);
+  },[month,category,tag,status,q,sort,direction,page,pageSize]);
   useEffect(()=>{
     const ctrl=new AbortController();
     setLoading(true);setError("");setData(null);
@@ -117,6 +120,12 @@ export function ExpenseSpreadsheet({bookId,cats,books,canEdit,canDelete,months,
           {cats.map(c=><option key={c.id} value={c.id}>
             {c.nome}
           </option>)}
+        </select>
+      </label>
+      <label className="expense-filter">
+        <select value={tag} onChange={update(setTag)} aria-label="Filtrar por tag">
+          <option value="">Todas as tags</option>
+          {tags.map(t=><option key={t.id} value={t.id}>{t.nome}</option>)}
         </select>
       </label>
       <label className="expense-filter">

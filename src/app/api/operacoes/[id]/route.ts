@@ -5,6 +5,7 @@ import { backTo, forbidden, sameOriginPost } from "@/lib/request-security";
 import { parsePaymentDate } from "@/lib/payment-date";
 import {checkDuplicate} from "@/lib/duplicate-guard";
 import {strongDuplicateKey} from "@/lib/duplicate-identity";
+import {parseTagIds,validateTags,writeTags,copyProposalTags} from "@/lib/tags";
 export const runtime="nodejs";
 
 export async function POST(request:Request,{params}:{params:Promise<{id:string}>}){
@@ -17,6 +18,7 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
   if(!op.rows[0])return forbidden();
   const oldTitular=Number(op.rows[0].titular_id);
   const f=await request.formData();
+  const tagIds=parseTagIds(f);
   const action=String(f.get("acao")||"editar");
   if(action==="excluir"||action==="restaurar"){
     if(!await canAccessTitular(user,oldTitular,"delete"))return forbidden();
@@ -76,7 +78,7 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
   const moneyRaw=String(f.get("valor")||"").trim().replace(",",".");
   const money=moneyRaw===""?null:Number(moneyRaw);
   // Troca de titular só pela rota dedicada /mover: evita quebrar vínculos de PDFs.
-  if(!titular||titular!==oldTitular||!title||!date||dataPagamento===undefined||!["despesa","outro"].includes(tipo)||
+  if(tagIds===null||!titular||titular!==oldTitular||!title||!date||dataPagamento===undefined||!["despesa","outro"].includes(tipo)||
      (money!==null&&(!Number.isFinite(money)||money<0))||
      !await canAccessTitular(user,titular,"edit"))return forbidden();
   if(cat){
@@ -88,6 +90,7 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
   const conn=await db.connect();
   try{
     await conn.query("BEGIN");
+    if(!await validateTags(conn,tagIds)){await conn.query("ROLLBACK");return forbidden();}
     const current=await conn.query<{tipo:string;referencia:string;documento_tipo:string|null}>(
       "SELECT o.tipo,o.referencia,("+
       "SELECT p.documento_tipo FROM propostas p WHERE p.operacao_id=o.id AND p.aprovado_em IS NOT NULL "+
@@ -112,6 +115,7 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
       [id,titular,title,date,cat,tipo,description,contraparte,referencia,money,user.id,dataPagamento,
         strongDuplicateKey(documentType,referencia)],
     );
+    await writeTags(conn,"operacao",id,tagIds);
     await conn.query("UPDATE propostas SET titular_id=$2 WHERE operacao_id=$1",[id,titular]);
     await conn.query("INSERT INTO historico_operacoes(operacao_id,usuario_id,acao,dados) "+
       "VALUES($1,$2,'edição',$3::jsonb)",

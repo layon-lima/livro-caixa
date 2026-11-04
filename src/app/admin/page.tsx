@@ -1,7 +1,7 @@
 import {StandaloneWorkspace} from "@/components/standalone-workspace";
 import {requireAdmin} from "@/lib/auth";
 import {getDatabase} from "@/lib/database";
-import {AdminConsole,type AdminCategory,type AdminOwner,type AdminUser,type AdminPermission} from "@/components/admin-console";
+import {AdminConsole,type AdminCategory,type AdminOwner,type AdminUser,type AdminPermission,type AdminTag} from "@/components/admin-console";
 export const dynamic="force-dynamic";
 
 export default async function Admin({searchParams}:{
@@ -9,7 +9,7 @@ export default async function Admin({searchParams}:{
 }){
   await requireAdmin();
   const db=getDatabase();
-  const [cats,users,owners,perms,query]=await Promise.all([
+  const [cats,users,owners,tags,perms,query]=await Promise.all([
     db.query<AdminCategory>(
       "SELECT c.id::text,c.nome,c.ativa,"+
       "(SELECT COUNT(*)::int FROM operacoes o WHERE o.categoria_id=c.id) AS operacoes "+
@@ -23,14 +23,18 @@ export default async function Admin({searchParams}:{
       "(SELECT COUNT(*)::int FROM operacoes o WHERE o.titular_id=t.id) AS operacoes,"+
       "(SELECT COUNT(*)::int FROM arquivos a WHERE a.titular_envio_id=t.id) AS arquivos "+
       "FROM titulares t ORDER BY t.ativo DESC,t.nome"),
+    db.query<AdminTag>(
+      "SELECT t.id::text,t.nome,t.ativa,"+
+      "(SELECT COUNT(*)::int FROM operacao_tags ot WHERE ot.tag_id=t.id) AS usos "+
+      "FROM tags t ORDER BY t.ativa DESC,t.nome"),
     db.query<AdminPermission>(
       "SELECT user_id::text,titular_id::text,can_view,can_import,can_approve,can_edit,can_delete "+
       "FROM user_titular_permissions"),
     searchParams
   ]);
-  const tab=query.tab==="usuarios"||query.tab==="titulares"?query.tab:"categorias";
+  const tab=query.tab==="usuarios"||query.tab==="titulares"||query.tab==="tags"?query.tab:"categorias";
   return <StandaloneWorkspace title="Administração" section="admin">
-    <AdminConsole categories={cats.rows} users={users.rows} owners={owners.rows}
+    <AdminConsole categories={cats.rows} users={users.rows} owners={owners.rows} tags={tags.rows}
       permissions={perms.rows} initialTab={tab}
       message={query.created==="1"?"created":query.saved==="1"?"saved":""}
       error={query.error||""} suggestion={query.sugerir_titular||""}/>

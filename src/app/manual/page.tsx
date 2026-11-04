@@ -4,10 +4,12 @@ import { requireUser } from "@/lib/auth";
 import { categorias, titularesPermitidos } from "@/lib/document-data";
 import { ArrowLeft, PenLine } from "lucide-react";
 import {SafeManualForm} from "@/components/safe-manual-form";
+import {TagPicker} from "@/components/tag-picker";
+import {tagsDisponiveis} from "@/lib/tags";
 export const dynamic="force-dynamic";
 export default async function Manual({searchParams}:{searchParams:Promise<{titular?:string;erro?:string}>}){
   const user=await requireUser();
-  const [books,cats,query]=await Promise.all([titularesPermitidos(user,"edit"),categorias(),searchParams]);
+  const [books,cats,tags,query]=await Promise.all([titularesPermitidos(user,"edit"),categorias(),tagsDisponiveis(),searchParams]);
   const selected=books.find(t=>t.id===query.titular)||books[0];
   return <StandaloneWorkspace title="Lançamento manual" section="livros"><div className="work-page">
     <header className="work-bar"><Link href="/"><ArrowLeft size={16}/> Livros Caixa</Link>
@@ -38,6 +40,7 @@ export default async function Manual({searchParams}:{searchParams:Promise<{titul
           <input name="referencia" maxLength={100} placeholder="Ex.: identificador Pix"/>
         </label>
         <label>Descrição<textarea name="descricao" rows={3}/></label>
+        <TagPicker tags={tags}/>
       </SafeManualForm>}
       {query.erro&&<p className="form-error" role="alert">{
         query.erro==="duplicado"?"Transação já registrada. O lançamento foi bloqueado.":

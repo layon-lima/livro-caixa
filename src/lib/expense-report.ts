@@ -3,7 +3,7 @@ import { getDatabase } from "@/lib/database";
 import { suggestDocumentName } from "@/lib/document-name";
 
 export type ExpenseFilters={
-  mes:string;categoria:string;q:string;status:"todos"|"com-documento"|"sem-documento";
+  mes:string;categoria:string;tag:string;q:string;status:"todos"|"com-documento"|"sem-documento";
   sort:"data"|"competencia"|"titulo"|"categoria"|"contraparte"|"valor";
   direction:"asc"|"desc";page:number;pageSize:number;
 };
@@ -12,13 +12,14 @@ export type ExpenseRow={
   categoria:string|null;subcategoria:string|null;tipo:string;competencia:string;
   data_registro:string;data_pagamento:string|null;contraparte:string;descricao:string;referencia:string;
   valor:string|null;quantidade_documentos:string;documento:string|null;documento_tipo:string|null;arquivo_id:string|null;quantidade_no_arquivo:number|null;
-  tem_documento:boolean;
+  tem_documento:boolean;tags:string[];
 };
 export type MonthTotal={mes:string;quantidade:number;total:string};
 
 export function parseExpenseFilters(p:URLSearchParams):ExpenseFilters{
   const mes=/^20\d{2}-(0[1-9]|1[0-2])$/.test(p.get("mes")||"")?p.get("mes")!:"";
   const categoria=/^[1-9]\d{0,14}$/.test(p.get("categoria")||"")?p.get("categoria")!:"";
+  const tag=/^[1-9]\d{0,14}$/.test(p.get("tag")||"")?p.get("tag")!:"";
   const q=(p.get("q")||"").trim().slice(0,120);
   const status=["todos","com-documento","sem-documento"].includes(p.get("status")||"")?
     p.get("status") as ExpenseFilters["status"]:"todos";
@@ -28,7 +29,7 @@ export function parseExpenseFilters(p:URLSearchParams):ExpenseFilters{
   const page=Math.max(1,Math.min(100000,Number.parseInt(p.get("page")||"1",10)||1));
   const size=Number.parseInt(p.get("pageSize")||"50",10);
   const pageSize=[25,50,100].includes(size)?size:50;
-  return {mes,categoria,q,status,sort,direction,page,pageSize};
+  return {mes,categoria,tag,q,status,sort,direction,page,pageSize};
 }
 
 const orderKeys:Record<ExpenseFilters["sort"],string>={
@@ -48,6 +49,8 @@ function condition(filters:ExpenseFilters){
     "to_char(o.competencia,'YYYY-MM')=$"+(args.length+1));}
   if(filters.categoria){args.push(filters.categoria);predicates.push(
     "o.categoria_id=$"+(args.length+1));}
+  if(filters.tag){args.push(filters.tag);predicates.push(
+    "EXISTS(SELECT 1 FROM operacao_tags ot WHERE ot.operacao_id=o.id AND ot.tag_id=$"+(args.length+1)+")");}
   if(filters.q){args.push("%"+filters.q+"%");const n=args.length+1;
     predicates.push("(o.titulo ILIKE $"+n+" OR o.descricao ILIKE $"+n+
       " OR o.contraparte ILIKE $"+n+" OR o.referencia ILIKE $"+n+
@@ -65,6 +68,8 @@ const from=" FROM operacoes o LEFT JOIN categorias c ON c.id=o.categoria_id ";
 const select="SELECT o.id::text,o.titular_id::text,o.titulo,o.categoria_id::text,"+
   "c.nome AS categoria,c.subcategoria,o.tipo,o.competencia::text,o.criado_em::text AS data_registro,o.data_pagamento::text,"+
   "o.contraparte,o.descricao,o.referencia,o.valor::text,"+
+  "COALESCE((SELECT array_agg(t.nome ORDER BY t.nome) FROM operacao_tags ot "+
+  "JOIN tags t ON t.id=ot.tag_id WHERE ot.operacao_id=o.id),ARRAY[]::text[]) AS tags,"+
   "(SELECT count(*)::text FROM operacao_arquivos oa WHERE oa.operacao_id=o.id) AS quantidade_documentos,"+
   "(SELECT a.nome_original FROM operacao_arquivos oa JOIN arquivos a ON a.id=oa.arquivo_id "+
   "WHERE oa.operacao_id=o.id ORDER BY oa.proposta_id LIMIT 1) AS documento,"+

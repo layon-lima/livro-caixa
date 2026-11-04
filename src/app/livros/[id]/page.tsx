@@ -3,6 +3,7 @@ import { requireUser, canAccessTitular } from "@/lib/auth";
 import { getDatabase } from "@/lib/database";
 import { ExplorerShell, type Titular } from "@/components/explorer-shell";
 import { categorias, titularesPermitidos, safeId } from "@/lib/document-data";
+import {tagsDisponiveis} from "@/lib/tags";
 import { ExpenseSpreadsheet } from "@/components/expense-spreadsheet";
 
 export const dynamic="force-dynamic";
@@ -18,7 +19,7 @@ export default async function Livro({params,searchParams}:{
 
   const db=getDatabase();
   const query=await searchParams;
-  const [title,books,cats,months,editBooks,canEdit,canDelete]=await Promise.all([
+  const [title,books,cats,tags,months,editBooks,canEdit,canDelete]=await Promise.all([
     db.query<Titular>("SELECT id::text,nome FROM titulares WHERE id=$1 AND ativo=TRUE",[id]),
     user.isAdmin
       ?db.query<Titular>("SELECT id::text,nome FROM titulares WHERE ativo=TRUE ORDER BY nome")
@@ -27,6 +28,7 @@ export default async function Livro({params,searchParams}:{
         "JOIN user_titular_permissions p ON p.titular_id=t.id "+
         "WHERE p.user_id=$1 AND p.can_view=TRUE AND t.ativo=TRUE ORDER BY t.nome",[user.id]),
     categorias(),
+    tagsDisponiveis(),
     db.query<{mes:string}>(
       "SELECT DISTINCT to_char(o.competencia,'YYYY-MM') AS mes FROM operacoes o "+
       "WHERE o.titular_id=$1 AND o.excluido_em IS NULL "+
@@ -51,7 +53,7 @@ export default async function Livro({params,searchParams}:{
       Esta operação contém arquivos compartilhados com outros lançamentos.
       Para evitar misturar documentos, a movimentação foi bloqueada.
     </p>}
-    <ExpenseSpreadsheet key={id} bookId={String(id)} cats={cats}
+    <ExpenseSpreadsheet key={id} bookId={String(id)} cats={cats} tags={tags}
       books={editBooks} canEdit={canEdit} canDelete={canDelete}
       months={months.rows.map(m=>m.mes)} initialMonth={month}
       initialCategory={category} initialSearch={search}/>

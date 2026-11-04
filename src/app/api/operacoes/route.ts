@@ -5,6 +5,7 @@ import { backTo, forbidden, sameOriginPost } from "@/lib/request-security";
 import { parsePaymentDate } from "@/lib/payment-date";
 import {checkDuplicate} from "@/lib/duplicate-guard";
 import {strongDuplicateKey} from "@/lib/duplicate-identity";
+import {parseTagIds,validateTags,writeTags,copyProposalTags} from "@/lib/tags";
 export const runtime="nodejs";
 
 export async function POST(request:Request){
@@ -12,6 +13,7 @@ export async function POST(request:Request){
   const user=await currentUser();if(!user)return forbidden();
   const json=request.headers.get("accept")?.includes("application/json");
   const f=await request.formData();
+  const tagIds=parseTagIds(f);
   const titular=safeId(f.get("titularId")),categoria=safeId(f.get("categoriaId"));
   const titulo=String(f.get("titulo")||"").trim().slice(0,170);
   const competencia=competence(f.get("competencia"));
@@ -24,7 +26,7 @@ export async function POST(request:Request){
   const valorNumber=valorRaw.includes(",")?valorRaw.replace(/\./g,"").replace(",","."):valorRaw;
   const valor=valorNumber?Number(valorNumber):null;
   const confirmSimilar=String(f.get("confirmarSemelhante")||"")==="1";
-  if(!titular||!titulo||!competencia||dataPagamento===undefined||
+  if(tagIds===null||!titular||!titulo||!competencia||dataPagamento===undefined||
      !["despesa","outro"].includes(tipo)||
      (valor!==null&&(!Number.isFinite(valor)||valor<0||valor>1e14))||
      !await canAccessTitular(user,titular,"edit"))return forbidden();
@@ -36,6 +38,7 @@ export async function POST(request:Request){
   const cx=await db.connect();
   try{
     await cx.query("BEGIN");
+    if(!await validateTags(cx,tagIds)){await cx.query("ROLLBACK");return forbidden();}
     const duplicate=await checkDuplicate(cx,{
       titularId:titular,documentType:"manual",reference:referencia,
       paymentDate:dataPagamento,amount:valor,counterparty:contraparte,type:tipo
@@ -59,6 +62,7 @@ export async function POST(request:Request){
       [titular,titulo,competencia,categoria,tipo,contraparte,descricao,valor,referencia,user.id,dataPagamento,
         strongDuplicateKey("manual",referencia)]
     );
+    await writeTags(cx,"operacao",Number(r.rows[0].id),tagIds);
     if(duplicate?.level==="similar"&&confirmSimilar)await cx.query(
       "INSERT INTO historico_operacoes(operacao_id,usuario_id,acao,dados) "+
       "VALUES($1,$2,'confirmação de possível duplicidade',$3::jsonb)",

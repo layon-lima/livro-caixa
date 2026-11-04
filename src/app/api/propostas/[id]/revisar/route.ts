@@ -7,6 +7,7 @@ import { confirmedCategoryId, suggestedCategory } from "@/lib/category-suggestio
 import { parsePaymentDate } from "@/lib/payment-date";
 import {checkDuplicate} from "@/lib/duplicate-guard";
 import {strongDuplicateKey} from "@/lib/duplicate-identity";
+import {parseTagIds,validateTags,writeTags,copyProposalTags} from "@/lib/tags";
 
 export const runtime="nodejs";
 
@@ -15,6 +16,7 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
   const user=await currentUser();if(!user)return forbidden();
   const id=safeId((await params).id);if(!id)return forbidden();
   const form=await request.formData();
+  const tagIds=parseTagIds(form);
   const batchRaw=String(form.get("arquivos")||"");
   const batch=/^\d+(?:,\d+){0,99}$/.test(batchRaw)?batchRaw:"";
   const lote=String(form.get("lote")||"");
@@ -45,7 +47,7 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
   const confirmSimilar=String(form.get("confirmarSemelhante")||"")==="1";
   let similarConfirmed=false;
 
-  if(!["salvar","aprovar"].includes(action)||!titular||!date||!titulo||paymentDate===undefined||
+  if(tagIds===null||!["salvar","aprovar"].includes(action)||!titular||!date||!titulo||paymentDate===undefined||
     (proposed&&!suggestion)||(categoryMode&&!proposed&&!categoria)||
     !["receita","despesa","outro"].includes(tipo)||
     (valor!==null&&(!Number.isFinite(valor)||valor<0||valor>1e14))||
@@ -55,6 +57,7 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
   const connection=await db.connect();
   try{
     await connection.query("BEGIN");
+    if(!await validateTags(connection,tagIds)){await connection.query("ROLLBACK");return error("dados");}
     const found=await connection.query<{
       id:string;titular_id:string;arquivo_id:string;duplicada_de:string|null;
       aprovado_em:string|null;status:string;
@@ -107,6 +110,7 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
         operationId,user.id,suggestion?.nome||"","",paymentDate],
     );
 
+    await writeTags(connection,"proposta",id,tagIds);
     if(action==="aprovar"){
       if(old.status!=="pronto"){await connection.query("ROLLBACK");return error("ainda-processando");}
       let targetId:number|null=operationId;
@@ -119,6 +123,7 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
         );
         targetId=Number(created.rows[0].id);
       }
+      await copyProposalTags(connection,id,targetId!);
       // Ao vincular comprovante a uma operação antiga sem data, preencher a
       // efetivação comprovada; jamais sobrescrever uma data existente.
       if(paymentDate)await connection.query(

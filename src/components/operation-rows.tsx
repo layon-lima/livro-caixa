@@ -7,7 +7,7 @@ import { suggestDocumentName } from "@/lib/document-name";
 import { documentTypeLabel, formatTransactionDate } from "@/lib/spreadsheet-fields";
 
 export type OperationEntry={
-  id:string;titular_id:string;titulo:string;categoria:string|null;subcategoria:string|null;
+  id:string;titular_id:string;titulo:string;categoria:string|null;subcategoria:string|null;tags?:string[];
   categoria_id:string|null;competencia:string;tipo:string;descricao:string;
   contraparte:string;referencia:string;valor:string|null;quantidade_documentos:string; data_registro?:string; data_pagamento?:string|null; documento?:string|null; documento_tipo?:string|null; tem_documento?:boolean;
 };
@@ -106,7 +106,10 @@ export function OperationRows({operations,documents,books,canEdit,canDelete,book
               {formatTransactionDate(op.data_pagamento)}
             </span>
             <span className="expense-value">{op.valor!==null?money(op.valor):"—"}</span>
-            <span className="expense-strong" title={op.contraparte||"Recebedor não identificado"}>{op.contraparte||"—"}</span>
+            <span className="expense-strong" title={op.contraparte||"Recebedor não identificado"}>
+              {op.contraparte||"—"}
+              {Boolean(op.tags?.length)&&<small className="expense-tag-label">{op.tags!.map(t=>"#"+t).join(" · ")}</small>}
+            </span>
             <span className="expense-kind" title={documentTypeLabel(op)}>
               {documentTypeLabel(op)}
             </span>
@@ -174,6 +177,7 @@ export function OperationRows({operations,documents,books,canEdit,canDelete,book
       </div>}
       {menu.view==="info"&&<div className="entity-popup-details">
         <div><span>Categoria</span><strong>{current.categoria||"Sem categoria"}</strong></div>
+        <div><span>Tags</span><strong>{current.tags?.join(" · ")||"Sem tags"}</strong></div>
         <div><span>Competência</span><strong>{current.competencia.slice(0,7)}</strong></div>
         <div><span>Tipo</span><strong>{current.tipo}</strong></div>
         <div><span>Valor</span><strong>{money(current.valor)||"—"}</strong></div>

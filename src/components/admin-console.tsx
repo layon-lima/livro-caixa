@@ -9,18 +9,19 @@ import {
 import {AdminPasswordInput} from "@/components/admin-password-input";
 
 export type AdminCategory={id:string;nome:string;ativa:boolean;operacoes:number};
+export type AdminTag={id:string;nome:string;ativa:boolean;usos:number};
 export type AdminOwner={id:string;nome:string;ativo:boolean;operacoes:number;arquivos:number};
 export type AdminUser={id:string;username:string;is_admin:boolean;is_active:boolean;livros:number};
 export type AdminPermission={
   user_id:string;titular_id:string;can_view:boolean;can_import:boolean;
   can_approve:boolean;can_edit:boolean;can_delete:boolean;
 };
-type Tab="categorias"|"usuarios"|"titulares";
-type Target={id:string;name:string;kind:"category"|"user"|"owner";active:boolean};
+type Tab="categorias"|"usuarios"|"titulares"|"tags";
+type Target={id:string;name:string;kind:"category"|"user"|"owner"|"tag";active:boolean};
 type Modal={kind:"create"|"edit"|"delete"|"reset";target?:Target}|null;
 const routes:Record<Tab,string>={
   categorias:"/api/admin/categorias",usuarios:"/api/admin/users",
-  titulares:"/api/admin/titulares"
+  titulares:"/api/admin/titulares",tags:"/api/admin/tags"
 };
 const fields=[
   {key:"view",label:"Consultar"},
@@ -39,8 +40,8 @@ const errLabels:Record<string,string>={
   processamento:"Não foi possível concluir. Confira os dados e tente novamente."
 };
 
-export function AdminConsole({categories,users,owners,permissions,initialTab,message,error,suggestion}:{
- categories:AdminCategory[];users:AdminUser[];owners:AdminOwner[];
+export function AdminConsole({categories,users,owners,tags,permissions,initialTab,message,error,suggestion}:{
+ categories:AdminCategory[];users:AdminUser[];owners:AdminOwner[];tags:AdminTag[];
  permissions:AdminPermission[];initialTab:Tab;message:string;error:string;suggestion:string;
 }){
   const [tab,setTab]=useState<Tab>(suggestion?"titulares":initialTab);
@@ -52,26 +53,27 @@ export function AdminConsole({categories,users,owners,permissions,initialTab,mes
   const allCounts={
     categorias:categories.filter(x=>x.ativa).length,
     usuarios:users.filter(x=>x.is_active).length,
-    titulares:owners.filter(x=>x.ativo).length
+    titulares:owners.filter(x=>x.ativo).length,
+    tags:tags.filter(x=>x.ativa).length
   };
   const rows=useMemo(()=>{
-    const list=tab==="categorias"?categories:tab==="usuarios"?users:owners;
+    const list=tab==="categorias"?categories:tab==="usuarios"?users:tab==="titulares"?owners:tags;
     const term=fold(search.trim());
     return list.filter(x=>{
       const active="ativa" in x?x.ativa:"is_active" in x?x.is_active:x.ativo;
       const name="nome" in x?x.nome:x.username;
       return active!==archived&&(!term||fold(name).includes(term));
     });
-  },[tab,search,archived,categories,users,owners]);
-  const title=tab==="categorias"?"Categorias":tab==="usuarios"?"Usuários":"Titulares";
-  const single=tab==="categorias"?"categoria":tab==="usuarios"?"usuário":"titular";
+  },[tab,search,archived,categories,users,owners,tags]);
+  const title=tab==="categorias"?"Categorias":tab==="usuarios"?"Usuários":tab==="titulares"?"Titulares":"Tags";
+  const single=tab==="categorias"?"categoria":tab==="usuarios"?"usuário":tab==="titulares"?"titular":"tag";
   const selected=modal?.target;
   function switchTab(next:Tab){
     setTab(next);setSearch("");setArchived(false);setModal(null);setPermissionUser(null);
   }
-  function targetFor(row:AdminCategory|AdminOwner|AdminUser):Target{
+  function targetFor(row:AdminCategory|AdminOwner|AdminUser|AdminTag):Target{
     return {id:row.id,name:"nome" in row?row.nome:row.username,
-      kind:tab==="categorias"?"category":tab==="usuarios"?"user":"owner",
+      kind:tab==="categorias"?"category":tab==="usuarios"?"user":tab==="titulares"?"owner":"tag",
       active:"ativa" in row?row.ativa:"is_active" in row?row.is_active:row.ativo};
   }
   function beginPermissions(user:AdminUser){
@@ -91,7 +93,7 @@ export function AdminConsole({categories,users,owners,permissions,initialTab,mes
           <p>Cadastros e acessos do Livro Caixa, em um só lugar.</p>
         </div>
       </div>
-      <div className="admin-v2-total">{allCounts.categorias+allCounts.usuarios+allCounts.titulares} cadastros ativos</div>
+      <div className="admin-v2-total">{allCounts.categorias+allCounts.usuarios+allCounts.titulares+allCounts.tags} cadastros ativos</div>
     </div>
     {(message||error)&&<div role={error?"alert":"status"} className={"admin-v2-alert "+(error?"admin-v2-error":"admin-v2-ok")}>
       {error?errLabels[error]||"Verifique o cadastro e tente novamente.":
@@ -102,6 +104,8 @@ export function AdminConsole({categories,users,owners,permissions,initialTab,mes
         onClick={()=>switchTab("categorias")}><Tags size={17}/> Categorias <span>{allCounts.categorias}</span></button>
       <button role="tab" aria-selected={tab==="usuarios"} type="button" className={tab==="usuarios"?"active":""}
         onClick={()=>switchTab("usuarios")}><Users size={17}/> Usuários <span>{allCounts.usuarios}</span></button>
+      <button role="tab" aria-selected={tab==="tags"} type="button" className={tab==="tags"?"active":""}
+        onClick={()=>switchTab("tags")}><Tags size={17}/> Tags <span>{allCounts.tags}</span></button>
       <button role="tab" aria-selected={tab==="titulares"} type="button" className={tab==="titulares"?"active":""}
         onClick={()=>switchTab("titulares")}><BookOpen size={17}/> Titulares <span>{allCounts.titulares}</span></button>
     </div>
@@ -111,6 +115,7 @@ export function AdminConsole({categories,users,owners,permissions,initialTab,mes
           <h2>{title}</h2>
           <p>{tab==="categorias"?"Categorias compartilhadas entre todos os livros":
             tab==="usuarios"?"Controle de contas e permissões de acesso":
+            tab==="tags"?"Etiquetas livres para combinar em qualquer lançamento":
             "Livros e titulares cadastrados no sistema"}</p>
         </div>
         <div className="admin-v2-actions">
@@ -137,14 +142,14 @@ export function AdminConsole({categories,users,owners,permissions,initialTab,mes
         {rows.map(row=>{
           const target=targetFor(row);
           const isAdmin=tab==="usuarios"&&(row as AdminUser).is_admin;
-          const meta=tab==="categorias"?
+          const meta=tab==="tags"?(row as AdminTag).usos+" lançamento(s) com esta tag":tab==="categorias"?
             (row as AdminCategory).operacoes+" lançamento(s) vinculado(s)":
             tab==="usuarios"?
               (isAdmin?"Administrador":(row as AdminUser).livros+" livro(s) com permissões"):
               (row as AdminOwner).operacoes+" lançamento(s) · "+(row as AdminOwner).arquivos+" arquivo(s)";
           return <div className="admin-v2-item" key={tab+"-"+row.id}>
             <div className="admin-v2-item-icon">
-              {tab==="categorias"?<FolderClosed size={18}/>:
+              {tab==="tags"?<Tags size={18}/>:tab==="categorias"?<FolderClosed size={18}/>:
                 tab==="usuarios"?<Users size={18}/>:<BookOpen size={18}/>}
             </div>
             <div className="admin-v2-item-info">
@@ -244,11 +249,11 @@ export function AdminConsole({categories,users,owners,permissions,initialTab,mes
                 <p className="admin-v2-hint">Depois de criar, defina a quais titulares o usuário pode acessar em “Permissões”.</p>
               </>}
             </>:<>
-              <label htmlFor="admin-entity-name">Nome {tab==="categorias"?"da categoria":"do titular"}</label>
+              <label htmlFor="admin-entity-name">Nome {tab==="categorias"?"da categoria":tab==="tags"?"da tag":"do titular"}</label>
               <input id="admin-entity-name" name="nome" autoFocus
                 defaultValue={selected?.name||(tab==="titulares"?suggestion.slice(0,120):"")}
-                maxLength={tab==="categorias"?80:120} minLength={3}
-                placeholder={tab==="categorias"?"Ex.: Manutenção de Veículos":"Nome completo do titular"}
+                maxLength={tab==="categorias"?80:tab==="tags"?60:120} minLength={tab==="tags"?1:3}
+                placeholder={tab==="categorias"?"Ex.: Manutenção de Veículos":tab==="tags"?"Ex.: Safra 2026, Urgente, Pessoal":"Nome completo do titular"}
                 required/>
             </>}
             <div className="admin-v2-dialog-footer">
