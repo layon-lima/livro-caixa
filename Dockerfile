@@ -24,6 +24,7 @@ RUN apk add --no-cache poppler-utils tesseract-ocr tesseract-ocr-data-por tesser
     chown nextjs:nextjs /data/livro-caixa-arquivos
 COPY --from=builder --chown=nextjs:nextjs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nextjs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nextjs /app/public ./public
 COPY --from=deps --chown=nextjs:nextjs /app/node_modules ./node_modules
 COPY --chown=nextjs:nextjs scripts ./scripts
 COPY --chown=nextjs:nextjs worker ./worker

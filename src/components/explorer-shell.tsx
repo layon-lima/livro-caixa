@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import {
   BookOpen, ChevronRight, Folder,
   LayoutList, LogOut, Settings2, Trash2,
@@ -17,7 +18,7 @@ export function ExplorerShell({ user, titulares, selected, children, pageTitle, 
   return (
     <div className={"workspace"+(focusMode?" workspace-focus":"")}>
       <aside className="rail" aria-label="Navegação">
-        <div className="rail-mark" aria-label="Livro Caixa Inteligente">LC</div>
+        <div className="rail-mark" aria-label="Livro Caixa Inteligente"><Image src="/icons/icon-192.png" width={36} height={36} alt="" priority unoptimized/></div>
         <Link className={"rail-item"+(activeSection==="livros"?" rail-item-active":"")} href="/" aria-label="Livros Caixa">
           <BookOpen size={19} strokeWidth={1.8} aria-hidden="true" /><span>Livros</span>
         </Link>

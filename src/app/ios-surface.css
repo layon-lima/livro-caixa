@@ -313,3 +313,7 @@ body {
 @media(prefers-reduced-motion:reduce) {
   .rail-item,.expense-sheet .expense-sheet-row {transition:none;}
 }
+
+/* Ícone oficial LC */
+.rail-mark {padding:0!important;border:0!important;background:transparent!important;box-shadow:none!important;overflow:hidden;}
+.rail-mark img {display:block;width:100%;height:100%;object-fit:cover;border-radius:11px;}
