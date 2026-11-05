@@ -8,7 +8,7 @@ const favicon=path.join(process.cwd(),"assets/favicon-source.png");
 const iconDir=path.join(process.cwd(),"public/icons");
 const appDir=path.join(process.cwd(),"src/app");
 await fs.mkdir(iconDir,{recursive:true});
-const resize=(file,n)=>sharp(file).resize(n,n,{kernel:"lanczos3"}).png({compressionLevel:9}).toBuffer();
+const resize=(file,n)=>sharp(file).resize(n,n,{kernel:"lanczos3"}).ensureAlpha().png({compressionLevel:9}).toBuffer();
 const [n512,n192,n180,n32,n16]=await Promise.all([
  resize(source,512),resize(source,192),resize(source,180),
  resize(favicon,32),resize(favicon,16)
