@@ -1179,3 +1179,71 @@ button { cursor: pointer; }
  .admin-v2-tabs button {flex:1 0 auto;min-width:84px;}
  .lc-tags-picker {padding:8px;}
 }
+
+/* Grade estilo Excel: cabeçalho em cada agrupamento de mês e bordas de células. */
+.expense-sheet .expense-table-header,
+.expense-sheet .expense-sheet-row {
+  display:grid;
+  grid-template-columns:108px 132px minmax(350px,1.9fr) 92px minmax(180px,.85fr) minmax(190px,.85fr);
+  min-width:1110px;
+  width:100%;
+  box-sizing:border-box;
+}
+.expense-sheet .expense-month-header {min-width:1110px;}
+.expense-sheet .expense-table-header {
+  position:static;
+  z-index:auto;
+  min-height:36px;
+  background:#eaf0f7;
+  color:#465b72;
+  border-top:1px solid #bdccd9;
+  border-bottom:1px solid #aebfd0;
+  letter-spacing:0;
+}
+.expense-sheet .expense-table-header > span,
+.expense-sheet .expense-sheet-row > span {
+  min-width:0;
+  box-sizing:border-box;
+  padding:9px 11px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  border-right:1px solid #c7d3e0;
+}
+.expense-sheet .expense-table-header > span:last-child,
+.expense-sheet .expense-sheet-row > span:last-child {border-right:0;}
+.expense-sheet .expense-table-header > span {
+  font-weight:700;
+  font-size:10px;
+  display:flex;
+  align-items:center;
+}
+.expense-sheet .expense-table-header > span.align-right {justify-content:flex-end;}
+.expense-sheet .expense-sheet-row {
+  min-height:42px;
+  border-bottom:1px solid #cbd6e2;
+  font-size:11px;
+}
+.expense-sheet .expense-sheet-row .expense-document {
+  overflow:hidden;
+  color:#365d88;
+  font-weight:600;
+}
+.expense-sheet .expense-sheet-row .expense-document > span {
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.expense-sheet .expense-sheet-row > .expense-type-cell {
+  display:flex;
+  align-items:center;
+}
+.expense-sheet .expense-sheet-row .expense-type-cell .expense-kind {
+  margin:0;
+  max-width:100%;
+  flex-shrink:1;
+}
+.expense-sheet .expense-sheet-row .expense-category,
+.expense-sheet .expense-sheet-row .expense-tags {color:#405873;font-size:11px;}
+.expense-sheet .expense-sheet-row .expense-tags {color:#316b9c;}
+.expense-sheet .expense-month {border-bottom:1px solid #b7c6d6;}

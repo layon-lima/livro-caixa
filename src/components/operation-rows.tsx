@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { FileText, Folder, FolderInput, Pencil, Trash2, X, Eye, ChevronLeft, ChevronDown, ChevronRight, CalendarDays } from "lucide-react";
 import { suggestDocumentName } from "@/lib/document-name";
@@ -23,6 +23,7 @@ type Props={
   operations:OperationEntry[];documents:AttachedDocument[];books:Book[];
   canEdit:boolean;canDelete:boolean;bookId:string;
   variant?:"explorer"|"spreadsheet";monthlyTotals?:{mes:string;quantidade:number;total:string}[];
+  columnHeader?:ReactNode;
 };
 type Menu={id:string;x:number;y:number;view:"actions"|"files"|"move"|"delete"|"info";arquivoId?:string};
 const money=(v:string|null)=>v===null?"":Number(v).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
@@ -31,7 +32,7 @@ const place=(x:number,y:number)=>({
   y:Math.max(8,Math.min(y,window.innerHeight-350))
 });
 
-export function OperationRows({operations,documents,books,canEdit,canDelete,bookId,variant="explorer",monthlyTotals=[]}:Props){
+export function OperationRows({operations,documents,books,canEdit,canDelete,bookId,variant="explorer",monthlyTotals=[],columnHeader}:Props){
   const [collapsed,setCollapsed]=useState<string[]>([]);
   const [selected,setSelected]=useState<string|null>(null);
   const [menu,setMenu]=useState<Menu|null>(null);
@@ -90,34 +91,39 @@ export function OperationRows({operations,documents,books,canEdit,canDelete,book
             <span className="expense-month-count">{total?.quantidade??entries.length} lançamentos</span>
             <span className="expense-month-total">Total do mês: <strong>{money(total?.total||"0")}</strong></span>
           </button>
-          {!closed&&entries.map(op=><div key={op.id} className={"expense-sheet-row"+(selected===op.id?" selected":"")}
-            role="button" tabIndex={0} title="Clique para selecionar, duplo clique para ações"
-            aria-label={op.titulo+". Dois cliques para ações"}
-            onClick={()=>{setSelected(op.id);setMenu(null);}}
-            onDoubleClick={e=>show(op.id,e.clientX,e.clientY)}
-            onContextMenu={e=>{e.preventDefault();show(op.id,e.clientX,e.clientY);}}
-            onKeyDown={e=>{
-              if(e.key==="Enter"||e.key===" "){
-                e.preventDefault();const b=e.currentTarget.getBoundingClientRect();
-                show(op.id,b.left+80,b.top+20);
-              }
-            }}>
-            <span className="expense-date" title={op.data_pagamento?"Data efetiva da transação: "+formatTransactionDate(op.data_pagamento):"Data da transação não identificada"}>
-              {formatTransactionDate(op.data_pagamento)}
-            </span>
-            <span className="expense-value">{op.valor!==null?money(op.valor):"—"}</span>
-            <span className="expense-strong" title={op.contraparte||"Recebedor não identificado"}>
-              {op.contraparte||"—"}
-              {Boolean(op.tags?.length)&&<small className="expense-tag-label">{op.tags!.map(t=>"#"+t).join(" · ")}</small>}
-            </span>
-            <span className="expense-kind" title={documentTypeLabel(op)}>
-              {documentTypeLabel(op)}
-            </span>
-            <span className={"expense-document"+(!op.documento?" expense-document-missing":"")} title={op.documento||"Sem documento"}>
-              {op.documento&&<FileText size={15} strokeWidth={1.7} aria-hidden="true"/>}
-              <span>{op.documento||"Sem documento"}</span>
-            </span>
-          </div>)}
+          {!closed&&<>
+            {columnHeader}
+            {entries.map(op=><div key={op.id} className={"expense-sheet-row"+(selected===op.id?" selected":"")}
+              role="button" tabIndex={0} title="Clique para selecionar, duplo clique para ações"
+              aria-label={op.titulo+". Dois cliques para ações"}
+              onClick={()=>{setSelected(op.id);setMenu(null);}}
+              onDoubleClick={e=>show(op.id,e.clientX,e.clientY)}
+              onContextMenu={e=>{e.preventDefault();show(op.id,e.clientX,e.clientY);}}
+              onKeyDown={e=>{
+                if(e.key==="Enter"||e.key===" "){
+                  e.preventDefault();const b=e.currentTarget.getBoundingClientRect();
+                  show(op.id,b.left+80,b.top+20);
+                }
+              }}>
+              <span className="expense-date" title={op.data_pagamento?"Data efetiva da transação: "+formatTransactionDate(op.data_pagamento):"Data da transação não identificada"}>
+                {formatTransactionDate(op.data_pagamento)}
+              </span>
+              <span className="expense-value">{op.valor!==null?money(op.valor):"—"}</span>
+              <span className={"expense-document"+(!op.documento?" expense-document-missing":"")} title={op.documento||"Sem documento"}>
+                {op.documento&&<FileText size={15} strokeWidth={1.7} aria-hidden="true"/>}
+                <span>{op.documento||"Sem documento"}</span>
+              </span>
+              <span className="expense-type-cell"><span className="expense-kind" title={documentTypeLabel(op)}>
+                {documentTypeLabel(op)}
+              </span></span>
+              <span className="expense-category" title={op.categoria||"Sem categoria"}>
+                {op.categoria||"—"}
+              </span>
+              <span className="expense-tags" title={op.tags?.join(" · ")||"Sem tags"}>
+                {op.tags?.length?op.tags.map(t=>"#"+t).join(" · "):"—"}
+              </span>
+            </div>)}
+          </>}
         </section>;
       });
     })():fileEntries.map(({op,doc,key})=><div key={key}

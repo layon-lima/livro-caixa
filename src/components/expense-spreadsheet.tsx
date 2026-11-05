@@ -13,7 +13,7 @@ type ExpenseItem=OperationEntry&{
 type Month={mes:string;quantidade:number;total:string};
 type Data={rows:ExpenseItem[];summary:{total:string;quantidade:number};
   months:Month[];page:number;pageSize:number};
-type Sort="data"|"contraparte"|"valor";
+type Sort="data"|"valor"|"titulo";
 const fmt=(n:string)=>Number(n||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 
 export function ExpenseSpreadsheet({bookId,cats,tags,books,canEdit,canDelete,months,
@@ -71,7 +71,7 @@ export function ExpenseSpreadsheet({bookId,cats,tags,books,canEdit,canDelete,mon
   };
   function updateSort(next:Sort){
     if(sort===next)setDirection(d=>d==="asc"?"desc":"asc");
-    else{setSort(next);setDirection(next==="contraparte"?"asc":"desc");}
+    else{setSort(next);setDirection(next==="titulo"?"asc":"desc");}
     setPage(1);
   }
   function submit(e:FormEvent){e.preventDefault();setQ(typing.trim());setPage(1);}
@@ -98,6 +98,15 @@ export function ExpenseSpreadsheet({bookId,cats,tags,books,canEdit,canDelete,mon
     aria-label={"Ordenar por "+label} onClick={()=>updateSort(key)}>
     {label}{sort===key?<span aria-hidden="true">{direction==="asc"?" ↑":" ↓"}</span>:null}
   </button>;
+  // Os títulos das colunas acompanham cada agrupamento mensal.
+  const monthlyColumnHeader=<div className="expense-table-header" role="row">
+    <span role="columnheader">{sortButton("Data","data")}</span>
+    <span role="columnheader" className="align-right">{sortButton("Valor","valor")}</span>
+    <span role="columnheader">{sortButton("Documento","titulo")}</span>
+    <span role="columnheader">Tipo</span>
+    <span role="columnheader">Categoria</span>
+    <span role="columnheader">Tags</span>
+  </div>;
   return <div className="expense-sheet">
     <div className="expense-toolbar">
       <label className="expense-month-select" aria-label="Filtrar mês">
@@ -143,17 +152,10 @@ export function ExpenseSpreadsheet({bookId,cats,tags,books,canEdit,canDelete,mon
     {error&&<p className="form-error expense-error" role="alert">{error}</p>}
     <div className="expense-table-card">
     <div className="expense-grid-scroller">
-      <div className="expense-table-header" role="row">
-        <span>{sortButton("Data","data")}</span>
-        <span className="align-right">{sortButton("Valor","valor")}</span>
-        <span>{sortButton("Recebedor","contraparte")}</span>
-        <span>Tipo</span>
-        <span>Documento</span>
-      </div>
       {loading&&<div className="expense-loading" role="status">
         <LoaderCircle className="spin" size={17}/> Atualizando lançamentos…
       </div>}
-      {!loading&&<OperationRows key={params} variant="spreadsheet"
+      {!loading&&<OperationRows key={params} variant="spreadsheet" columnHeader={monthlyColumnHeader}
         operations={data?.rows||[]} documents={documents}
         monthlyTotals={data?.months||[]} books={books}
         canEdit={canEdit} canDelete={canDelete} bookId={bookId}/>}
