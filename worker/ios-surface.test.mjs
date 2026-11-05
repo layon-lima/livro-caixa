@@ -35,5 +35,5 @@ test("Cada mês é card independente, com cinco colunas e filtros preservados",a
   assert.match(rows,/className="expense-category-chip"/);
   assert.match(rows,/className="expense-tag-chip"/);
   assert.match(rows,/\{!closed&&<>\s*\{columnHeader\}/);
-  assert.match(rows,/onDoubleClick=\{e=>show\(op.id,e.clientX,e.clientY\)\}/);
+  assert.match(rows,/onDoubleClick=\{e=>activate\(op.id,e.clientX,e.clientY,op.arquivo_id\|\|undefined\)\}/);
 });
