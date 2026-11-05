@@ -18,6 +18,23 @@ test("O botão global só conta pendências reais, sem duplicados ou aprovados",
   assert.match(pending,/p\.aprovado_em IS NOT NULL/);
   assert.match(pending,/return NextResponse\.json\(\{count:first\?\.total\|\|0,href\}/);
   assert.doesNotMatch(pending,/LIMIT 50/);
+  // Pendências que a tela não permite validar não entram no contador.
+  assert.match(pending,/a.status='pronto'/);
+  assert.match(pending,/JOIN titulares t ON t.id=p.titular_id/);
+});
+test("O botão de pendências nunca abre um ZIP já concluído",async()=>{
+  const [api,page,actions]=await Promise.all([
+    read("src/app/api/importar/pendentes/route.ts"),
+    read("src/app/conferencia/page.tsx"),
+    read("src/components/global-workspace-actions.tsx")
+  ]);
+  assert.doesNotMatch(api,/SELECT l.id::text FROM lotes_importacao/);
+  assert.doesNotMatch(api,/\/conferencia\?lote=/);
+  assert.match(api,/\/conferencia\?id=/);
+  assert.match(api,/\/conferencia\?arquivo=/);
+  assert.match(actions,/router.push\(pending.href\|\|"\/conferencia"\)/);
+  assert.match(page,/p.duplicada_de IS NULL/);
+  assert.match(page,/a.status='pronto'/);
 });
 test("O contador é reconsultado após navegar/aprovar e ao voltar à aba",async()=>{
   const actions=await read("src/components/global-workspace-actions.tsx");

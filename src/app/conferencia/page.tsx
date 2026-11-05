@@ -59,7 +59,8 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
     "FROM propostas p JOIN arquivos a ON a.id=p.arquivo_id JOIN titulares t ON t.id=p.titular_id "+
     "LEFT JOIN propostas orig ON orig.id=p.duplicada_de "+
     (user.isAdmin?"":"JOIN user_titular_permissions up ON up.titular_id=p.titular_id AND up.user_id=$1 AND up.can_approve=true ")+
-    "WHERE p.aprovado_em IS NULL AND p.descartado_em IS NULL AND a.descartado_em IS NULL "+
+    "WHERE p.aprovado_em IS NULL AND p.descartado_em IS NULL AND p.duplicada_de IS NULL "+
+    "AND a.descartado_em IS NULL AND a.status='pronto' "+
     scope+
     (lote?"ORDER BY p.id ASC LIMIT 1000":"ORDER BY p.id DESC LIMIT 500"),
     queryArgs);
@@ -80,8 +81,9 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
     "FROM arquivos a JOIN titulares t ON t.id=a.titular_envio_id "+
     (user.isAdmin?"":"JOIN user_titular_permissions up ON up.titular_id=a.titular_envio_id "+
       "AND up.user_id=$1 AND up.can_approve=true ")+
-    "WHERE a.status IN ('aguardando','processando','erro') AND a.descartado_em IS NULL "+
+    "WHERE a.status IN ('aguardando','processando') AND a.descartado_em IS NULL "+
     "AND NOT EXISTS (SELECT 1 FROM propostas p WHERE p.arquivo_id=a.id AND p.aprovado_em IS NULL) "+
+    "AND NOT EXISTS (SELECT 1 FROM propostas p WHERE p.arquivo_id=a.id AND p.aprovado_em IS NOT NULL) "+
     pendingExtra+(lote?"ORDER BY a.id ASC LIMIT 300":"ORDER BY a.id DESC LIMIT 100"),
     pendingArgs
   );
