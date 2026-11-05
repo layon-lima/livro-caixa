@@ -30,7 +30,7 @@ test("Conferência oferece apenas Salvar e Descartar no rodapé",async()=>{
 
 test("Cada proposta mantém seu formulário independente ao navegar",async()=>{
   const page=await read("src/app/conferencia/page.tsx");
-  assert.match(page,/className="conference-edit" key=\{"review-"\+selected\.id\}/);
+  assert.match(page,/className="conference-panel conference-edit" key=\{"review-"\+selected\.id\}/);
   assert.match(page,/<form key=\{selected\.id\} id=\{formId\}/);
   assert.match(page,/defaultValue=\{selected\.contraparte\}/);
   assert.match(page,/defaultValue=\{selected\.valor\|\|""\}/);
