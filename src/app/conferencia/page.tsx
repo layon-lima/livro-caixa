@@ -9,9 +9,8 @@ import { ReviewCategoryPicker } from "@/components/review-category-picker";
 import {TagPicker} from "@/components/tag-picker";
 import {tagsDisponiveis} from "@/lib/tags";
 import { ConferenceQueue, type QueueItem } from "@/components/conference-queue";
-import { suggestDocumentName } from "@/lib/document-name";
 import { BatchQueueRefresh } from "@/components/batch-queue-refresh";
-import { summarizeZipBatch,type ZipBatchEntry } from "@/lib/zip-batch-status";
+import { describeZipEntry,summarizeZipBatch,type ZipBatchEntry } from "@/lib/zip-batch-status";
 import { buildZipQueue } from "@/lib/zip-conference-queue";
 import { DiscardDocument } from "@/components/discard-document";
 import { notFound } from "next/navigation";
@@ -40,6 +39,16 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
   ):null;
   const batchEntries=batchRows?.rows||[];
   const batchSummary=summarizeZipBatch(batchEntries);
+  // Prestação de contas dos arquivos que foram filtrados como já existentes.
+  // Mantemos apenas o nome do próprio arquivo enviado, sem revelar dados de
+  // outros livros nem reapresentar o duplicado para aprovação.
+  const zipIgnored=batchEntries.flatMap(entry=>{
+    const state=describeZipEntry(entry);
+    return state.group==="duplicate"?[{
+      id:"zip-"+entry.ordem,nome:entry.nome_entrada,
+      status:state.label,motivo:state.description,arquivoId:entry.arquivo_id
+    }]:[];
+  });
   const ids=query.arquivos && /^\d+(?:,\d+){0,99}$/.test(query.arquivos)
     ? [...new Set(query.arquivos.split(",").map(Number))].filter(x=>Number.isSafeInteger(x)&&x>0)
     : null;
@@ -88,6 +97,28 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
     pendingArgs
   );
   const inProgress=pending?.rows||[];
+  // Além dos duplicados pelo conteúdo do arquivo, registrar os marcados
+  // pela análise de uma proposta. O filtro normal exclui esses registros.
+  const proposalDuplicateArgs:(string|number[])[]=lote?[lote]:batch?[batch]:[];
+  const proposalDuplicateScope=lote?
+    "AND EXISTS(SELECT 1 FROM lote_itens li WHERE li.lote_id=$1 AND li.arquivo_id=p.arquivo_id) ":
+    batch?"AND p.arquivo_id=ANY($1::bigint[]) ":"";
+  const proposalDuplicates=proposalDuplicateScope?await db.query<{
+    id:string;nome_original:string;arquivo_id:string;
+  }>(
+    "SELECT p.id::text,a.nome_original,a.id::text AS arquivo_id FROM propostas p "+
+    "JOIN arquivos a ON a.id=p.arquivo_id "+
+    "WHERE p.duplicada_de IS NOT NULL AND p.aprovado_em IS NULL "+
+    "AND p.descartado_em IS NULL AND a.descartado_em IS NULL "+
+    proposalDuplicateScope+"ORDER BY p.id DESC LIMIT 300",proposalDuplicateArgs):null;
+  const alreadyReported=new Set(zipIgnored.map(x=>x.arquivoId));
+  const ignoredDuplicates=[
+    ...zipIgnored.map(({id,nome,status,motivo})=>({id,nome,status,motivo})),
+    ...(proposalDuplicates?.rows||[]).filter(p=>!alreadyReported.has(p.arquivo_id)).map(p=>({
+      id:"proposta-"+p.id,nome:p.nome_original,status:"Duplicado na análise",
+      motivo:"Este lançamento já foi identificado anteriormente e não entrou na fila."
+    }))
+  ];
   const requested=all.find(p=>p.id===query.id);
   const activePending=requested?null:
     (query.arquivo?inProgress.find(p=>p.id===query.arquivo):
@@ -104,18 +135,13 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
   const selectedTagRows=selected?await db.query<{tag_id:string}>(
     "SELECT tag_id::text FROM proposta_tags WHERE proposta_id=$1",[selected.id]):null;
   const selectedTags=selectedTagRows?.rows.map(x=>x.tag_id)||[];
-  const selectedCat=selected?cats.find(c=>c.id===selected.categoria_id):null;
-  const selectedName=selected?suggestDocumentName({
-    originalName:selected.nome_original,documentType:selected.documento_tipo,
-    title:selected.titulo,counterparty:selected.contraparte,description:selected.descricao,
-    category:selectedCat?.nome||selected.categoria_sugerida_nome,
-    paymentDate:selected.data_pagamento
-  }):"";
+  // Antes de salvar, nenhum título gerado por OCR substitui o nome recebido.
+  const selectedName=selected?.nome_original||"";
   const queue:QueueItem[]=lote?
     buildZipQueue(batchEntries,all):
     [
       ...all.map(p=>({
-        id:p.id,arquivo_id:p.arquivo_id,titulo:p.titulo,nome_titular:p.nome_titular,referencia:p.referencia,
+        id:p.id,arquivo_id:p.arquivo_id,titulo:p.nome_original,nome_titular:p.nome_titular,referencia:p.referencia,
         status:(p.duplicada_de?"duplicado":p.revisada_em?"revisado":"pendente") as QueueItem["status"]
       })),
       ...inProgress.map(p=>({
@@ -152,7 +178,7 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
     <div className="work-page conference-page">
       <div className="conference-layout">
         <aside className="conference-queue-pane" aria-label="Fila de documentos">
-          <ConferenceQueue items={queue} queryRoot={batchQuery} selectedId={selected?.id}
+          <ConferenceQueue items={queue} ignoredDuplicates={ignoredDuplicates} queryRoot={batchQuery} selectedId={selected?.id}
             selectedFile={activePending?.id} lote={lote} arquivos={batch?.join(",")} loteTotal={batchEntries.length}/>
           <BatchQueueRefresh active={Boolean((zipBatch&&(zipBatch.status==="recebendo"||zipBatch.status==="extraindo"))||batchEntries.some(x=>x.leitura_status==="aguardando"||x.leitura_status==="processando"))}/>
         </aside>
@@ -235,9 +261,9 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
                 className="flat-button">Conferir cadastro</Link>}
             </div>}
             {!selected.duplicada_de&&<>
-              <section className="conference-panel conference-edit">
+              <section className="conference-panel conference-edit" key={"review-"+selected.id}>
                 <h2><ClipboardCheck size={17}/> Confirmar lançamento</h2>
-                <form id={formId} action={"/api/propostas/"+selected.id+"/revisar"}
+                <form key={selected.id} id={formId} action={"/api/propostas/"+selected.id+"/revisar"}
                   method="post" className="review-form">
                   {batch&&<input type="hidden" name="arquivos" value={batch.join(",")}/>}
                   {lote&&<input type="hidden" name="lote" value={lote}/>}

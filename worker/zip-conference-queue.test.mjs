@@ -106,3 +106,12 @@ test("Um arquivo aprovado não volta à fila como aguardando/processando sem pro
   })];
   assert.deepEqual(buildZipQueue(entries,[]),[]);
 });
+
+test("Título original permanece durante a análise, mesmo com descrição OCR",()=>{
+  const entries=[entry(5,"importado",{arquivo_id:"202",leitura_status:"pronto"})];
+  const propostas=[{id:"41",arquivo_id:"202",titulo:"Comprovante — RECEBEDOR NOVO",
+    nome_titular:"Jonas"}];
+  const result=buildZipQueue(entries,propostas);
+  assert.equal(result.length,1);
+  assert.equal(result[0].titulo,"documento-5.pdf");
+});

@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LoaderCircle, ExternalLink } from "lucide-react";
-import { suggestDocumentName } from "@/lib/document-name";
 
 type LiveFields={
   titulo?:string;documento_tipo?:string;titular_id?:string;categoria?:string;
@@ -84,15 +83,10 @@ export function LiveReview({arquivoId,nome,books,cats,isAdmin}:{
   const known=categoryNames.find(c=>c.label===fields.categoria);
   const finished=stage==="pronto";
   const stateName=stages[stage]||"Processando o documento…";
-  const proposedName=suggestDocumentName({
-    originalName:nome,documentType:fields.documento_tipo,title:fields.titulo,
-    counterparty:fields.contraparte,category:fields.categoria,
-    description:fields.descricao,paymentDate:fields.data_pagamento
-  });
   const field=(value:string|undefined)=>value||"";
   return <>
     <div className="page-title-compact">
-      <h2 title={"Nome no envio: "+nome}>{proposedName}</h2>
+      <h2 title={"Nome original: "+nome}>{nome}</h2>
       <a href={"/api/documentos/"+arquivoId} target="_blank" rel="noreferrer">
         Abrir original <ExternalLink size={13}/>
       </a>

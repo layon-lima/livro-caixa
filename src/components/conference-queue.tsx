@@ -31,8 +31,9 @@ const tags:Record<QueueItem["status"],string>={
   "sem-proposta":"Sem proposta",
 };
 
-export function ConferenceQueue({items,queryRoot,selectedId,selectedFile,lote,arquivos,loteTotal}:{
-  items:QueueItem[];queryRoot:string;selectedId?:string;selectedFile?:string;
+export type IgnoredDuplicate={id:string;nome:string;status:string;motivo:string};
+export function ConferenceQueue({items,ignoredDuplicates=[],queryRoot,selectedId,selectedFile,lote,arquivos,loteTotal}:{
+  items:QueueItem[];ignoredDuplicates?:IgnoredDuplicate[];queryRoot:string;selectedId?:string;selectedFile?:string;
   lote?:string;arquivos?:string;loteTotal?:number;
 }){
   const [search,setSearch]=useState("");
@@ -63,6 +64,17 @@ export function ConferenceQueue({items,queryRoot,selectedId,selectedFile,lote,ar
         <strong>{activeItems.length} documento(s) pendente(s) na fila</strong>
         <span>{readyCount} pronto(s) para validar · {waitingCount} em leitura · {loteTotal??activeItems.length} no ZIP</span>
       </div>}
+      {ignoredDuplicates.length>0&&<details className="cq-ignored-details" key={lote||arquivos||"general"}
+        open={ignoredDuplicates.length<=8}>
+        <summary>{ignoredDuplicates.length} ignorado(s) por duplicidade — ver nomes</summary>
+        <div className="cq-ignored-list">
+          {ignoredDuplicates.map(item=><div className="cq-ignored-row" key={item.id}>
+            <strong title={item.nome}>{item.nome}</strong>
+            <span>{item.status}</span>
+            <small>{item.motivo}</small>
+          </div>)}
+        </div>
+      </details>}
     </div>
     <div className="cq-form">
       <div className="cq-rows">

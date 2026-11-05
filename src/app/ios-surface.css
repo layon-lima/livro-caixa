@@ -317,3 +317,29 @@ body {
 /* Ícone oficial LC */
 .rail-mark {padding:0!important;border:0!important;background:transparent!important;box-shadow:none!important;overflow:hidden;}
 .rail-mark img {display:block;width:100%;height:100%;object-fit:cover;border-radius:11px;}
+
+/* Itens ignorados são auditáveis sem reaparecer como lançamentos pendentes. */
+.cq-ignored-details {
+  margin-top:8px;
+  border:1px solid #e4cba9;
+  border-radius:11px;
+  padding:8px 9px;
+  background:rgba(255,248,235,.94);
+}
+.cq-ignored-details summary {
+  color:#765422;font-size:10px;font-weight:700;cursor:pointer;
+}
+.cq-ignored-list {
+  display:flex;flex-direction:column;gap:0;
+  margin-top:8px;max-height:225px;overflow-y:auto;
+}
+.cq-ignored-row {
+  display:flex;flex-direction:column;gap:2px;
+  padding:7px 2px;border-top:1px solid #f0dfc5;
+}
+.cq-ignored-row strong {
+  color:#553e24;font-size:10px;line-height:1.4;
+  overflow-wrap:anywhere;font-weight:650;
+}
+.cq-ignored-row span {color:#986529;font-size:10px;font-weight:650;}
+.cq-ignored-row small {color:#83725a;font-size:10px;line-height:1.4;}

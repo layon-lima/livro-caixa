@@ -44,7 +44,8 @@ export function buildZipQueue(
         const proposals=pendingByFile.get(file)||[];
         const rows:ZipQueueItem[]=proposals.filter(p=>!p.duplicada_de).map(p=>({
           id:p.id,arquivo_id:file,
-          titulo:proposals.length===1?p.titulo:entry.nome_entrada+" — "+p.titulo,
+          // A descrição do OCR será usada somente depois da aprovação.
+          titulo:entry.nome_entrada,
           nome_titular:p.nome_titular,status:p.revisada_em?"revisado":"pendente",
           referencia:p.referencia,ordinal
         }));
