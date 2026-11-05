@@ -21,14 +21,18 @@ export async function GET(_request:Request,{params}:{params:Promise<{id:string}>
   }>(
     "SELECT a.chave_armazenamento,a.armazenamento,a.nome_original,a.mime,a.titular_envio_id::text, "+
     "ARRAY(SELECT DISTINCT p.titular_id::text FROM propostas p WHERE p.arquivo_id=a.id) AS acessos,"+
-    "(SELECT count(*)::int FROM propostas p WHERE p.arquivo_id=a.id) AS propostas_quantidade,"+
+    "(SELECT count(*)::int FROM propostas p WHERE p.arquivo_id=a.id AND p.descartado_em IS NULL) AS propostas_quantidade,"+
     "d.documento_tipo,d.titulo,d.contraparte,d.descricao,d.data_pagamento::text,d.categoria,d.subcategoria "+
     "FROM arquivos a "+
-    "LEFT JOIN LATERAL (SELECT p.documento_tipo,o.titulo,o.contraparte,o.descricao,o.data_pagamento,"+
+    "LEFT JOIN LATERAL (SELECT p.documento_tipo,"+
+    "COALESCE(NULLIF(o.titulo,''),p.titulo) AS titulo,"+
+    "COALESCE(NULLIF(o.contraparte,''),p.contraparte) AS contraparte,"+
+    "COALESCE(NULLIF(o.descricao,''),p.descricao) AS descricao,"+
+    "COALESCE(o.data_pagamento,p.data_pagamento) AS data_pagamento,"+
     "c.nome AS categoria,c.subcategoria FROM propostas p "+
-    "JOIN operacoes o ON o.id=p.operacao_id LEFT JOIN categorias c ON c.id=o.categoria_id "+
-    "WHERE p.arquivo_id=a.id AND p.aprovado_em IS NOT NULL "+
-    "ORDER BY p.id LIMIT 1) d ON TRUE "+
+    "LEFT JOIN operacoes o ON o.id=p.operacao_id LEFT JOIN categorias c ON c.id=COALESCE(o.categoria_id,p.categoria_id) "+
+    "WHERE p.arquivo_id=a.id AND p.descartado_em IS NULL "+
+    "ORDER BY (p.aprovado_em IS NOT NULL) DESC,p.id LIMIT 1) d ON TRUE "+
     "WHERE a.id=$1",[fileId],
   );
   const file=r.rows[0];
@@ -52,12 +56,17 @@ export async function GET(_request:Request,{params}:{params:Promise<{id:string}>
       paymentDate:file.data_pagamento
     }):file.nome_original;
     const safeName=displayName.replace(/[\\/\r\n"]/g,"_");
+    // RFC 5987: preservar acentos em nomes usados pelo navegador.
+    const asciiName=safeName.normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+      .replace(/[^\x20-\x7e]/g,"_").replace(/["\\;]/g,"_");
+    const encodedName=encodeURIComponent(safeName).replace(/['()*]/g,
+      c=>"%"+c.charCodeAt(0).toString(16).toUpperCase());
     const body=new Uint8Array(data.length);
     body.set(data);
     return new NextResponse(body.buffer,{
       headers:{
         "Content-Type":file.mime,
-        "Content-Disposition":'inline; filename="'+safeName+'"',
+        "Content-Disposition":'inline; filename="'+asciiName+'"; filename*=UTF-8\'\''+encodedName,
         "Cache-Control":"private, no-store",
         "X-Content-Type-Options":"nosniff",
         "Content-Security-Policy":"sandbox",

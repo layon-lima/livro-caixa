@@ -35,9 +35,15 @@ export default async function Importar({searchParams}:{searchParams:Promise<{tit
     "(SELECT count(*)::int FROM propostas pp WHERE pp.arquivo_id=a.id AND pp.descartado_em IS NULL) AS propostas_quantidade,"+
     "EXISTS(SELECT 1 FROM propostas p WHERE p.arquivo_id=a.id AND p.descartado_em IS NULL AND (p.revisada_em IS NOT NULL OR p.aprovado_em IS NOT NULL)) AS revisado "+
     "FROM arquivos a JOIN titulares t ON t.id=a.titular_envio_id "+
-    "LEFT JOIN LATERAL (SELECT p.titulo,p.documento_tipo,p.contraparte,p.descricao,p.data_pagamento,"+
-    "p.categoria_id,p.categoria_sugerida_nome,p.categoria_sugerida_subcategoria "+
-    "FROM propostas p WHERE p.arquivo_id=a.id AND p.descartado_em IS NULL ORDER BY p.id LIMIT 1) first ON TRUE "+
+    "LEFT JOIN LATERAL (SELECT COALESCE(NULLIF(o.titulo,''),p.titulo) AS titulo,"+
+    "p.documento_tipo,COALESCE(NULLIF(o.contraparte,''),p.contraparte) AS contraparte,"+
+    "COALESCE(NULLIF(o.descricao,''),p.descricao) AS descricao,"+
+    "COALESCE(o.data_pagamento,p.data_pagamento) AS data_pagamento,"+
+    "COALESCE(o.categoria_id,p.categoria_id) AS categoria_id,"+
+    "p.categoria_sugerida_nome,p.categoria_sugerida_subcategoria "+
+    "FROM propostas p LEFT JOIN operacoes o ON o.id=p.operacao_id "+
+    "WHERE p.arquivo_id=a.id AND p.descartado_em IS NULL "+
+    "ORDER BY (p.aprovado_em IS NOT NULL) DESC,p.id LIMIT 1) first ON TRUE "+
     "LEFT JOIN categorias c ON c.id=first.categoria_id "+
     (user.isAdmin?"":"JOIN user_titular_permissions p ON p.titular_id=a.titular_envio_id AND p.user_id=$1 AND p.can_import=true ")+
     "WHERE a.descartado_em IS NULL ORDER BY a.id DESC LIMIT 100",

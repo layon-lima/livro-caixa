@@ -75,15 +75,30 @@ function dateSuffix(value:string|null|undefined):string{
   return d+"-"+m+"-"+y;
 }
 
+// O nome exibido vem primeiro do campo "Descrição do lançamento" (titulo).
+// Os bytes e o nome de origem ficam preservados para auditoria.
+function descriptiveName(value:string|null|undefined):string{
+  const clean=String(value||"").normalize("NFC")
+    .replace(/[\\/<>:"|?*\u0000-\u001f\u007f]/g," ")
+    .replace(/\s+/g," ").replace(/[. ]+$/g,"").trim()
+    .replace(/\.(?:pdf|xml|png|jpe?g)$/i,"").trim();
+  const generic=compact(clean);
+  if(!generic||/^(?:COMPROVANTE|COMPROVANTE PIX|PIX|PAGAMENTO|DOCUMENTO|ARQUIVO|RECIBO|BOLETO|NOTA FISCAL|OUTRO|SCAN|SEM TITULO)$/.test(generic))
+    return "";
+  const base=clean.slice(0,170).trim().replace(/[. ]+$/g,"");
+  return /^(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i.test(base)?"DOCUMENTO "+base:base;
+}
+
 export function suggestDocumentName(data:DocumentNameData):string{
   const original=String(data.originalName||"").trim();
+  const suffix=extension(original);
+  const description=descriptiveName(data.title)||descriptiveName(data.description);
+  if(description)return description+(suffix?"."+suffix:"");
+  // Sem descrição identificável, usar identificação estruturada anterior.
   const party=compact(data.counterparty);
   const kind=label(data);
-  // Só renomear quando houver identificação útil. Nunca inventar recebedores
-  // nem apresentar o nome técnico de um documento como classificação real.
   if(!kind||party.length<3||["NAO IDENTIFICADO","SEM RECEBEDOR","DESCONHECIDO"].includes(party))
     return original;
-  const suffix=extension(original);
   const chunks=[kind,purpose(data),party.slice(0,75),dateSuffix(data.paymentDate)].filter(Boolean);
   const basename=chunks.join(" ").slice(0,175).trim();
   return basename+(suffix?"."+suffix:"");
