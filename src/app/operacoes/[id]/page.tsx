@@ -23,9 +23,8 @@ export default async function Editar({params,searchParams}:{
   const [cats,books,tags,assigned,files]=await Promise.all([
     categorias(),titularesPermitidos(user,"edit"),tagsDisponiveis(),
     db.query<{tag_id:string}>("SELECT tag_id::text FROM operacao_tags WHERE operacao_id=$1",[id]),
-    db.query<{arquivo_id:string;nome_original:string;documento_tipo:string;quantidade_no_arquivo:number}>(
-      "SELECT oa.arquivo_id::text,a.nome_original,p.documento_tipo,"+
-      "(SELECT COUNT(*)::int FROM propostas p2 WHERE p2.arquivo_id=a.id) AS quantidade_no_arquivo "+
+    db.query<{arquivo_id:string;nome_original:string;documento_tipo:string}>(
+      "SELECT oa.arquivo_id::text,a.nome_original,p.documento_tipo "+
       "FROM operacao_arquivos oa JOIN arquivos a ON a.id=oa.arquivo_id "+
       "JOIN propostas p ON p.id=oa.proposta_id "+
       "WHERE oa.operacao_id=$1",[id]),
@@ -81,8 +80,8 @@ export default async function Editar({params,searchParams}:{
       </form>
       <h2 className="work-heading">Documentos vinculados</h2>
       {files.rows.map(f=><div className="upload-file-row" key={f.arquivo_id}>
-        <a href={"/api/documentos/"+f.arquivo_id} target="_blank" rel="noreferrer"><FileText size={14}/>{
-          f.quantidade_no_arquivo>1?f.nome_original:suggestDocumentName({
+        <a href={"/api/documentos/"+f.arquivo_id+"?operacao="+id} target="_blank" rel="noreferrer"><FileText size={14}/>{
+          suggestDocumentName({
             originalName:f.nome_original,documentType:f.documento_tipo,
             title:op.titulo,counterparty:op.contraparte,category:opCategory?.nome,
             subcategory:opCategory?.subcategoria,description:op.descricao,

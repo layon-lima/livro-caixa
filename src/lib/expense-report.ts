@@ -83,12 +83,15 @@ const select="SELECT o.id::text,o.titular_id::text,o.titulo,o.categoria_id::text
   "EXISTS (SELECT 1 FROM operacao_arquivos oa WHERE oa.operacao_id=o.id) AS tem_documento ";
 
 function namesForReport(rows:ExpenseRow[]):ExpenseRow[]{
-  return rows.map(row=>({...row,documento:row.documento&&Number(row.quantidade_no_arquivo)<=1?suggestDocumentName({
+  // Cada linha da planilha é um lançamento, mesmo quando um PDF gerou várias
+  // propostas. O nome exibido deve refletir o título do lançamento desta linha.
+  // O arquivo físico continua intacto e pode servir a vários lançamentos.
+  return rows.map(row=>({...row,documento:row.documento?suggestDocumentName({
     originalName:row.documento,documentType:row.documento_tipo,
     title:row.titulo,counterparty:row.contraparte,
     category:row.categoria,
     description:row.descricao,paymentDate:row.data_pagamento
-  }):row.documento}));
+  }):null}));
 }
 
 export async function expensePage(titularId:number,filters:ExpenseFilters){

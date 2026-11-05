@@ -7,11 +7,17 @@ import { suggestDocumentName } from "@/lib/document-name";
 export const runtime="nodejs";
 export const dynamic="force-dynamic";
 
-export async function GET(_request:Request,{params}:{params:Promise<{id:string}>}) {
+export async function GET(request:Request,{params}:{params:Promise<{id:string}>}) {
   const user=await currentUser();
   if (!user) return new Response("Não autenticado",{status:401});
   const fileId=safeId((await params).id);
   if (!fileId) return new Response("Arquivo não encontrado",{status:404});
+  // Em arquivos que geraram vários lançamentos, o contexto determina o nome
+  // do PDF, sem reescrever o original compartilhado.
+  const operationParam=new URL(request.url).searchParams.get("operacao");
+  const operationId=operationParam===null?null:safeId(operationParam);
+  if(operationParam!==null&&!operationId)
+    return new Response("Lançamento inválido",{status:400});
   const r=await getDatabase().query<{
     chave_armazenamento:string;armazenamento:string;nome_original:string;
     mime:string;titular_envio_id:string;acessos:string[];
@@ -45,15 +51,39 @@ export async function GET(_request:Request,{params}:{params:Promise<{id:string}>
   if(file.armazenamento!=="local") {
     return new Response("Arquivo antigo pendente de migração de armazenamento.",{status:503});
   }
+  let operationName:typeof file|undefined;
+  if(operationId){
+    const related=await getDatabase().query<{
+      titulo:string;documento_tipo:string;contraparte:string;descricao:string;
+      data_pagamento:string|null;categoria:string|null;subcategoria:string|null;
+      titular_id:string;
+    }>(
+      "SELECT o.titulo,p.documento_tipo,o.contraparte,o.descricao,"+
+      "o.data_pagamento::text,c.nome AS categoria,c.subcategoria,o.titular_id::text "+
+      "FROM operacao_arquivos oa "+
+      "JOIN operacoes o ON o.id=oa.operacao_id "+
+      "JOIN propostas p ON p.id=oa.proposta_id "+
+      "LEFT JOIN categorias c ON c.id=o.categoria_id "+
+      "WHERE oa.arquivo_id=$1 AND oa.operacao_id=$2 AND o.excluido_em IS NULL "+
+      "ORDER BY oa.proposta_id LIMIT 1",[fileId,operationId]
+    );
+    const matched=related.rows[0];
+    if(!matched)return new Response("Documento não vinculado ao lançamento",{status:404});
+    if(!user.isAdmin&&!await canAccessTitular(user,Number(matched.titular_id),"view"))
+      return new Response("Acesso negado",{status:403});
+    operationName={...file,...matched};
+  }
   try {
     const data=await readOriginal(file.chave_armazenamento,file.armazenamento);
-    // Ao abrir/salvar, usar o nome identificado. O conteúdo original é imutável.
-    // PDFs com mais de uma proposta continuam com o nome de origem.
-    const displayName=file.propostas_quantidade===1?suggestDocumentName({
-      originalName:file.nome_original,documentType:file.documento_tipo,
-      title:file.titulo,counterparty:file.contraparte,category:file.categoria,
-      subcategory:file.subcategoria,description:file.descricao,
-      paymentDate:file.data_pagamento
+    // Com contexto da operação, a descrição daquele lançamento prevalece
+    // mesmo em arquivos históricos que possuem várias propostas.
+    // Sem contexto, um PDF compartilhado mantém o nome original.
+    const nameData=operationName||file;
+    const displayName=(operationName||file.propostas_quantidade===1)?suggestDocumentName({
+      originalName:file.nome_original,documentType:nameData.documento_tipo,
+      title:nameData.titulo,counterparty:nameData.contraparte,category:nameData.categoria,
+      subcategory:nameData.subcategoria,description:nameData.descricao,
+      paymentDate:nameData.data_pagamento
     }):file.nome_original;
     const safeName=displayName.replace(/[\\/\r\n"]/g,"_");
     // RFC 5987: preservar acentos em nomes usados pelo navegador.

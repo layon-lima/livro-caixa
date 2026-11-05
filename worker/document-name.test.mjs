@@ -55,3 +55,31 @@ test("Títulos genéricos aproveitam detalhes; caracteres proibidos são removid
     title:"Comprovante",description:"Aluguel: sede / novembro *2026*"
   }),"Aluguel sede novembro 2026.pdf");
 });
+
+test("Histórico com vários lançamentos recebe nome específico por operação",()=>{
+  const historic="E60746948202610281555357938ZSTI.pdf";
+  assert.equal(suggestDocumentName({
+    originalName:historic,documentType:"comprovante",
+    title:"Comprovante Pix — GUSTAVO HENRIQUE ALVES DE CARVALHO BATISTA",
+    counterparty:"GUSTAVO HENRIQUE ALVES DE CARVALHO BATISTA"
+  }),"Comprovante Pix — GUSTAVO HENRIQUE ALVES DE CARVALHO BATISTA.pdf");
+});
+
+test("Regressão: planilha e abertura incluem multi-propostas com nome por lançamento",async()=>{
+  const {readFile}=await import("node:fs/promises");
+  const root=new URL("../",import.meta.url);
+  const [report,row,page,download]=await Promise.all([
+    readFile(new URL("src/lib/expense-report.ts",root),"utf8"),
+    readFile(new URL("src/components/operation-rows.tsx",root),"utf8"),
+    readFile(new URL("src/app/operacoes/[id]/page.tsx",root),"utf8"),
+    readFile(new URL("src/app/api/documentos/[id]/route.ts",root),"utf8")
+  ]);
+  assert.doesNotMatch(report,/row\.quantidade_no_arquivo\)\s*<=1\s*\?\s*suggestDocumentName/);
+  assert.match(report,/documento:row\.documento\?suggestDocumentName/);
+  assert.doesNotMatch(row,/Number\(doc\.quantidade_no_arquivo\)>1\?doc\.nome_original/);
+  assert.match(row,/\?operacao="\+current\.id/);
+  assert.doesNotMatch(page,/quantidade_no_arquivo>1\?f\.nome_original/);
+  assert.match(page,/\?operacao="\+id/);
+  assert.match(download,/oa\.arquivo_id=\$1 AND oa\.operacao_id=\$2/);
+  assert.match(download,/operationName\|\|file\.propostas_quantidade===1/);
+});

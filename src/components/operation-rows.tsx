@@ -14,11 +14,11 @@ export type OperationEntry={
 export type AttachedDocument={operacao_id:string;arquivo_id:string;nome_original:string;documento_tipo:string;quantidade_no_arquivo?:number;nome_exibicao?:string};
 type Book={id:string;nome:string};
 const displayName=(doc:AttachedDocument,op:OperationEntry)=>doc.nome_exibicao||
-  (Number(doc.quantidade_no_arquivo)>1?doc.nome_original:suggestDocumentName({
-  originalName:doc.nome_original,documentType:doc.documento_tipo,title:op.titulo,
-  counterparty:op.contraparte,category:op.categoria,subcategory:op.subcategoria,
-  description:op.descricao,paymentDate:op.data_pagamento,
-}));
+  suggestDocumentName({
+    originalName:doc.nome_original,documentType:doc.documento_tipo,title:op.titulo,
+    counterparty:op.contraparte,category:op.categoria,subcategory:op.subcategoria,
+    description:op.descricao,paymentDate:op.data_pagamento,
+  });
 type Props={
   operations:OperationEntry[];documents:AttachedDocument[];books:Book[];
   canEdit:boolean;canDelete:boolean;bookId:string;
@@ -156,7 +156,7 @@ export function OperationRows({operations,documents,books,canEdit,canDelete,book
         <button type="button" onClick={()=>setMenu(null)} aria-label="Fechar ações"><X size={16}/></button>
       </div>
       {menu.view==="actions"&&<div className="entity-popup-options">
-        {menu.arquivoId&&<a href={"/api/documentos/"+menu.arquivoId}
+        {menu.arquivoId&&<a href={"/api/documentos/"+menu.arquivoId+"?operacao="+current.id}
           target="_blank" rel="noopener noreferrer" onClick={()=>setMenu(null)}>
           <FileText size={15}/> Abrir documento original
         </a>}
@@ -186,7 +186,7 @@ export function OperationRows({operations,documents,books,canEdit,canDelete,book
         {current.descricao&&<p>{current.descricao}</p>}
       </div>}
       {menu.view==="files"&&<div className="entity-popup-options">
-        {currentDocs.map(f=><a key={f.arquivo_id} href={"/api/documentos/"+f.arquivo_id}
+        {currentDocs.map(f=><a key={f.arquivo_id} href={"/api/documentos/"+f.arquivo_id+"?operacao="+current.id}
           target="_blank" rel="noopener noreferrer"><FileText size={15}/><span className="truncate">{displayName(f,current)}</span></a>)}
         {Number(current.quantidade_documentos)>currentDocs.length&&
           <Link href={"/operacoes/"+current.id} onClick={()=>setMenu(null)}>
