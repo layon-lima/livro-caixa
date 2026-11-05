@@ -1184,12 +1184,12 @@ button { cursor: pointer; }
 .expense-sheet .expense-table-header,
 .expense-sheet .expense-sheet-row {
   display:grid;
-  grid-template-columns:108px 132px minmax(350px,1.9fr) 92px minmax(180px,.85fr) minmax(190px,.85fr);
-  min-width:1110px;
+  grid-template-columns:108px 132px minmax(350px,2fr) minmax(180px,.9fr) minmax(190px,.9fr);
+  min-width:960px;
   width:100%;
   box-sizing:border-box;
 }
-.expense-sheet .expense-month-header {min-width:1110px;}
+.expense-sheet .expense-month-header {min-width:960px;}
 .expense-sheet .expense-table-header {
   position:static;
   z-index:auto;
@@ -1233,15 +1233,6 @@ button { cursor: pointer; }
   overflow:hidden;
   text-overflow:ellipsis;
   white-space:nowrap;
-}
-.expense-sheet .expense-sheet-row > .expense-type-cell {
-  display:flex;
-  align-items:center;
-}
-.expense-sheet .expense-sheet-row .expense-type-cell .expense-kind {
-  margin:0;
-  max-width:100%;
-  flex-shrink:1;
 }
 .expense-sheet .expense-sheet-row .expense-category,
 .expense-sheet .expense-sheet-row .expense-tags {color:#405873;font-size:11px;}

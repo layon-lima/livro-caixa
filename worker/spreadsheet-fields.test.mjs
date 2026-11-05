@@ -26,9 +26,11 @@ test("Planilha mensal mostra grade Excel e cabeçalhos em cada mês",async()=>{
   ]);
   const header=ui.split("const monthlyColumnHeader=")[1]?.split('  return <div className="expense-sheet">')[0];
   assert.ok(header);
-  for(const label of ["Data","Valor","Documento","Tipo","Categoria","Tags"])
+  for(const label of ["Data","Valor","Documento","Categoria","Tags"])
     assert.ok(header.includes(label),label);
-  assert.equal((header.match(/role="columnheader"/g)||[]).length,6);
+  assert.equal((header.match(/role="columnheader"/g)||[]).length,5);
+  assert.doesNotMatch(header,/\bTipo\b/);
+  assert.doesNotMatch(rows,/expense-type-cell|documentTypeLabel\(op\)/);
   assert.match(ui,/columnHeader=\{monthlyColumnHeader\}/);
   assert.doesNotMatch(ui,/sortButton\("Recebedor"/);
   assert.match(rows,/\{!closed&&<>\s*\{columnHeader\}/);
@@ -36,6 +38,7 @@ test("Planilha mensal mostra grade Excel e cabeçalhos em cada mês",async()=>{
   assert.match(rows,/className="expense-tags"/);
   assert.doesNotMatch(rows,/className="expense-strong" title=\{op.contraparte/);
   assert.match(css,/grid-template-columns:108px 132px minmax\(350px/);
+  assert.match(css,/min-width:960px/);
   assert.match(css,/border-right:1px solid #c7d3e0/);
   assert.match(css,/border-bottom:1px solid #cbd6e2/);
 });

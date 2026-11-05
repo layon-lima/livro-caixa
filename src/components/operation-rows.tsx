@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { FileText, Folder, FolderInput, Pencil, Trash2, X, Eye, ChevronLeft, ChevronDown, ChevronRight, CalendarDays } from "lucide-react";
 import { suggestDocumentName } from "@/lib/document-name";
-import { documentTypeLabel, formatTransactionDate } from "@/lib/spreadsheet-fields";
+import { formatTransactionDate } from "@/lib/spreadsheet-fields";
 
 export type OperationEntry={
   id:string;titular_id:string;titulo:string;categoria:string|null;subcategoria:string|null;tags?:string[];
@@ -113,9 +113,6 @@ export function OperationRows({operations,documents,books,canEdit,canDelete,book
                 {op.documento&&<FileText size={15} strokeWidth={1.7} aria-hidden="true"/>}
                 <span>{op.documento||"Sem documento"}</span>
               </span>
-              <span className="expense-type-cell"><span className="expense-kind" title={documentTypeLabel(op)}>
-                {documentTypeLabel(op)}
-              </span></span>
               <span className="expense-category" title={op.categoria||"Sem categoria"}>
                 {op.categoria||"—"}
               </span>

@@ -103,7 +103,6 @@ export function ExpenseSpreadsheet({bookId,cats,tags,books,canEdit,canDelete,mon
     <span role="columnheader">{sortButton("Data","data")}</span>
     <span role="columnheader" className="align-right">{sortButton("Valor","valor")}</span>
     <span role="columnheader">{sortButton("Documento","titulo")}</span>
-    <span role="columnheader">Tipo</span>
     <span role="columnheader">Categoria</span>
     <span role="columnheader">Tags</span>
   </div>;
