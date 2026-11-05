@@ -1,13 +1,13 @@
 import { StandaloneWorkspace } from "@/components/standalone-workspace";
 import Link from "next/link";
-import { requireUser } from "@/lib/auth";
+import { requireAdmin } from "@/lib/auth";
 import { getDatabase } from "@/lib/database";
 import { Trash2, ArrowLeft } from "lucide-react";
 import { TrashRows } from "@/components/trash-rows";
 export const dynamic = "force-dynamic";
 
 export default async function Lixeira({searchParams}:{searchParams:Promise<{erro?:string;id?:string}>}) {
-  const user=await requireUser();
+  const user=await requireAdmin();
   const db=getDatabase();
   const rows=await db.query<{id:string;titulo:string;nome:string;competencia:string}>(
     "SELECT o.id::text,o.titulo,t.nome,o.competencia::text FROM operacoes o JOIN titulares t ON t.id=o.titular_id "+

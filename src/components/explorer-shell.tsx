@@ -21,9 +21,9 @@ export function ExplorerShell({ user, titulares, selected, children, pageTitle, 
         <Link className={"rail-item"+(activeSection==="livros"?" rail-item-active":"")} href="/" aria-label="Livros Caixa">
           <BookOpen size={19} strokeWidth={1.8} aria-hidden="true" /><span>Livros</span>
         </Link>
-        <Link className={"rail-item"+(activeSection==="lixeira"?" rail-item-active":"")} href="/lixeira" aria-label="Lixeira">
+        {user.isAdmin&&<Link className={"rail-item"+(activeSection==="lixeira"?" rail-item-active":"")} href="/lixeira" aria-label="Lixeira">
           <Trash2 size={19} strokeWidth={1.8}/><span>Lixeira</span>
-        </Link>
+        </Link>}
         {user.isAdmin&&<Link className={"rail-item"+(activeSection==="admin"?" rail-item-active":"")} href="/admin" aria-label="Administração">
           <Settings2 size={19} strokeWidth={1.8}/><span>Admin</span>
         </Link>}

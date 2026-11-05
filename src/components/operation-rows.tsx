@@ -8,6 +8,7 @@ import { formatTransactionDate } from "@/lib/spreadsheet-fields";
 
 export type OperationEntry={
   id:string;titular_id:string;titulo:string;categoria:string|null;subcategoria:string|null;tags?:string[];
+  arquivo_id?:string|null;
   categoria_id:string|null;competencia:string;tipo:string;descricao:string;
   contraparte:string;referencia:string;valor:string|null;quantidade_documentos:string; data_registro?:string; data_pagamento?:string|null; documento?:string|null; documento_tipo?:string|null; tem_documento?:boolean;
 };
@@ -21,7 +22,7 @@ const displayName=(doc:AttachedDocument,op:OperationEntry)=>doc.nome_exibicao||
   });
 type Props={
   operations:OperationEntry[];documents:AttachedDocument[];books:Book[];
-  canEdit:boolean;canDelete:boolean;bookId:string;
+  canEdit:boolean;canDelete:boolean;isAdmin:boolean;bookId:string;
   variant?:"explorer"|"spreadsheet";monthlyTotals?:{mes:string;quantidade:number;total:string}[];
   columnHeader?:ReactNode;
 };
@@ -32,7 +33,7 @@ const place=(x:number,y:number)=>({
   y:Math.max(8,Math.min(y,window.innerHeight-350))
 });
 
-export function OperationRows({operations,documents,books,canEdit,canDelete,bookId,variant="explorer",monthlyTotals=[],columnHeader}:Props){
+export function OperationRows({operations,documents,books,canEdit,canDelete,isAdmin,bookId,variant="explorer",monthlyTotals=[],columnHeader}:Props){
   const [collapsed,setCollapsed]=useState<string[]>([]);
   const [selected,setSelected]=useState<string|null>(null);
   const [menu,setMenu]=useState<Menu|null>(null);
@@ -61,9 +62,21 @@ export function OperationRows({operations,documents,books,canEdit,canDelete,book
     return ()=>{document.removeEventListener("keydown",onKey);document.removeEventListener("pointerdown",onClick);};
   },[menu]);
   function show(id:string,x:number,y:number,arquivoId?:string){
+    if(!isAdmin)return;
     const position=place(x,y);
     setSelected(id);setDestination(bookId);
     setMenu({id,...position,view:"actions",arquivoId});
+  }
+  // Para contas comuns: somente o PDF vinculado ao lançamento, sem popup.
+  // A checagem de acesso ao documento continua no servidor.
+  function openDocument(id:string,arquivoId?:string){
+    if(!arquivoId)return;
+    window.open("/api/documentos/"+encodeURIComponent(arquivoId)+
+      "?operacao="+encodeURIComponent(id),"_blank","noopener,noreferrer");
+  }
+  function activate(id:string,x:number,y:number,arquivoId?:string){
+    if(isAdmin)show(id,x,y,arquivoId);
+    else openDocument(id,arquivoId);
   }
   const view=(kind:Menu["view"])=>setMenu(m=>m?{...m,view:kind}:null);
   return <div className={"operation-scroll"+(variant==="spreadsheet"?" expense-scroll":"")} aria-label="Operações do livro">
@@ -94,15 +107,16 @@ export function OperationRows({operations,documents,books,canEdit,canDelete,book
           {!closed&&<>
             {columnHeader}
             {entries.map(op=><div key={op.id} className={"expense-sheet-row"+(selected===op.id?" selected":"")}
-              role="button" tabIndex={0} title="Clique para selecionar, duplo clique para ações"
-              aria-label={op.titulo+". Dois cliques para ações"}
+              role="button" tabIndex={0}
+              title={isAdmin?"Clique para selecionar, duplo clique para ações":op.arquivo_id?"Duplo clique para abrir o documento":"Lançamento sem documento"}
+              aria-label={op.titulo+(isAdmin?". Dois cliques para ações":op.arquivo_id?". Dois cliques para abrir o documento":". Sem documento")}
               onClick={()=>{setSelected(op.id);setMenu(null);}}
-              onDoubleClick={e=>show(op.id,e.clientX,e.clientY)}
-              onContextMenu={e=>{e.preventDefault();show(op.id,e.clientX,e.clientY);}}
+              onDoubleClick={e=>activate(op.id,e.clientX,e.clientY,op.arquivo_id||undefined)}
+              onContextMenu={e=>{if(isAdmin){e.preventDefault();show(op.id,e.clientX,e.clientY);}}}
               onKeyDown={e=>{
                 if(e.key==="Enter"||e.key===" "){
                   e.preventDefault();const b=e.currentTarget.getBoundingClientRect();
-                  show(op.id,b.left+80,b.top+20);
+                  activate(op.id,b.left+80,b.top+20,op.arquivo_id||undefined);
                 }
               }}>
               <span className="expense-date" title={op.data_pagamento?"Data efetiva da transação: "+formatTransactionDate(op.data_pagamento):"Data da transação não identificada"}>
@@ -126,16 +140,16 @@ export function OperationRows({operations,documents,books,canEdit,canDelete,book
     })():fileEntries.map(({op,doc,key})=><div key={key}
       className={"operation-row operation-popup-row explorer-file-row"+(selected===key?" selected":"")}
       role="button" tabIndex={0}
-      aria-label={(doc?displayName(doc,op):op.titulo)+". Dois cliques para ações"}
-      title="Clique para selecionar; dois cliques para abrir as opções do arquivo"
+      aria-label={(doc?displayName(doc,op):op.titulo)+(isAdmin?". Dois cliques para ações":doc?". Dois cliques para abrir o documento":". Sem documento")}
+      title={isAdmin?"Duplo clique para opções do arquivo":doc?"Duplo clique para abrir o documento":"Lançamento sem documento"}
       onClick={()=>{setSelected(key);setMenu(null);}}
-      onDoubleClick={e=>{show(op.id,e.clientX,e.clientY,doc?.arquivo_id);setSelected(key);}}
-      onContextMenu={e=>{e.preventDefault();show(op.id,e.clientX,e.clientY,doc?.arquivo_id);setSelected(key);}}
+      onDoubleClick={e=>{activate(op.id,e.clientX,e.clientY,doc?.arquivo_id);setSelected(key);}}
+      onContextMenu={e=>{if(isAdmin){e.preventDefault();show(op.id,e.clientX,e.clientY,doc?.arquivo_id);setSelected(key);}}}
       onKeyDown={e=>{
         if(e.key==="Enter"||e.key===" "){
           e.preventDefault();
           const b=e.currentTarget.getBoundingClientRect();
-          show(op.id,b.left+75,b.top+25,doc?.arquivo_id);
+          activate(op.id,b.left+75,b.top+25,doc?.arquivo_id);
           setSelected(key);
         }
       }}>
@@ -150,7 +164,7 @@ export function OperationRows({operations,documents,books,canEdit,canDelete,book
       <span className="explorer-file-value">{money(op.valor)||"—"}</span>
     </div>)}
     {operations.length===0&&<p className="empty-info">Nenhum lançamento para os filtros selecionados.</p>}
-    {menu&&current&&<div ref={popup} className="entity-actions-popup" role="dialog"
+    {isAdmin&&menu&&current&&<div ref={popup} className="entity-actions-popup" role="dialog"
       aria-label={"Ações de "+current.titulo} style={{left:menu.x,top:menu.y}}
       onClick={e=>e.stopPropagation()}>
       <div className="entity-popup-header">

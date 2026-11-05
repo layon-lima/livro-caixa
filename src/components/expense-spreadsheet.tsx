@@ -16,9 +16,9 @@ type Data={rows:ExpenseItem[];summary:{total:string;quantidade:number};
 type Sort="data"|"valor"|"titulo";
 const fmt=(n:string)=>Number(n||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 
-export function ExpenseSpreadsheet({bookId,cats,tags,books,canEdit,canDelete,months,
+export function ExpenseSpreadsheet({bookId,cats,tags,books,canEdit,canDelete,isAdmin,months,
   initialMonth="",initialCategory="",initialSearch=""}:{
-  bookId:string;cats:Category[];tags:Tag[];books:Book[];canEdit:boolean;canDelete:boolean;
+  bookId:string;cats:Category[];tags:Tag[];books:Book[];canEdit:boolean;canDelete:boolean;isAdmin:boolean;
   months:string[];initialMonth?:string;initialCategory?:string;initialSearch?:string;
 }){
   const [month,setMonth]=useState(initialMonth);
@@ -157,7 +157,7 @@ export function ExpenseSpreadsheet({bookId,cats,tags,books,canEdit,canDelete,mon
       {!loading&&<OperationRows key={params} variant="spreadsheet" columnHeader={monthlyColumnHeader}
         operations={data?.rows||[]} documents={documents}
         monthlyTotals={data?.months||[]} books={books}
-        canEdit={canEdit} canDelete={canDelete} bookId={bookId}/>}
+        canEdit={canEdit} canDelete={canDelete} isAdmin={isAdmin} bookId={bookId}/>}
     </div>
     <footer className="expense-footer">
       <span>{count.toLocaleString("pt-BR")} lançamentos de saída

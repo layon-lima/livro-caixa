@@ -54,7 +54,7 @@ export default async function Livro({params,searchParams}:{
       Para evitar misturar documentos, a movimentação foi bloqueada.
     </p>}
     <ExpenseSpreadsheet key={id} bookId={String(id)} cats={cats} tags={tags}
-      books={editBooks} canEdit={canEdit} canDelete={canDelete}
+      books={editBooks} canEdit={canEdit} canDelete={canDelete} isAdmin={user.isAdmin}
       months={months.rows.map(m=>m.mes)} initialMonth={month}
       initialCategory={category} initialSearch={search}/>
   </ExplorerShell>;

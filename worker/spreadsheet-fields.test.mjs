@@ -42,3 +42,24 @@ test("Planilha mensal mostra grade Excel e cabeçalhos em cada mês",async()=>{
   assert.match(css,/border-right:1px solid #c7d3e0/);
   assert.match(css,/border-bottom:1px solid #cbd6e2/);
 });
+
+test("Usuário comum abre arquivo por duplo clique e não recebe popup",async()=>{
+  const {readFile}=await import("node:fs/promises");
+  const root=new URL("../",import.meta.url);
+  const [page,spreadsheet,rows,shell,trash]=await Promise.all([
+    readFile(new URL("src/app/livros/[id]/page.tsx",root),"utf8"),
+    readFile(new URL("src/components/expense-spreadsheet.tsx",root),"utf8"),
+    readFile(new URL("src/components/operation-rows.tsx",root),"utf8"),
+    readFile(new URL("src/components/explorer-shell.tsx",root),"utf8"),
+    readFile(new URL("src/app/lixeira/page.tsx",root),"utf8")
+  ]);
+  assert.match(page,/isAdmin=\{user\.isAdmin\}/);
+  assert.match(spreadsheet,/isAdmin=\{isAdmin\}/);
+  assert.match(rows,/if\(!isAdmin\)return;/);
+  assert.match(rows,/window\.open\("\/api\/documentos\/"/);
+  assert.match(rows,/onDoubleClick=\{e=>activate\(op\.id,e\.clientX,e\.clientY,op\.arquivo_id\|\|undefined\)\}/);
+  assert.match(rows,/isAdmin&&menu&&current/);
+  assert.match(rows,/if\(isAdmin\)\{e\.preventDefault\(\);show/);
+  assert.match(shell,/\{user\.isAdmin&&<Link className=\{"rail-item"\+\(activeSection==="lixeira"/);
+  assert.match(trash,/const user=await requireAdmin\(\)/);
+});
