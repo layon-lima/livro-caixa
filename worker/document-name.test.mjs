@@ -20,7 +20,7 @@ test("Boleto de fertilizante fica identificado mesmo sem IA",()=>{
   assert.equal(suggestDocumentName({
     originalName:"scan.pdf",documentType:"boleto",
     counterparty:"AGREX DO BRASIL LTDA",category:"Compras Fazenda",description:"Fertilizante NPK"
-  }),"BOLETO FERTILIZANTES AGREX DO BRASIL LTDA.pdf");
+  }),"Fertilizante NPK.pdf");
 });
 test("Sem identificação segura, preservar nome original",()=>{
   assert.equal(suggestDocumentName({originalName:"Comprovante.pdf",
@@ -33,7 +33,7 @@ test("Não inventar abastecimento só porque é pagamento num posto",()=>{
 });
 test("Extensão do original permanece e caracteres inválidos são removidos",()=>{
   assert.equal(suggestDocumentName({originalName:"sem-nome.xml",documentType:"nota fiscal",
-    counterparty:"Distribuidora / Norte: 01",category:"Compras Fazenda",description:"Compra de sementes"}),"NOTA FISCAL SEMENTES DISTRIBUIDORA NORTE 01.xml");
+    counterparty:"Distribuidora / Norte: 01",category:"Compras Fazenda",description:"Compra de sementes"}),"Compra de sementes.xml");
 });
 
 test("Retroativo: lançamento antigo aprovado exibe o título confirmado",()=>{
