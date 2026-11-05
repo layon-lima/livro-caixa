@@ -99,7 +99,8 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
   const inProgress=pending?.rows||[];
   // Além dos duplicados pelo conteúdo do arquivo, registrar os marcados
   // pela análise de uma proposta. O filtro normal exclui esses registros.
-  const proposalDuplicateArgs:(string|number[])[]=lote?[lote]:batch?[batch]:[];
+  const proposalDuplicateArgs:(string|number[]|number)[]=lote?[lote]:batch?[batch]:[];
+  if(!user.isAdmin)proposalDuplicateArgs.push(user.id);
   const proposalDuplicateScope=lote?
     "AND EXISTS(SELECT 1 FROM lote_itens li WHERE li.lote_id=$1 AND li.arquivo_id=p.arquivo_id) ":
     batch?"AND p.arquivo_id=ANY($1::bigint[]) ":"";
@@ -108,6 +109,8 @@ export default async function Conferencia({searchParams}:{searchParams:Promise<{
   }>(
     "SELECT p.id::text,a.nome_original,a.id::text AS arquivo_id FROM propostas p "+
     "JOIN arquivos a ON a.id=p.arquivo_id "+
+    (user.isAdmin?"":"JOIN user_titular_permissions dupup ON dupup.titular_id=p.titular_id "+
+      "AND dupup.user_id=$2 AND dupup.can_approve=true ")+
     "WHERE p.duplicada_de IS NOT NULL AND p.aprovado_em IS NULL "+
     "AND p.descartado_em IS NULL AND a.descartado_em IS NULL "+
     proposalDuplicateScope+"ORDER BY p.id DESC LIMIT 300",proposalDuplicateArgs):null;

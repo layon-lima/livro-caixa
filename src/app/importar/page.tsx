@@ -51,11 +51,11 @@ export default async function Importar({searchParams}:{searchParams:Promise<{tit
   ),
     physicalStorageBytes(),
   ]);
-  // A coluna Arquivo acompanha a identificação do OCR ainda durante a leitura.
-  // PDFs com vários documentos preservam o nome do conjunto.
+  // Antes da aprovação, os arquivos sempre conservam o nome recebido.
+  // O nome baseado na descrição passa a ser exibido depois de aprovado.
   const namedFiles=list.rows.map(file=>{
     const preview=file.progresso_dados||{};
-    return {...file,nome_sugerido:file.propostas_quantidade>1?file.nome_original:
+    return {...file,nome_sugerido:!file.aprovado||file.propostas_quantidade>1?file.nome_original:
       suggestDocumentName({
         originalName:file.nome_original,
         documentType:file.documento_tipo||preview.documento_tipo,

@@ -56,3 +56,12 @@ test("Conferência mostra nomes originais e explicita os duplicados filtrados",a
   assert.match(live,/Nome original:/);
   assert.doesNotMatch(live,/\{proposedName\}/);
 });
+
+test("Duplicados são exibidos sem revelar arquivos de titulares sem permissão",async()=>{
+  const [page,importPage]=await Promise.all([
+    read("src/app/conferencia/page.tsx"),read("src/app/importar/page.tsx")
+  ]);
+  assert.match(page,/dupup\.user_id=\$2 AND dupup\.can_approve=true/);
+  assert.match(page,/if\(!user\.isAdmin\)proposalDuplicateArgs\.push\(user\.id\)/);
+  assert.match(importPage,/nome_sugerido:!file\.aprovado\|\|file\.propostas_quantidade>1\?file\.nome_original/);
+});
