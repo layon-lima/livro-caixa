@@ -114,10 +114,10 @@ export function OperationRows({operations,documents,books,canEdit,canDelete,book
                 <span>{op.documento||"Sem documento"}</span>
               </span>
               <span className="expense-category" title={op.categoria||"Sem categoria"}>
-                {op.categoria||"—"}
+                <span className="expense-category-chip">{op.categoria||"—"}</span>
               </span>
               <span className="expense-tags" title={op.tags?.join(" · ")||"Sem tags"}>
-                {op.tags?.length?op.tags.map(t=>"#"+t).join(" · "):"—"}
+                {op.tags?.length?op.tags.map(t=><span className="expense-tag-chip" key={t}>{"#"+t}</span>):"—"}
               </span>
             </div>)}
           </>}

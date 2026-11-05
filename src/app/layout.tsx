@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./ios-surface.css";
 import {Suspense} from "react";
 import { GlobalWorkspaceActions } from "@/components/global-workspace-actions";
 

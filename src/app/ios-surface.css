@@ -1,0 +1,315 @@
+/*
+ * Visual iOS-inspired — Livro Caixa Inteligente
+ * Somente aparência: sem alterar rotas, cálculos, permissões ou fluxos.
+ * Os agrupamentos mensais permanecem tabelas densas, porém em cards separados.
+ */
+:root {
+  --bg:#edf2fa;
+  --panel:#fff;
+  --line:#dae3f0;
+  --line-soft:#e8eef6;
+  --ink:#20334f;
+  --muted:#74859b;
+  --blue:#286fd4;
+  --rail:#132b4d;
+  --rail-hover:#224d7f;
+  --ios-page:#eaf1fc;
+  --ios-border:rgba(183,202,228,.66);
+  --ios-surface:rgba(255,255,255,.88);
+  --ios-shadow:0 6px 20px rgba(37,72,125,.085),0 1px 3px rgba(37,72,125,.05);
+  --ios-shadow-raised:0 10px 26px rgba(38,78,136,.12),0 2px 5px rgba(38,78,136,.055);
+}
+html,body {background:var(--ios-page);}
+body {
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
+  color:var(--ink);
+}
+.workspace {
+  background:linear-gradient(142deg,#f8fbff 0%,#edf3fd 43%,#e5eefb 100%);
+}
+.content-pane,.file-list {background:transparent;}
+.content-header,
+.workspace-focus .content-header {
+  background:rgba(255,255,255,.72);
+  border-bottom:1px solid rgba(208,222,240,.85);
+  box-shadow:0 1px 8px rgba(39,72,117,.045);
+  -webkit-backdrop-filter:blur(16px);
+  backdrop-filter:blur(16px);
+}
+.content-header .crumb strong {color:#193b63;}
+.list-titlebar {background:transparent;border-bottom:0;}
+.list-titlebar h1 {color:#152b4b;font-weight:750;}
+.statusbar {background:rgba(255,255,255,.43);border-color:rgba(207,221,239,.85);}
+.rail {
+  background:linear-gradient(170deg,#18375f 0%,#102844 52%,#172e51 100%);
+  box-shadow:inset -1px 0 rgba(255,255,255,.10),3px 0 16px rgba(17,37,71,.085);
+  gap:11px;padding:12px 5px 0;
+}
+.rail-mark {
+  background:linear-gradient(145deg,#4c9bff,#1561ce);
+  border:1px solid rgba(255,255,255,.30);
+  border-radius:12px;
+  box-shadow:0 4px 13px rgba(12,93,205,.24),inset 0 1px rgba(255,255,255,.3);
+}
+.rail-item {
+  width:54px;
+  min-height:55px;
+  border:1px solid transparent;
+  border-left:1px solid transparent;
+  border-radius:13px;
+  color:#bed1e8;
+  transition:background-color .16s ease,box-shadow .16s ease;
+}
+.rail-item:hover {background:rgba(106,163,226,.16);}
+.rail-item-active {
+  background:linear-gradient(135deg,rgba(98,164,249,.35),rgba(71,121,197,.16));
+  color:#fff;
+  border:1px solid rgba(174,207,249,.34);
+  box-shadow:inset 0 1px rgba(255,255,255,.17),0 4px 12px rgba(4,21,46,.10);
+}
+.nav-arrows button {border-radius:10px;}
+.nav-arrows button:hover {background:rgba(215,231,252,.85);}
+.logout-button,.flat-button,.filter-bar button,.search-bar button {
+  border-radius:10px;
+  border-color:#d4e1f0;
+  background:rgba(255,255,255,.88);
+  box-shadow:0 1px 3px rgba(36,69,116,.045);
+}
+.primary-btn {
+  border-radius:10px;
+  background:linear-gradient(180deg,#3489ed,#216ecb);
+  border-color:#2677d1;
+  box-shadow:0 3px 8px rgba(40,114,211,.15);
+}
+.primary-btn:hover {background:linear-gradient(180deg,#277ee4,#185eb6);}
+.review-form input,.review-form select,.review-form textarea,
+.form-row-compact select,.login-form input,.inline-form input,
+.conference-fields input,.conference-fields select,.conference-fields textarea,
+.conference-extra textarea,.admin-v2-dialog-body>input {
+  border-color:#cedbea;
+  border-radius:10px;
+  background:rgba(255,255,255,.92);
+}
+.review-form input:focus-visible,.review-form select:focus-visible,
+.review-form textarea:focus-visible {
+  outline:2px solid #acd3ff;
+  outline-offset:0;
+}
+.home-books-grid {background:transparent;}
+.home-book-tile {
+  background:linear-gradient(150deg,rgba(255,255,255,.99),rgba(247,251,255,.88));
+  border-color:var(--ios-border);
+  border-radius:19px;
+  box-shadow:var(--ios-shadow);
+}
+.home-book-tile:hover {box-shadow:var(--ios-shadow-raised);border-color:#b5d1f2;}
+.home-book-icon {border-radius:16px;}
+.global-manual-fab {
+  background:linear-gradient(160deg,#4197f1,#1d68cb);
+  box-shadow:0 9px 24px rgba(31,96,187,.27),inset 0 1px rgba(255,255,255,.24);
+  border:1px solid rgba(255,255,255,.4);
+}
+.global-review-return,.global-upload-toast,.entity-actions-popup,
+.login-form,.admin-v2-dialog {
+  border-color:var(--ios-border);
+  border-radius:16px;
+  background:rgba(255,255,255,.97);
+  box-shadow:var(--ios-shadow-raised);
+}
+.work-page,.conference-page,.workspace-focus .content-pane,.admin-v2 {
+  background:transparent;
+}
+.work-main {background:transparent;}
+.work-main.narrow-work {
+  background:rgba(255,255,255,.86);
+  border:1px solid var(--ios-border);
+  border-radius:17px;
+  box-shadow:var(--ios-shadow);
+  margin-top:10px;
+  margin-bottom:10px;
+}
+.work-bar {background:rgba(255,255,255,.68);border-color:#dce6f3;}
+.drop-area,.lc-tags-picker,.manual-duplicate-warning {
+  border-radius:13px;
+}
+.upload-files {border-radius:12px;border-color:#d8e4f2;background:rgba(255,255,255,.85);}
+.admin-v2 {background:transparent;}
+.admin-v2-panel {
+  border-radius:18px;
+  border-color:var(--ios-border);
+  background:rgba(255,255,255,.92);
+  box-shadow:var(--ios-shadow-raised);
+}
+.admin-v2-total,.admin-v2-tabs,.admin-v2-search {
+  border-radius:11px;
+  border-color:#d7e3f1;
+  background:rgba(255,255,255,.75);
+}
+.admin-v2-tabs {padding:4px 5px 0;}
+.admin-v2-tabs button {border-radius:9px 9px 0 0;}
+.admin-v2-icon {border-radius:14px;}
+.admin-v2-new {border-radius:10px;background:linear-gradient(180deg,#3489ed,#206cc9);}
+.admin-v2-item-icon,.admin-v2-mini-tag {border-radius:10px;}
+.conference-document {background:transparent;}
+.conference-queue-pane {
+  background:rgba(255,255,255,.71);
+  border-right-color:#d9e5f4;
+}
+.conference-doc-header,.conference-panel,.conference-text {
+  border-radius:17px;
+  border-color:var(--ios-border);
+  background:rgba(255,255,255,.95);
+  box-shadow:var(--ios-shadow);
+}
+.conference-summary {border-color:#dce7f4;border-radius:11px;}
+.cq-search {border-radius:11px;background:rgba(255,255,255,.9);}
+.cq-row.selected {border-radius:11px;}
+.conference-text pre {border-radius:10px;}
+
+/* Livro: cada mês fica fisicamente separado do plano de fundo. */
+.expense-sheet {
+  background:transparent;
+  padding:10px 14px 12px;
+  gap:10px;
+}
+.expense-toolbar {
+  background:rgba(255,255,255,.81);
+  border:1px solid var(--ios-border);
+  border-radius:17px;
+  box-shadow:var(--ios-shadow);
+  -webkit-backdrop-filter:blur(12px);
+  backdrop-filter:blur(12px);
+}
+.expense-search,.expense-filter {
+  border-radius:11px;
+  border-color:#d5e2f1;
+  background:rgba(255,255,255,.9);
+}
+.expense-search:focus-within {box-shadow:0 0 0 3px rgba(74,142,231,.12);}
+.expense-search button {border-radius:0 10px 10px 0;}
+.expense-toolbar select,.expense-footer select {border-radius:10px;}
+.expense-excel {border-radius:11px;}
+.expense-table-card {
+  border:0;
+  box-shadow:none;
+  border-radius:0;
+  background:transparent;
+  overflow:hidden;
+  gap:8px;
+}
+.expense-grid-scroller {
+  background:transparent;
+  padding:4px 5px 10px;
+  scrollbar-color:#b2c5de transparent;
+}
+.expense-grid-scroller .expense-scroll {overflow:visible;}
+.expense-month {
+  background:rgba(255,255,255,.94);
+  border:1px solid rgba(184,205,234,.72);
+  border-radius:17px;
+  box-shadow:var(--ios-shadow-raised);
+  overflow:hidden;
+  margin:0 0 13px;
+  isolation:isolate;
+}
+.expense-month-header {
+  border:0;
+  border-bottom:1px solid #e0e9f7;
+  min-height:47px;
+  padding:9px 14px;
+  background:linear-gradient(115deg,#f8fbff 0%,#edf4ff 100%);
+  color:#1d3d69;
+}
+.expense-month:first-child .expense-month-header {border-top:0;}
+.expense-month-header:hover {background:linear-gradient(115deg,#f1f7ff,#e6f0ff);}
+.expense-month-header>span.expense-month-count {
+  background:rgba(255,255,255,.95);
+  border:1px solid #d5e4f5;
+  border-radius:999px;
+  padding:3px 10px;
+}
+.expense-month-header .expense-month-total strong {
+  color:#1e62bc;
+  font-weight:750;
+}
+.expense-sheet .expense-table-header {
+  background:linear-gradient(180deg,#f2f6fc,#eaf1fb);
+  border-top:0;
+  border-bottom:1px solid #d9e5f2;
+  color:#45617f;
+  min-height:35px;
+}
+.expense-sheet .expense-table-header>span,
+.expense-sheet .expense-sheet-row>span {
+  border-right:1px solid #e0e8f2;
+  padding:8px 11px;
+}
+.expense-sheet .expense-sheet-row {
+  background:rgba(255,255,255,.96);
+  border-bottom:1px solid #e3eaf3;
+  min-height:41px;
+  transition:background-color .12s ease;
+}
+.expense-sheet .expense-sheet-row:nth-child(odd) {background:#f9fbff;}
+.expense-sheet .expense-sheet-row:last-child {border-bottom:0;}
+.expense-sheet .expense-sheet-row:hover {background:#ecf5ff;}
+.expense-sheet .expense-sheet-row.selected {
+  background:#e6f1ff;
+  box-shadow:inset 3px 0 #3989e7;
+}
+.expense-sheet .expense-sheet-row .expense-value {color:#bb3340;}
+.expense-sheet .expense-sheet-row .expense-document {color:#244970;}
+.expense-sheet .expense-sheet-row .expense-category,
+.expense-sheet .expense-sheet-row .expense-tags {
+  display:flex;
+  align-items:center;
+  gap:5px;
+  overflow:hidden;
+}
+.expense-category-chip,.expense-tag-chip {
+  display:inline-flex;
+  align-items:center;
+  max-width:100%;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  padding:3px 9px;
+  border-radius:999px;
+  font-size:10px;
+  line-height:1.45;
+  font-weight:600;
+}
+.expense-category-chip {
+  color:#435a79;
+  background:#eff3fa;
+  border:1px solid #e0e8f3;
+}
+.expense-tag-chip {
+  color:#2666b7;
+  background:#e8f2ff;
+  border:1px solid #cde0fb;
+  flex-shrink:1;
+}
+.expense-footer {
+  background:rgba(255,255,255,.86);
+  border:1px solid var(--ios-border);
+  border-radius:15px;
+  box-shadow:var(--ios-shadow);
+  margin:0 5px 3px;
+  min-height:50px;
+}
+.expense-footer>strong>span {color:#1b65bb;}
+.expense-pagination button {border-radius:10px;}
+
+/* Sem adicionar scroll interno aos cards; o scroller principal permanece único. */
+@media(max-width:800px) {
+  .expense-sheet {padding:8px 9px;gap:8px;}
+  .expense-toolbar {border-radius:14px;}
+  .expense-month {border-radius:13px;margin-bottom:10px;}
+  .expense-month-header {padding:8px 10px;}
+  .expense-footer {flex-wrap:wrap;margin:0 3px 3px;}
+  .work-main.narrow-work {border-radius:12px;margin:7px;}
+}
+@media(prefers-reduced-motion:reduce) {
+  .rail-item,.expense-sheet .expense-sheet-row {transition:none;}
+}
